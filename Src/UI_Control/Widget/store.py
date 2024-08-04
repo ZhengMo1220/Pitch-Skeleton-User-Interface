@@ -65,7 +65,7 @@ class Store_Widget(QtWidgets.QWidget):
             QMessageBox.warning(self, "儲存影片失敗", "請不要多次按下儲存影片按鈕!")
             return
         self.saving_video = True
-        output_folder = f"../Db/output/{self.video_name}"
+        output_folder = f"../../Db/output/{self.video_name}"
         if os.path.exists(output_folder):
             shutil.rmtree(output_folder)    
         os.makedirs(output_folder)
@@ -111,9 +111,6 @@ class Store_Widget(QtWidgets.QWidget):
             image = draw_points_and_skeleton(image, person_df, joints_dict()['haple']['skeleton_links'], 
                                             points_color_palette='gist_rainbow', skeleton_palette_samples='jet',
                                             points_palette_samples=10, confidence_threshold=0.3)
-        else:
-            pass
-
         return image
     
     def obtain_frame_data(self,frame_num,person_df):

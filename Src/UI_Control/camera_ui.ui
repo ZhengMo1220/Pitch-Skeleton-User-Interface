@@ -105,6 +105,19 @@
            </item>
            <item>
             <layout class="QGridLayout" name="gridLayout">
+             <item row="0" column="1">
+              <widget class="QPushButton" name="start_code_btn">
+               <property name="minimumSize">
+                <size>
+                 <width>0</width>
+                 <height>40</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>開始分析</string>
+               </property>
+              </widget>
+             </item>
              <item row="0" column="0">
               <widget class="QPushButton" name="open_camera_btn">
                <property name="minimumSize">
@@ -118,16 +131,16 @@
                </property>
               </widget>
              </item>
-             <item row="0" column="1">
-              <widget class="QPushButton" name="start_code_btn">
+             <item row="1" column="0">
+              <widget class="QPushButton" name="record_btn">
                <property name="minimumSize">
                 <size>
-                 <width>0</width>
+                 <width>150</width>
                  <height>40</height>
                 </size>
                </property>
                <property name="text">
-                <string>開始分析</string>
+                <string>開始錄影</string>
                </property>
               </widget>
              </item>
