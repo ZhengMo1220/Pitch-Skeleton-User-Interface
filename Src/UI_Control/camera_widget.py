@@ -5,11 +5,13 @@ import numpy as np
 import sys
 import cv2
 import os
+from threading import Lock
 from camera_ui import Ui_camera_ui
 import pandas as pd
 import queue
 from argparse import ArgumentParser
-from lib.cv_thread import VideoCaptureThread
+from lib.cv_thread import VideoCaptureThread, VideoWriterThread
+from datetime import datetime
 from lib.timer import Timer
 from lib.vis_image import draw_grid, draw_bbox
 from lib.vis_pose import draw_points_and_skeleton, joints_dict
@@ -46,8 +48,10 @@ class PoseCameraTabControl(QWidget):
 
 
     def bind_ui(self):
+        self.ui.record_btn.setDisabled(True)
         self.ui.open_camera_btn.clicked.connect(self.toggle_camera)
         self.ui.start_code_btn.clicked.connect(self.toggle_analyze)
+        self.ui.record_btn.clicked.connect(self.toggle_record)
         
     def init_model(self):
         self.detector = init_detector(
@@ -68,10 +72,13 @@ class PoseCameraTabControl(QWidget):
         self.db_path = f"../../Db"
         self.is_opened = False
         self.is_analyze = False
+        self.is_record = False
+        self.lock = Lock()  
         self.pre_person_df = pd.DataFrame()
-        self.video_scene = QGraphicsScene()
+        self.camera_scene = QGraphicsScene()
         self.person_df = pd.DataFrame()
         self.frame_buffer = queue.Queue(maxsize=1)
+        self.frame_queue = queue.Queue()
         self.kpts_dict = joints_dict()['haple']['keypoints']
         self.detect_args = set_detect_parser()
         self.tracker_args = set_tracker_parser()
@@ -80,10 +87,20 @@ class PoseCameraTabControl(QWidget):
         if self.is_opened:
             self.close_camera()
             self.ui.open_camera_btn.setText("開啟相機")
+            self.ui.record_btn.setDisabled(True)
         else:
             self.open_camera()
             self.ui.open_camera_btn.setText("關閉相機")
+            self.ui.record_btn.setEnabled(True)
     
+    def toggle_record(self):
+        if self.is_record:
+            self.stop_recording()
+            self.ui.record_btn.setText("開始錄影")
+        else:
+            self.start_recording()
+            self.ui.record_btn.setText("停止錄影")
+
     def toggle_analyze(self):
         if self.is_analyze:
             self.is_analyze = False
@@ -100,13 +117,50 @@ class PoseCameraTabControl(QWidget):
 
     def close_camera(self):
         self.video_thread.stop_capture()
-        self.video_scene.clear()
+        self.camera_scene.clear()
+        self.ui.camer_frame_view.setScene(self.camera_scene)
         self.is_opened = False
 
-    def buffer_frame(self, frame:np.ndarray):
-        if not self.frame_buffer.full():
-            self.frame_buffer.put(frame)
-            self.analyze_frame()
+    def buffer_frame(self, frame: np.ndarray):
+        with self.lock:
+            try:
+                self.frame_buffer.put_nowait(frame)
+                self.analyze_frame()
+            except queue.Full:
+                print("Frame buffer is full, skipping frame")
+
+            if self.is_record:
+                try:
+                    self.frame_queue.put_nowait(frame)
+                except queue.Full:
+                    print("Frame queue is full, skipping frame")
+  
+    def start_recording(self):
+        # 指定要儲存的資料夾
+        output_dir = f'../../Db/record/'
+        # 確保資料夾存在
+        os.makedirs(output_dir, exist_ok=True)
+
+        # 獲取當前時間作為檔名的一部分
+        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # 組合成完整的檔案路徑
+        output_file = os.path.join(output_dir, f'C{self.ui.camera_id_input.value()}_{current_time}.mp4')
+
+        self.record_thread = VideoWriterThread(output_file=output_file, frame_queue=self.frame_queue)
+        # self.record_thread = VideoWriterThread(output_file='output.mp4', frame_queue=self.frame_queue)
+        if self.is_opened:
+            frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = self.video_thread.cap.get(cv2.CAP_PROP_FPS)
+            video_info = f"resolution:{frame_width}x{frame_height}, fps:{fps}"
+            print(video_info)
+            self.record_thread.start_writing(frame_width, frame_height, fps)
+            self.is_record = True
+
+    def stop_recording(self):
+        self.record_thread.stop_writing()
+        self.is_record = False
 
     def show_image(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
         scene.clear()
@@ -173,7 +227,7 @@ class PoseCameraTabControl(QWidget):
                 image = draw_bbox(self.person_df, image)
         if self.ui.show_line_checkBox.isChecked():
             image = draw_grid(image)
-        self.show_image(image, self.video_scene, self.ui.camer_frame_view)
+        self.show_image(image, self.camera_scene, self.ui.camer_frame_view)
         self.person_df = pd.DataFrame()
 
     def smooth_kpt(self, person_ids):
