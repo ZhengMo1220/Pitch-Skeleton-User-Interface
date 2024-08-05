@@ -10,12 +10,12 @@ from camera_ui import Ui_camera_ui
 import pandas as pd
 import queue
 from argparse import ArgumentParser
-from lib.cv_thread import VideoCaptureThread, VideoWriter
+from utils.cv_thread import VideoCaptureThread, VideoWriter
 from datetime import datetime
-from lib.timer import Timer
-from lib.vis_image import draw_grid, draw_bbox
-from lib.vis_pose import draw_points_and_skeleton, joints_dict
-from lib.set_parser import set_detect_parser, set_tracker_parser
+from utils.timer import Timer
+from utils.vis_image import draw_grid, draw_bbox
+from utils.vis_pose import draw_points_and_skeleton, joints_dict
+from utils.set_parser import set_detect_parser, set_tracker_parser
 from topdown_demo_with_mmdet import process_one_image
 from image_demo import detect_image
 from mmcv.transforms import Compose
@@ -28,7 +28,7 @@ from tracker.mc_bot_sort import BoTSORT
 from tracker.tracking_utils.timer import Timer
 from mmpose.apis import init_model as init_pose_estimator
 from mmpose.utils import adapt_mmdet_pipeline
-from lib.one_euro_filter import OneEuroFilter
+from utils.one_euro_filter import OneEuroFilter
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 try:
     from mmdet.apis import inference_detector, init_detector
@@ -72,10 +72,12 @@ class PoseCameraTabControl(QWidget):
         self.is_opened = False
         self.is_analyze = False
         self.is_record = False
+        # self.image_size = [0,0]
         self.pre_person_df = pd.DataFrame()
         self.camera_scene = QGraphicsScene()
         self.person_df = pd.DataFrame()
         self.frame_buffer = queue.Queue()
+        self.frame_count = 0
         self.kpts_dict = joints_dict()['haple']['keypoints']
         self.detect_args = set_detect_parser()
         self.tracker_args = set_tracker_parser()
@@ -84,9 +86,14 @@ class PoseCameraTabControl(QWidget):
         if self.is_opened:
             self.close_camera()
             self.ui.open_camera_btn.setText("開啟相機")
+            self.ui.image_resolution_label.setText(f"(0, 0) - ")
             self.ui.record_btn.setDisabled(True)
         else:
             self.open_camera()
+            frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
+            self.ui.image_resolution_label.setText(f"(0, 0) - Image Resolution: {frame_width} x {frame_height}, FPS: {fps} ")
             self.ui.open_camera_btn.setText("關閉相機")
             self.ui.record_btn.setEnabled(True)
     
@@ -94,8 +101,16 @@ class PoseCameraTabControl(QWidget):
         if self.is_record:
             self.stop_recording()
             self.ui.record_btn.setText("開始錄影")
+            frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
+            self.ui.image_resolution_label.setText(f"(0, 0) - Image Resolution: {frame_width} x {frame_height}, FPS: {fps} ")
         else:
             self.start_recording()
+            frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
+            self.ui.image_resolution_label.setText(f"(0, 0) - Image Resolution: {frame_width} x {frame_height}, FPS: {fps} - 錄影中")
             self.ui.record_btn.setText("停止錄影")
 
     def toggle_analyze(self):
@@ -122,11 +137,12 @@ class PoseCameraTabControl(QWidget):
             self.video_writer = None
 
     def buffer_frame(self, frame:np.ndarray):
-        count = 0
-        if not self.frame_buffer.full():
+        self.frame_count += 1
+        if not self.frame_buffer.full() and self.frame_count % 15 ==0:     
             self.frame_buffer.put(frame)
-            if count %6 ==0:
-                self.analyze_frame()
+            self.analyze_frame()
+
+
         if self.video_writer is not None:
             self.video_writer.write(frame)
     

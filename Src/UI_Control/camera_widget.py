@@ -10,12 +10,12 @@ from camera_ui import Ui_camera_ui
 import pandas as pd
 import queue
 from argparse import ArgumentParser
-from lib.cv_thread import VideoCaptureThread, VideoWriter
+from utils.cv_thread import VideoCaptureThread, VideoWriter
 from datetime import datetime
-from lib.timer import Timer
-from lib.vis_image import draw_grid, draw_bbox
-from lib.vis_pose import draw_points_and_skeleton, joints_dict
-from lib.set_parser import set_detect_parser, set_tracker_parser
+from utils.timer import Timer
+from utils.vis_image import draw_grid, draw_bbox
+from utils.vis_pose import draw_points_and_skeleton, joints_dict
+from utils.set_parser import set_detect_parser, set_tracker_parser
 from topdown_demo_with_mmdet import process_one_image
 from image_demo import detect_image
 from mmcv.transforms import Compose
@@ -28,7 +28,7 @@ from tracker.mc_bot_sort import BoTSORT
 from tracker.tracking_utils.timer import Timer
 from mmpose.apis import init_model as init_pose_estimator
 from mmpose.utils import adapt_mmdet_pipeline
-from lib.one_euro_filter import OneEuroFilter
+from utils.one_euro_filter import OneEuroFilter
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 try:
     from mmdet.apis import inference_detector, init_detector
@@ -185,9 +185,10 @@ class PoseCameraTabControl(QWidget):
     def analyze_frame(self):
         if not self.frame_buffer.empty():
             frame = self.frame_buffer.get()
+            img = frame.copy()
             if self.is_analyze:
                 self.timer.tic()
-                pred_instances, person_ids = process_one_image(self.detect_args, frame, self.detector, self.detector_test_pipeline, self.pose_estimator, self.tracker)
+                pred_instances, person_ids = process_one_image(self.detect_args, img, self.detector, self.detector_test_pipeline, self.pose_estimator, self.tracker)
                 average_time = self.timer.toc()
                 fps= int(1/max(average_time,0.00001))
                 if fps <10:
@@ -198,7 +199,7 @@ class PoseCameraTabControl(QWidget):
                 person_bboxes = pred_instances['bboxes']
                 self.merge_person_datas(person_ids, person_bboxes, person_kpts)
                 self.smooth_kpt(person_ids)
-            self.update_frame(frame)
+            self.update_frame(img)
 
     def update_frame(self, image:np.ndarray):
         if not self.person_df.empty:

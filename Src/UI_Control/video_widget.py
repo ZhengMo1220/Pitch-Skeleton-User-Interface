@@ -12,12 +12,12 @@ import pandas as pd
 from argparse import ArgumentParser
 import cv2
 import numpy as np
-from lib.cv_thread import VideoToImagesThread
-from lib.util import DataType
-from lib.set_parser import set_detect_parser, set_tracker_parser
-from lib.timer import Timer
-from lib.vis_image import  draw_bbox
-from lib.vis_pose import draw_points_and_skeleton, joints_dict
+from utils.cv_thread import VideoToImagesThread
+from utils.util import DataType
+from utils.set_parser import set_detect_parser, set_tracker_parser
+from utils.timer import Timer
+from utils.vis_image import  draw_bbox
+from utils.vis_pose import draw_points_and_skeleton, joints_dict
 from Widget.store import Store_Widget
 from topdown_demo_with_mmdet import process_one_image
 from image_demo import detect_image
@@ -33,7 +33,7 @@ from tracker.mc_bot_sort import BoTSORT
 from tracker.tracking_utils.timer import Timer
 from mmpose.apis import init_model as init_pose_estimator
 from mmpose.utils import adapt_mmdet_pipeline
-from lib.one_euro_filter import OneEuroFilter
+from utils.one_euro_filter import OneEuroFilter
 import pyqtgraph as pg
 # 設置背景和前景顏色
 
