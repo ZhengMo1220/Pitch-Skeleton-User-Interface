@@ -1,6 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout
-from camera_widget import PoseCameraTabControl
+# from camera_widget import PoseCameraTabControl
+from camera_widget_beta import PoseCameraTabControl
 from video_widget import PoseVideoTabControl
 from main_window import Ui_MainWindow
 
