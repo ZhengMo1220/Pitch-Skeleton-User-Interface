@@ -6,7 +6,7 @@ from Widget.store_ui import store_ui_widget
 import os
 import cv2
 import shutil
-from lib.vis_pose import draw_points_and_skeleton, joints_dict
+from utils.vis_pose import draw_points_and_skeleton, joints_dict
 import pandas as pd
 
 class Store_Widget(QtWidgets.QWidget):
