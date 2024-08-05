@@ -121,10 +121,12 @@ class PoseCameraTabControl(QWidget):
             self.video_writer.release()
             self.video_writer = None
 
-    def buffer_frame(self, frame:np.ndarray):      
+    def buffer_frame(self, frame:np.ndarray):
+        count = 0
         if not self.frame_buffer.full():
             self.frame_buffer.put(frame)
-            self.analyze_frame()
+            if count %6 ==0:
+                self.analyze_frame()
         if self.video_writer is not None:
             self.video_writer.write(frame)
     
