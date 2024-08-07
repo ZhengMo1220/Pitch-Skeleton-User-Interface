@@ -71,13 +71,52 @@
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_7">
       <item>
-       <widget class="QGroupBox" name="camera_setting_groupbox">
+       <widget class="QGroupBox" name="camer_setting_groupbox">
         <property name="title">
          <string>相機設定</string>
         </property>
-        <layout class="QVBoxLayout" name="verticalLayout_10">
-         <item>
-          <layout class="QVBoxLayout" name="verticalLayout_4">
+        <layout class="QGridLayout" name="gridLayout">
+         <item row="2" column="0">
+          <layout class="QHBoxLayout" name="horizontalLayout">
+           <item>
+            <widget class="QLabel" name="camera_id_label">
+             <property name="text">
+              <string>相機ID:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QSpinBox" name="camera_id_input">
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item row="4" column="0">
+          <widget class="QCheckBox" name="camera_checkBox">
+           <property name="text">
+            <string>開啟相機</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="2">
+          <widget class="QCheckBox" name="analyze_checkBox">
+           <property name="text">
+            <string>骨架分析</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <widget class="QCheckBox" name="record_checkBox">
+           <property name="text">
+            <string>開始錄影</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <layout class="QHBoxLayout" name="horizontalLayout_3">
            <item>
             <widget class="QLabel" name="fps_label">
              <property name="text">
@@ -86,67 +125,55 @@
             </widget>
            </item>
            <item>
-            <layout class="QHBoxLayout" name="horizontalLayout">
-             <item>
-              <widget class="QLabel" name="camera_id_label">
-               <property name="text">
-                <string>相機ID:</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QSpinBox" name="camera_id_input">
-               <property name="alignment">
-                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item>
-            <layout class="QGridLayout" name="gridLayout">
-             <item row="0" column="1">
-              <widget class="QPushButton" name="start_code_btn">
-               <property name="minimumSize">
-                <size>
-                 <width>0</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="text">
-                <string>開始分析</string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="0">
-              <widget class="QPushButton" name="open_camera_btn">
-               <property name="minimumSize">
-                <size>
-                 <width>150</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="text">
-                <string>開啟相機</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="0">
-              <widget class="QPushButton" name="record_btn">
-               <property name="minimumSize">
-                <size>
-                 <width>150</width>
-                 <height>40</height>
-                </size>
-               </property>
-               <property name="text">
-                <string>開始錄影</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
+            <widget class="QLabel" name="fps_info_label">
+             <property name="text">
+              <string>0</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
            </item>
           </layout>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="display_groupbox">
+        <property name="title">
+         <string>顯示資訊</string>
+        </property>
+        <layout class="QGridLayout" name="gridLayout_2">
+         <item row="0" column="1">
+          <widget class="QCheckBox" name="show_bbox_checkbox">
+           <property name="text">
+            <string>人物框</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="checked">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="QCheckBox" name="show_skeleton_checkBox">
+           <property name="text">
+            <string>人體骨架</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="2">
+          <widget class="QCheckBox" name="show_line_checkBox">
+           <property name="text">
+            <string>輔助線</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </widget>
@@ -157,40 +184,6 @@
          <string>手動關節點修正</string>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_6">
-         <item>
-          <layout class="QHBoxLayout" name="horizontalLayout_5">
-           <item>
-            <widget class="QCheckBox" name="show_skeleton_checkBox">
-             <property name="text">
-              <string>Show Skeleton</string>
-             </property>
-             <property name="checked">
-              <bool>true</bool>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QCheckBox" name="show_bbox_checkbox">
-             <property name="text">
-              <string>Show BBox</string>
-             </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
-             <property name="checked">
-              <bool>false</bool>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QCheckBox" name="show_line_checkBox">
-             <property name="text">
-              <string>Show Line</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
          <item>
           <widget class="QTableWidget" name="keypoint_table">
            <property name="minimumSize">
@@ -231,6 +224,9 @@
        </widget>
       </item>
      </layout>
+     <zorder>camer_setting_groupbox</zorder>
+     <zorder>kpt_adjust_groupbox</zorder>
+     <zorder>display_groupbox</zorder>
     </widget>
    </item>
   </layout>

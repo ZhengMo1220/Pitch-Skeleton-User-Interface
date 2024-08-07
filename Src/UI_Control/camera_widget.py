@@ -42,15 +42,15 @@ class PoseCameraTabControl(QWidget):
         self.ui = Ui_camera_ui()
         self.ui.setupUi(self)
         self.init_var()
-        self.bind_ui()
+        # self.bind_ui()
         self.init_model()
         self.video_writer = None
 
-    def bind_ui(self):
-        self.ui.record_btn.setDisabled(True)
-        self.ui.open_camera_btn.clicked.connect(self.toggle_camera)
-        self.ui.start_code_btn.clicked.connect(self.toggle_analyze)
-        self.ui.record_btn.clicked.connect(self.toggle_record)
+    # def bind_ui(self):
+        # self.ui.record_checkBox.setDisabled(True)
+        # self.ui.open_camera_btn.clicked.connect(self.toggle_camera)
+        # self.ui.start_code_btn.clicked.connect(self.toggle_analyze)
+        # self.ui.record_btn.clicked.connect(self.toggle_record)
         
     def init_model(self):
         self.detector = init_detector(

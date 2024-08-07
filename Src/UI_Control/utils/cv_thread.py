@@ -39,8 +39,8 @@ class VideoCaptureThread(QThread):
         super().__init__(parent)
         self.timer = Timer()
         self.cap = cv2.VideoCapture(camera_index)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         self.cap.set(cv2.CAP_PROP_FPS, 60)
         if not self.cap.isOpened():
             raise ValueError(f"Cannot open camera with index {camera_index}")
