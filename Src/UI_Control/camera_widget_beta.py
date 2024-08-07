@@ -47,10 +47,10 @@ class PoseCameraTabControl(QWidget):
         self.video_writer = None
 
     def bind_ui(self):
-        self.ui.record_btn.setDisabled(True)
-        self.ui.open_camera_btn.clicked.connect(self.toggle_camera)
-        self.ui.start_code_btn.clicked.connect(self.toggle_analyze)
-        self.ui.record_btn.clicked.connect(self.toggle_record)
+        self.ui.record_checkBox.setDisabled(True)
+        self.ui.camera_checkBox.clicked.connect(self.toggle_camera)
+        self.ui.analyze_checkBox.clicked.connect(self.toggle_analyze)
+        self.ui.record_checkBox.clicked.connect(self.toggle_record)
         
     def init_model(self):
         self.detector = init_detector(
@@ -72,7 +72,6 @@ class PoseCameraTabControl(QWidget):
         self.is_opened = False
         self.is_analyze = False
         self.is_record = False
-        # self.image_size = [0,0]
         self.pre_person_df = pd.DataFrame()
         self.camera_scene = QGraphicsScene()
         self.person_df = pd.DataFrame()
@@ -85,41 +84,35 @@ class PoseCameraTabControl(QWidget):
     def toggle_camera(self):
         if self.is_opened:
             self.close_camera()
-            self.ui.open_camera_btn.setText("開啟相機")
             self.ui.image_resolution_label.setText(f"(0, 0) - ")
-            self.ui.record_btn.setDisabled(True)
+            self.ui.record_checkBox.setDisabled(True)
         else:
             self.open_camera()
             frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
-            self.ui.image_resolution_label.setText(f"(0, 0) - Image Resolution: {frame_width} x {frame_height}, FPS: {fps} ")
-            self.ui.open_camera_btn.setText("關閉相機")
-            self.ui.record_btn.setEnabled(True)
+            self.ui.image_resolution_label.setText(f"(0, 0) - Resolution: {frame_width} x {frame_height}, FPS: {fps} ")
+            self.ui.record_checkBox.setEnabled(True)
     
     def toggle_record(self):
         if self.is_record:
             self.stop_recording()
-            self.ui.record_btn.setText("開始錄影")
             frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
-            self.ui.image_resolution_label.setText(f"(0, 0) - Image Resolution: {frame_width} x {frame_height}, FPS: {fps} ")
+            self.ui.image_resolution_label.setText(f"(0, 0) - Resolution: {frame_width} x {frame_height}, FPS: {fps} ")
         else:
             self.start_recording()
             frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
-            self.ui.image_resolution_label.setText(f"(0, 0) - Image Resolution: {frame_width} x {frame_height}, FPS: {fps} - 錄影中")
-            self.ui.record_btn.setText("停止錄影")
+            self.ui.image_resolution_label.setText(f"(0, 0) - Resolution: {frame_width} x {frame_height}, FPS: {fps} - 錄影中")
 
     def toggle_analyze(self):
         if self.is_analyze:
             self.is_analyze = False
-            self.ui.start_code_btn.setText("開始分析")
         else:
             self.is_analyze = True
-            self.ui.start_code_btn.setText("停止分析")
 
     def open_camera(self):
         self.video_thread = VideoCaptureThread(camera_index=self.ui.camera_id_input.value())
@@ -147,9 +140,9 @@ class PoseCameraTabControl(QWidget):
             self.video_writer.write(frame)
     
     def start_recording(self):
-        output_dir = f'../../Db/record/'
-        os.makedirs(output_dir, exist_ok=True)
         current_time = datetime.now().strftime("%Y%m%d_%H%M")
+        output_dir = f'../../Db/record/C{self.ui.camera_id_input.value()}_{current_time}'
+        os.makedirs(output_dir, exist_ok=True)
         video_filename = os.path.join(output_dir, f'C{self.ui.camera_id_input.value()}_{current_time}.mp4')
         frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -203,20 +196,21 @@ class PoseCameraTabControl(QWidget):
     def analyze_frame(self):
         if not self.frame_buffer.empty():
             frame = self.frame_buffer.get()
+            img = frame.copy()
             if self.is_analyze:
                 self.timer.tic()
-                pred_instances, person_ids = process_one_image(self.detect_args, frame, self.detector, self.detector_test_pipeline, self.pose_estimator, self.tracker)
+                pred_instances, person_ids = process_one_image(self.detect_args, img, self.detector, self.detector_test_pipeline, self.pose_estimator, self.tracker)
                 average_time = self.timer.toc()
                 fps= int(1/max(average_time,0.00001))
                 if fps <10:
-                    self.ui.fps_label.setText(f"FPS: 0{fps}")
+                    self.ui.fps_info_label.setText(f"{fps}")
                 else:
-                    self.ui.fps_label.setText(f"FPS: {fps}")
+                    self.ui.fps_info_label.setText(f"{fps}")
                 person_kpts = self.merge_keypoint_datas(pred_instances)
                 person_bboxes = pred_instances['bboxes']
                 self.merge_person_datas(person_ids, person_bboxes, person_kpts)
                 self.smooth_kpt(person_ids)
-            self.update_frame(frame)
+            self.update_frame(img)
 
     def update_frame(self, image:np.ndarray):
         if not self.person_df.empty:

@@ -65,16 +65,11 @@ class Store_Widget(QtWidgets.QWidget):
             QMessageBox.warning(self, "儲存影片失敗", "請不要多次按下儲存影片按鈕!")
             return
         self.saving_video = True
-        output_folder = f"../../Db/output/{self.video_name}"
-        if os.path.exists(output_folder):
-            shutil.rmtree(output_folder)    
-        os.makedirs(output_folder)
+        output_folder = f"../../Db/record/{self.video_name}"
+        # if os.path.exists(output_folder):
+        #     shutil.rmtree(output_folder)    
+        os.makedirs(output_folder, exist_ok=True)
         
-        # # save frame image            
-        # for i, frame in enumerate(self.video_images):
-        #     frame_path = os.path.join(output_folder, f"{i}.jpg")
-        #     cv2.imwrite(frame_path, frame)
-
        # 将 DataFrame 保存为 JSON 文件
         json_path = os.path.join(output_folder, f"{self.video_name}.json")
         self.reset_person_df()
@@ -85,9 +80,9 @@ class Store_Widget(QtWidgets.QWidget):
             save_person_df = self.filter_person_df()
 
         save_person_df.to_json(json_path, orient='records')
-        video_size = (1280, 720)
+        video_size = (1920, 1080)
         fps = 30.0
-        save_location = "../Db/output/" + self.video_name + "/" + self.video_name + ".mp4"
+        save_location = "../../Db/record/" + self.video_name + "/" + self.video_name + "_Sk.mp4"
 
         video_writer = cv2.VideoWriter(save_location, cv2.VideoWriter_fourcc(*'mp4v'), fps, video_size)
 
@@ -96,16 +91,23 @@ class Store_Widget(QtWidgets.QWidget):
             return
         
         for frame_num, frame in enumerate(self.video_images):
-            curr_person_df = self.obtain_frame_data(frame_num,save_person_df)
-            image = self.draw_image(frame_num,frame, curr_person_df)
-            video_writer.write(image)
+            # if frame_num != 0:
+            if frame is None or frame.shape[1] != video_size[0] or frame.shape[0] != video_size[1]:
+                QMessageBox.critical(self, "錯誤", f"第 {frame_num} 幀圖像尺寸不匹配或無效！")
+                # self.saving_video = False
+                # return
+            else:
+                curr_person_df = self.obtain_frame_data(frame_num,save_person_df)
+                image = self.draw_image(frame, curr_person_df)
+                video_writer.write(image)
 
         video_writer.release()
 
         self.saving_video = False
         QMessageBox.information(self, "儲存影片", "影片儲存完成!")
+
             
-    def draw_image(self,frame_num,frame,person_df):    
+    def draw_image(self,frame,person_df):    
         image=frame.copy()
         if not person_df.empty:
             image = draw_points_and_skeleton(image, person_df, joints_dict()['haple']['skeleton_links'], 
