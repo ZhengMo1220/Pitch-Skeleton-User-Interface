@@ -31,6 +31,10 @@ def draw_grid(image:np.ndarray):
     
     height, width = image.shape[:2]
 
+
+    draw_cross(image,int(width/2),int(height/2),length=20,color=(0,0,255),thickness = 3)
+
+
     # 計算垂直線的位置
     vertical_interval = width // 5
     vertical_lines = [vertical_interval * i for i in range(1, 5)]

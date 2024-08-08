@@ -18,7 +18,7 @@ from utils.set_parser import set_detect_parser, set_tracker_parser
 from utils.timer import Timer
 from utils.vis_image import  draw_bbox
 from utils.vis_pose import draw_points_and_skeleton, joints_dict
-from Widget.store import Store_Widget
+from Widget.store import Store_Widget, save_video
 from topdown_demo_with_mmdet import process_one_image
 from image_demo import detect_image
 from mmcv.transforms import Compose
@@ -57,8 +57,11 @@ class PoseVideoTabControl(QWidget):
         self.init_model()
 
     def bind_ui(self):
-        self.ui.load_video_btn.clicked.connect(
+        self.ui.load_original_video_btn.clicked.connect(
             lambda: self.load_video(self.ui.video_name_label, self.db_path + "/videos/"))
+        self.ui.load_processed_video_btn.clicked.connect(
+            lambda: self.load_video(self.ui.video_name_label, self.db_path + "/videos/"))
+        
         self.ui.play_btn.clicked.connect(self.play_btn_clicked)
         self.ui.back_key_btn.clicked.connect(
             lambda: self.ui.frame_slider.setValue(self.ui.frame_slider.value() - 1)
@@ -69,9 +72,8 @@ class PoseVideoTabControl(QWidget):
         self.ui.frame_slider.valueChanged.connect(self.analyze_frame)
         self.ui.video_keypoint_table.cellActivated.connect(self.on_cell_clicked)
         self.ui.video_frame_view.mousePressEvent = self.mousePressEvent
-        self.ui.video_store_data_btn.clicked.connect(self.show_store_window) 
-        # self.ui.video_load_data_btn.clicked.connect(self.load_json)
-        self.ui.analyze_checkBox.clicked.connect(self.toggle_detect)
+        self.ui.id_correct_btn.clicked.connect(self.correct_person_id)
+        self.ui.start_code_btn.clicked.connect(self.toggle_detect)
         self.ui.start_analyze_btn.clicked.connect(self.toggle_analyze)
 
     def init_model(self):
@@ -114,7 +116,7 @@ class PoseVideoTabControl(QWidget):
         self.detect_args = set_detect_parser()
         self.tracker_args = set_tracker_parser()
         self.kpts_dict = joints_dict()['haple']['keypoints']
-            
+
     def load_video(self, label_item, path:str):
         if self.is_play:
             QMessageBox.warning(self, "讀取影片失敗", "請先停止播放影片!")
@@ -284,6 +286,7 @@ class PoseVideoTabControl(QWidget):
     
         if self.ui.frame_slider.value() == (self.total_images-1):
             self.ui.play_btn.click()
+            save_video(self.video_name, self.video_images, self.person_df)
 
         if self.is_analyze:
             self.analyze_person(frame_num)
@@ -315,9 +318,10 @@ class PoseVideoTabControl(QWidget):
         average_time = self.timer.toc()
         fps= int(1/max(average_time,0.00001))
         if fps <10:
-            self.ui.video_fps_info_label.setText(f"{fps}")
+            self.ui.video_fps_info_label.setText(f"0{fps}")
         else:
             self.ui.video_fps_info_label.setText(f"{fps}")
+        
         person_kpts = self.merge_keypoint_datas(pred_instances)
         person_bboxes = pred_instances['bboxes']
         self.merge_person_datas(frame_num, person_ids, person_bboxes, person_kpts)
@@ -336,7 +340,8 @@ class PoseVideoTabControl(QWidget):
         return curr_person_df, frame_num
 
     def toggle_detect(self):
-        self.is_detect = self.ui.analyze_checkBox.isChecked()
+        self.is_detect = not self.is_detect
+        self.ui.play_btn.click()
 
     def toggle_analyze(self):
         self.ui.frame_slider.setValue(0)
@@ -370,53 +375,30 @@ class PoseVideoTabControl(QWidget):
             self.clear_table_view()
             return
 
-        # 定義分類
-        categories = {
-            "頭部": [0, 1, 2, 3, 4, 17, 18],
-            "左手": [5, 7, 9],
-            "右手": [6, 8, 10],
-            "左腳": [13, 15, 20, 22, 24],
-            "右腳": [14, 16, 21, 23, 25],
-            "軀幹": [11, 12, 19]
-        }
-
-        # 計算總行數
-        num_keypoints = sum(len(indices) for indices in categories.values()) + len(categories) 
-
         # 確保表格視圖大小足夠
+        num_keypoints = len(self.kpts_dict)
         if self.ui.video_keypoint_table.rowCount() < num_keypoints:
             self.ui.video_keypoint_table.setRowCount(num_keypoints)
 
-        row_idx = 0
         # 將關鍵點數據匯入到表格視圖中
-        for category, indices in categories.items():
-            category_item = QTableWidgetItem(category)
-            category_item.setBackground(QColor(200, 200, 200))
-            category_item.setTextAlignment(Qt.AlignLeft)
-            self.ui.video_keypoint_table.setItem(row_idx, 0, category_item)
-            self.ui.video_keypoint_table.setSpan(row_idx, 0, 1, 4)
-            row_idx += 1
-
-            for kpt_idx in indices:
-                kpt = person_data['keypoints'].iloc[0][kpt_idx]
-                kptx, kpty, kpt_label = kpt[0], kpt[1], kpt[3]
-                kpt_name = self.kpts_dict[kpt_idx]
-                kpt_name_item = QTableWidgetItem(str(kpt_name))
-                kptx_item = QTableWidgetItem(str(np.round(kptx, 1)))
-                kpty_item = QTableWidgetItem(str(np.round(kpty, 1)))
-                kpt_label_item = QTableWidgetItem("Y" if kpt_label else "N")
-
-                kpt_name_item.setTextAlignment(Qt.AlignRight)
-                kptx_item.setTextAlignment(Qt.AlignRight)
-                kpty_item.setTextAlignment(Qt.AlignRight)
-                kpt_label_item.setTextAlignment(Qt.AlignRight)
-
-                self.ui.video_keypoint_table.setItem(row_idx, 0, kpt_name_item)
-                self.ui.video_keypoint_table.setItem(row_idx, 1, kptx_item)
-                self.ui.video_keypoint_table.setItem(row_idx, 2, kpty_item)
-                self.ui.video_keypoint_table.setItem(row_idx, 3, kpt_label_item)
-
-                row_idx += 1
+        for kpt_idx, kpt in enumerate(person_data['keypoints'].iloc[0]): 
+            kptx, kpty, kpt_label = kpt[0], kpt[1], kpt[3]
+            kpt_name = self.kpts_dict[kpt_idx]
+            kpt_name_item = QTableWidgetItem(str(kpt_name))
+            kptx_item = QTableWidgetItem(str(np.round(kptx,1)))
+            kpty_item = QTableWidgetItem(str(np.round(kpty,1)))
+            if kpt_label :
+                kpt_label_item = QTableWidgetItem("Y")
+            else:
+                kpt_label_item = QTableWidgetItem("N")
+            kpt_name_item.setTextAlignment(Qt.AlignRight)
+            kptx_item.setTextAlignment(Qt.AlignRight)
+            kpty_item.setTextAlignment(Qt.AlignRight)
+            kpt_label_item.setTextAlignment(Qt.AlignRight)
+            self.ui.video_keypoint_table.setItem(kpt_idx, 0, kpt_name_item)
+            self.ui.video_keypoint_table.setItem(kpt_idx, 1, kptx_item)
+            self.ui.video_keypoint_table.setItem(kpt_idx, 2, kpty_item)
+            self.ui.video_keypoint_table.setItem(kpt_idx, 3, kpt_label_item)
 
     def on_cell_clicked(self, row, column):
         self.correct_kpt_idx = row
@@ -494,26 +476,6 @@ class PoseVideoTabControl(QWidget):
             self.ui.frame_slider.setValue(self.ui.frame_slider.value() - 1)
         else:
             super().keyPressEvent(event)
-
-    def load_json(self):
-        # 打開文件對話框以選擇 JSON 文件
-        json_path, _ = QFileDialog.getOpenFileName(
-            self, "选择要加载的 JSON 文件", "", "JSON 文件 (*.json)")
-
-        # 如果用戶取消選擇文件，則返回
-        if not json_path:
-            return
-        try:
-            # 从 JSON 文件中读取数据并转换为 DataFrame
-            self.person_df = pd.DataFrame()
-            self.person_df = pd.read_json(json_path)
-            process_frame_nums = self.person_df['frame_number'].unique()
-            self.processed_frames = sorted(set(frame_num for frame_num in process_frame_nums if frame_num!=0) )
-            self.start_frame_num = min(self.processed_frames) - 1
-            self.end_frame_num = max(self.processed_frames) - 1
-
-        except Exception as e:
-            print(f"加载 JSON 文件时出错：{e}") 
        
     def correct_person_id(self):
         # 檢查人員DataFrame是否為空
@@ -525,17 +487,18 @@ class PoseVideoTabControl(QWidget):
         # 確保要更正的人員ID和更正後的人員ID都在DataFrame中存在
         if (before_correct_id not in self.person_df['person_id'].unique()) or (after_correct_id not in self.person_df['person_id'].unique()):
             return
-        # 獲取當前帧數
-        frame_num = self.ui.frame_slider.value()
 
-        # 遍歷從當前帧數到最大處理帧數的範圍
-        for i in range(frame_num, max(self.processed_frames)):
-            # 尋找要交換的行
-            condition_1 = (self.person_df['frame_number'] == i) & (self.person_df['person_id'] == before_correct_id)
-            condition_2 = (self.person_df['frame_number'] == i) & (self.person_df['person_id'] == after_correct_id)
-            # 交換 remapped_id
-            self.person_df.loc[condition_1, 'person_id'] = after_correct_id
-            self.person_df.loc[condition_2, 'person_id'] = before_correct_id
+        frame_num = self.ui.frame_slider.value()
+        if (before_correct_id in self.person_df['person_id'].unique()) and (after_correct_id in self.person_df['person_id'].unique()):
+            print("correct")
+            # 遍歷從當前帧數到最大處理帧數的範圍
+            for i in range(frame_num, max(self.processed_frames)):
+                # 尋找要交換的行
+                condition_1 = (self.person_df['frame_number'] == i) & (self.person_df['person_id'] == before_correct_id)
+                # condition_2 = (self.person_df['frame_number'] == i) & (self.person_df['person_id'] == after_correct_id)
+                # 交換 remapped_id
+                self.person_df.loc[condition_1, 'person_id'] = after_correct_id
+                # self.person_df.loc[condition_2, 'person_id'] = before_correct_id
         # 更新畫面
         self.update_frame()
 
