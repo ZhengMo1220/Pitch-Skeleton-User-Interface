@@ -9,7 +9,61 @@ import shutil
 from utils.vis_pose import draw_points_and_skeleton, joints_dict
 import pandas as pd
 
+def obtain_frame_data(frame_num, person_df):
+    try:
+        return person_df.loc[(person_df['frame_number'] == frame_num)]
+    except ValueError:
+        print("ValueError")
+        return pd.DataFrame()
+
+def reset_keypoints(keypoints):
+    modified_keypoints = keypoints.copy()
+    for kpt in modified_keypoints:
+        if kpt[0] == 0.0 and kpt[1] == 0.0:
+            kpt[2] = 0
+    return modified_keypoints
+
+def reset_person_df(person_df):
+    person_df['keypoints'] = person_df['keypoints'].apply(reset_keypoints)
+    return person_df
+
+def draw_image(frame, person_df):
+    image = frame.copy()
+    if not person_df.empty:
+        image = draw_points_and_skeleton(image, person_df, joints_dict()['haple']['skeleton_links'],
+                                         points_color_palette='gist_rainbow', skeleton_palette_samples='jet',
+                                         points_palette_samples=10, confidence_threshold=0.3)
+    return image
+
+def save_video(video_name, video_images, person_df):
+    output_folder = os.path.join("../../Db/Record", video_name)
+    os.makedirs(output_folder, exist_ok=True)
+
+    json_path = os.path.join(output_folder, f"{video_name}.json")
+    save_person_df = reset_person_df(person_df)
+    save_person_df.to_json(json_path, orient='records')
+
+    video_size = (1920, 1080)
+    fps = 30.0
+    save_location = os.path.join(output_folder, f"{video_name}_Sk26.mp4")
+
+    video_writer = cv2.VideoWriter(save_location, cv2.VideoWriter_fourcc(*'mp4v'), fps, video_size)
+
+    if not video_writer.isOpened():
+        print("Error while opening video writer!")
+        return
+
+    for frame_num, frame in enumerate(video_images):
+        if frame is not None and frame.shape[:2] == (video_size[1], video_size[0]):
+            curr_person_df = obtain_frame_data(frame_num, save_person_df)
+            image = draw_image(frame, curr_person_df)
+            video_writer.write(image)
+
+    video_writer.release()
+    print("Store video success")
+
 class Store_Widget(QtWidgets.QWidget):
+
     def __init__(self, video_name, video_images, person_df):
         super().__init__()
         self.ui = store_ui_widget()
@@ -65,7 +119,7 @@ class Store_Widget(QtWidgets.QWidget):
             QMessageBox.warning(self, "儲存影片失敗", "請不要多次按下儲存影片按鈕!")
             return
         self.saving_video = True
-        output_folder = f"../../Db/record/{self.video_name}"
+        output_folder = f"../../Db/Record/{self.video_name}"
         # if os.path.exists(output_folder):
         #     shutil.rmtree(output_folder)    
         os.makedirs(output_folder, exist_ok=True)
@@ -82,7 +136,7 @@ class Store_Widget(QtWidgets.QWidget):
         save_person_df.to_json(json_path, orient='records')
         video_size = (1920, 1080)
         fps = 30.0
-        save_location = "../../Db/record/" + self.video_name + "/" + self.video_name + "_Sk.mp4"
+        save_location = "../../Db/Record/" + self.video_name + "/" + self.video_name + "_Sk.mp4"
 
         video_writer = cv2.VideoWriter(save_location, cv2.VideoWriter_fourcc(*'mp4v'), fps, video_size)
 
@@ -91,11 +145,8 @@ class Store_Widget(QtWidgets.QWidget):
             return
         
         for frame_num, frame in enumerate(self.video_images):
-            # if frame_num != 0:
             if frame is None or frame.shape[1] != video_size[0] or frame.shape[0] != video_size[1]:
                 QMessageBox.critical(self, "錯誤", f"第 {frame_num} 幀圖像尺寸不匹配或無效！")
-                # self.saving_video = False
-                # return
             else:
                 curr_person_df = self.obtain_frame_data(frame_num,save_person_df)
                 image = self.draw_image(frame, curr_person_df)
@@ -105,8 +156,7 @@ class Store_Widget(QtWidgets.QWidget):
 
         self.saving_video = False
         QMessageBox.information(self, "儲存影片", "影片儲存完成!")
-
-            
+    
     def draw_image(self,frame,person_df):    
         image=frame.copy()
         if not person_df.empty:

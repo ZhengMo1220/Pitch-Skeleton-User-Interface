@@ -190,6 +190,12 @@
            </item>
            <item>
             <widget class="QLabel" name="video_name_label">
+             <property name="minimumSize">
+              <size>
+               <width>130</width>
+               <height>0</height>
+              </size>
+             </property>
              <property name="text">
               <string/>
              </property>
@@ -211,6 +217,12 @@
            </item>
            <item>
             <widget class="QLabel" name="video_fps_info_label">
+             <property name="minimumSize">
+              <size>
+               <width>130</width>
+               <height>0</height>
+              </size>
+             </property>
              <property name="text">
               <string/>
              </property>
@@ -221,8 +233,8 @@
            </item>
           </layout>
          </item>
-         <item row="4" column="1">
-          <widget class="QPushButton" name="video_store_data_btn">
+         <item row="2" column="1">
+          <widget class="QPushButton" name="start_code_btn">
            <property name="minimumSize">
             <size>
              <width>150</width>
@@ -230,12 +242,25 @@
             </size>
            </property>
            <property name="text">
-            <string>儲存資料</string>
+            <string>處理和儲存</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QPushButton" name="load_original_video_btn">
+           <property name="minimumSize">
+            <size>
+             <width>150</width>
+             <height>40</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>載入原始影片</string>
            </property>
           </widget>
          </item>
          <item row="4" column="0">
-          <widget class="QPushButton" name="load_video_btn">
+          <widget class="QPushButton" name="load_processed_video_btn">
            <property name="minimumSize">
             <size>
              <width>150</width>
@@ -243,14 +268,39 @@
             </size>
            </property>
            <property name="text">
-            <string>載入影片</string>
+            <string>載入處理過的影片</string>
            </property>
           </widget>
          </item>
-         <item row="1" column="1">
-          <widget class="QCheckBox" name="analyze_checkBox">
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="groupBox">
+        <property name="title">
+         <string>顯示資訊</string>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_5">
+         <item>
+          <widget class="QCheckBox" name="video_show_skeleton_checkBox">
            <property name="text">
-            <string>骨架分析</string>
+            <string>人體骨架</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="video_show_bbox_checkbox">
+           <property name="text">
+            <string>人物框</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="checked">
+            <bool>false</bool>
            </property>
           </widget>
          </item>
@@ -393,38 +443,6 @@
             </widget>
            </item>
           </layout>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QGroupBox" name="groupBox">
-        <property name="title">
-         <string>顯示資訊</string>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_5">
-         <item>
-          <widget class="QCheckBox" name="video_show_skeleton_checkBox">
-           <property name="text">
-            <string>人體骨架</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="video_show_bbox_checkbox">
-           <property name="text">
-            <string>人物框</string>
-           </property>
-           <property name="checkable">
-            <bool>true</bool>
-           </property>
-           <property name="checked">
-            <bool>false</bool>
-           </property>
-          </widget>
          </item>
         </layout>
        </widget>

@@ -76,7 +76,7 @@
          <string>相機設定</string>
         </property>
         <layout class="QGridLayout" name="gridLayout">
-         <item row="2" column="0">
+         <item row="0" column="0">
           <layout class="QHBoxLayout" name="horizontalLayout">
            <item>
             <widget class="QLabel" name="camera_id_label">
@@ -87,6 +87,12 @@
            </item>
            <item>
             <widget class="QSpinBox" name="camera_id_input">
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>0</height>
+              </size>
+             </property>
              <property name="alignment">
               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
              </property>
@@ -98,13 +104,6 @@
           <widget class="QCheckBox" name="camera_checkBox">
            <property name="text">
             <string>開啟相機</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="2">
-          <widget class="QCheckBox" name="analyze_checkBox">
-           <property name="text">
-            <string>骨架分析</string>
            </property>
           </widget>
          </item>
@@ -126,6 +125,12 @@
            </item>
            <item>
             <widget class="QLabel" name="fps_info_label">
+             <property name="minimumSize">
+              <size>
+               <width>130</width>
+               <height>0</height>
+              </size>
+             </property>
              <property name="text">
               <string>0</string>
              </property>
@@ -145,6 +150,16 @@
          <string>顯示資訊</string>
         </property>
         <layout class="QGridLayout" name="gridLayout_2">
+         <item row="0" column="0">
+          <widget class="QCheckBox" name="show_skeleton_checkBox">
+           <property name="text">
+            <string>人體骨架</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
          <item row="0" column="1">
           <widget class="QCheckBox" name="show_bbox_checkbox">
            <property name="text">
@@ -158,17 +173,7 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="0">
-          <widget class="QCheckBox" name="show_skeleton_checkBox">
-           <property name="text">
-            <string>人體骨架</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="2">
+         <item row="1" column="0">
           <widget class="QCheckBox" name="show_line_checkBox">
            <property name="text">
             <string>輔助線</string>
