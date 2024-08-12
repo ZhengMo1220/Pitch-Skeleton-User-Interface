@@ -35,8 +35,7 @@ def process_one_image(args,
                       test_pipeline,
                       pose_estimator,
                       tracker,
-                      visualizer=None,
-                      show_interval=0):
+                      select_id=-1):
     
     result = inference_detector(detector, img,test_pipeline=test_pipeline)
     det_result = result.pred_instances[
@@ -58,17 +57,27 @@ def process_one_image(args,
     for t in online_targets:
         tlwh = t.tlwh
         tid = t.track_id
-        if tlwh[2] * tlwh[3] > 10 :
-            # tracker assigned id
-            online_bbox.append(tlwh)
-            online_ids.append(tid)
+        if select_id == -1:
+            if tlwh[2] * tlwh[3] > 10 :
+                # tracker assigned id
+                online_bbox.append(tlwh)
+                online_ids.append(tid)
+        else:
+            if tlwh[2] * tlwh[3] > 10 :
+                if tid == select_id:
+                    online_bbox.append(tlwh)
+                    online_ids.append(tid)
+
     new_online_box = []
     for bbox in online_bbox:
         x1, y1, w, h = bbox
         x2 = x1 + w
         y2 = y1 + h
         new_online_box.append([x1, y1, x2, y2])
+    
     bboxes = np.array(new_online_box)
+    # bboxes = [left top corner pos, right bottom pos]
+
     pose_results = inference_topdown(pose_estimator, img, bboxes)
     data_samples = merge_data_samples(pose_results)
     # return bboxes, online_ids

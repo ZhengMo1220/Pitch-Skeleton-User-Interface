@@ -18,7 +18,7 @@ from utils.set_parser import set_detect_parser, set_tracker_parser
 from utils.timer import Timer
 from utils.vis_image import  draw_bbox
 from utils.vis_pose import draw_points_and_skeleton, joints_dict
-from Widget.store import Store_Widget, save_video
+from utils.store import save_video
 from topdown_demo_with_mmdet import process_one_image
 from image_demo import detect_image
 from mmcv.transforms import Compose
@@ -57,6 +57,7 @@ class PoseVideoTabControl(QWidget):
         self.init_model()
 
     def bind_ui(self):
+        self.ui.select_checkbox.setDisabled(True)
         self.ui.load_original_video_btn.clicked.connect(
             lambda: self.load_video(self.ui.video_name_label, self.db_path + "/videos/"))
         self.ui.load_processed_video_btn.clicked.connect(
@@ -74,8 +75,8 @@ class PoseVideoTabControl(QWidget):
         self.ui.video_frame_view.mousePressEvent = self.mousePressEvent
         self.ui.id_correct_btn.clicked.connect(self.correct_person_id)
         self.ui.start_code_btn.clicked.connect(self.toggle_detect)
-        self.ui.start_analyze_btn.clicked.connect(self.toggle_analyze)
-
+        self.ui.select_checkbox.clicked.connect(self.toggle_select)
+             
     def init_model(self):
         self.detector = init_detector(
             self.detect_args.det_config, self.detect_args.det_checkpoint, device=self.detect_args.device)
@@ -96,6 +97,8 @@ class PoseVideoTabControl(QWidget):
         self.is_play=False
         self.is_analyze = False
         self.is_detect = False
+        
+        self.select_person_id = -1
         self.processed_images=-1
         self.fps = 30
         self.video_images=[]
@@ -111,46 +114,63 @@ class PoseVideoTabControl(QWidget):
         self.person_df = pd.DataFrame()
         self.person_data = []
         self.label_kpt = False
-        self.select_id = 0
         self.select_frame = 0
         self.detect_args = set_detect_parser()
         self.tracker_args = set_tracker_parser()
         self.kpts_dict = joints_dict()['haple']['keypoints']
 
-    def load_video(self, label_item, path:str):
-        if self.is_play:
-            QMessageBox.warning(self, "讀取影片失敗", "請先停止播放影片!")
-            return
+    def load_video(self, label_item, path: str, value_filter=None, mode=DataType.VIDEO):
         self.init_var()
-        self.video_path = self.load_data(label_item, path, None, DataType.VIDEO)       
-        # no video found
-        if self.video_path == "":
+        if self.ui.select_checkbox.isChecked():
+            self.ui.select_checkbox.click()
+        # 判斷是資料夾還是檔案
+        if mode == DataType.FOLDER:
+            data_path = QFileDialog.getExistingDirectory(self, mode.value['tips'], path)
+        else:
+            name_filter = value_filter or mode.value['filter']
+            data_path, _ = QFileDialog.getOpenFileName(None, mode.value['tips'], path, name_filter)
+
+        # 檢查是否有選取檔案或資料夾
+        if not data_path:
             return
+
+        # 更新 UI 顯示
+        label_item.setText(os.path.basename(data_path))
+        label_item.setToolTip(data_path)
+
+        self.video_path = data_path
         label_item.setText("讀取影片中...")
-        #run image thread
-        self.v_t=VideoToImagesThread(self.video_path)
+        # 啟動影像處理執行緒
+        self.v_t = VideoToImagesThread(self.video_path)
         self.v_t.emit_signal.connect(self.video_to_frame)
         self.v_t.start()
 
-    def load_data(self, label_item, dir_path="", value_filter=None, mode=DataType.DEFAULT):
-        data_path = None
+    def load_process_video(self, label_item, path: str, value_filter=None, mode=DataType.VIDEO):
+        self.init_var()
+        if self.ui.select_checkbox.isChecked():
+            self.ui.select_checkbox.click()
+        # 判斷是資料夾還是檔案
         if mode == DataType.FOLDER:
-            data_path = QFileDialog.getExistingDirectory(
-                self, mode.value['tips'], dir_path)
+            data_path = QFileDialog.getExistingDirectory(self, mode.value['tips'], path)
         else:
-            name_filter = mode.value['filter'] if value_filter == None else value_filter
-            data_path, _ = QFileDialog.getOpenFileName(
-                None, mode.value['tips'], dir_path, name_filter)
-        if label_item == None:
-            return data_path
-        # check exist
-        if data_path:
-            label_item.setText(os.path.basename(data_path))
-            label_item.setToolTip(data_path)
-        else:
-            label_item.setText(mode.value['tips'])
-            label_item.setToolTip("")
-        return data_path  
+            name_filter = value_filter or mode.value['filter']
+            data_path, _ = QFileDialog.getOpenFileName(None, mode.value['tips'], path, name_filter)
+
+        # 檢查是否有選取檔案或資料夾
+        if not data_path:
+            return
+
+        # 更新 UI 顯示
+        label_item.setText(os.path.basename(data_path))
+        label_item.setToolTip(data_path)
+
+        self.video_path = data_path
+        label_item.setText("讀取影片中...")
+        
+        # 啟動影像處理執行緒
+        self.v_t = VideoToImagesThread(self.video_path)
+        self.v_t.emit_signal.connect(self.video_to_frame)
+        self.v_t.start()
 
     def show_image(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView): 
         scene.clear()
@@ -235,7 +255,7 @@ class PoseVideoTabControl(QWidget):
             self.ui.play_btn.setText("▶︎")
 
     def update_person_df(self):
-        person_id = self.select_id
+        person_id = self.select_person_id
         # 获取当前帧数
         frame_num = self.ui.frame_slider.value()
         # 获取表格中的数据并更新到 DataFrame 中
@@ -248,29 +268,6 @@ class PoseVideoTabControl(QWidget):
                                 (self.person_df['person_id'] == person_id), 'keypoints'].iloc[0][kpt_idx][:2] = [kpt_x, kpt_y]
         
         self.update_frame()
-
-    def switch_kpt_data(self):
-        right_leg_id = [12,14,16,21,23,25]
-        left_leg_id = [11,13,15,20,22,24]
-        curr_frame_num = self.ui.frame_slider.value()
-        person_data = self.person_df.loc[(self.person_df['frame_number'] == curr_frame_num) &
-                                (self.person_df['person_id'] == self.select_id)]
-        if not person_data.empty :
-            person_kpt = person_data.iloc[0]['keypoints']
-            correct_kpt = []
-            for i in range(len(person_kpt)): 
-                kptx , kpty, conf, label = person_kpt[i][0], person_kpt[i][1], person_kpt[i][2], person_kpt[i][3]
-                if i in left_leg_id:
-                    temp_kptx , temp_kpt_y , temp_kpt_conf, temp_kpt_label = person_kpt[i+1][0], person_kpt[i+1][1], person_kpt[i+1][2], person_kpt[i+1][3]  
-                    correct_kpt.append([temp_kptx , temp_kpt_y , temp_kpt_conf, temp_kpt_label])
-                    correct_kpt.append([kptx,kpty,conf,label])            
-                if i not in left_leg_id and i not in right_leg_id:
-                    correct_kpt.append([kptx, kpty, conf, label])  # 设置可信度为默认值
-            # 更新 DataFrame 中的数据
-
-            self.person_df.at[person_data.index[0], 'keypoints'] = correct_kpt
-
-            self.update_frame()
 
     def analyze_frame(self):
         frame_num = self.ui.frame_slider.value()
@@ -286,19 +283,19 @@ class PoseVideoTabControl(QWidget):
     
         if self.ui.frame_slider.value() == (self.total_images-1):
             self.ui.play_btn.click()
-            save_video(self.video_name, self.video_images, self.person_df)
+            save_video(self.video_name, self.video_images, self.person_df, select_id=self.select_person_id)
 
-        if self.is_analyze:
-            self.analyze_person(frame_num)
-        else:
-            if frame_num not in self.processed_frames and self.is_detect:
-                self.detect_kpt(image, frame_num)
-        
+
+        if frame_num not in self.processed_frames and self.is_detect:
+            self.detect_kpt(image, frame_num)
+            if self.select_person_id != -1:
+                self.import_data_to_table(self.select_person_id, frame_num)
+
         self.update_frame()
                  
     def update_frame(self):
         curr_person_df, frame_num= self.obtain_curr_data()
-        image=self.video_images[frame_num].copy()
+        image = self.video_images[frame_num].copy()
         
         if not curr_person_df.empty and frame_num in self.processed_frames:
             #haple
@@ -314,7 +311,9 @@ class PoseVideoTabControl(QWidget):
 
     def detect_kpt(self,image,frame_num:int):
         self.timer.tic()
-        pred_instances, person_ids = process_one_image(self.detect_args,image,self.detector,self.detector_test_pipeline,self.pose_estimator,self.tracker)
+        pred_instances, person_ids = process_one_image(self.detect_args,image,self.detector,
+                                                       self.detector_test_pipeline,self.pose_estimator,
+                                                       self.tracker, select_id= self.select_person_id)
         average_time = self.timer.toc()
         fps= int(1/max(average_time,0.00001))
         if fps <10:
@@ -328,10 +327,6 @@ class PoseVideoTabControl(QWidget):
         self.smooth_kpt(person_ids)
         self.processed_frames.add(frame_num)
 
-    def analyze_person(self, frame):
-        if self.select_id != 0:
-            self.import_data_to_table(self.select_id, frame)
-
     def obtain_curr_data(self):
         curr_person_df = pd.DataFrame()
         frame_num = self.ui.frame_slider.value()
@@ -341,15 +336,15 @@ class PoseVideoTabControl(QWidget):
 
     def toggle_detect(self):
         self.is_detect = not self.is_detect
+        self.ui.select_checkbox.setEnabled(True)
         self.ui.play_btn.click()
 
-    def toggle_analyze(self):
-        self.ui.frame_slider.setValue(0)
-        self.is_analyze = True
-        if not self.person_df.empty:
-            self.select_id = self.ui.select_id_input.value()
-            self.smooth_kpt([self.select_id])
-
+    def toggle_select(self):
+        if not self.ui.select_checkbox.isChecked():
+            self.select_person_id = -1
+        else:
+            self.ui.play_btn.click()
+            
     def clear_table_view(self):
         # 清空表格視圖
         self.ui.video_keypoint_table.clear()
@@ -373,6 +368,7 @@ class PoseVideoTabControl(QWidget):
         if person_data.empty:
             # print("未找到特定人員在特定幀的數據")
             self.clear_table_view()
+            self.ui.select_checkbox.click()
             return
 
         # 確保表格視圖大小足夠
@@ -432,7 +428,16 @@ class PoseVideoTabControl(QWidget):
                 self.send_to_table(kptx, kpty, 0)
             self.label_kpt = False
             self.update_frame()
-    
+
+        if self.ui.select_checkbox.isChecked():
+            pos = event.pos()
+            scene_pos = self.ui.video_frame_view.mapToScene(pos)
+            x, y = scene_pos.x(), scene_pos.y()
+            if event.button() == Qt.LeftButton:
+                self.person_id_selector(x, y)
+            if not self.is_play:
+                self.ui.play_btn.click()
+            
     def smooth_kpt(self,person_ids:list):
         for person_id in person_ids:
             pre_frame_num = 0
@@ -461,14 +466,6 @@ class PoseVideoTabControl(QWidget):
                 # 更新 DataFrame 中的数据
                 self.person_df.at[curr_person_data.index[0], 'keypoints'] = smoothed_kpts
 
-    def show_store_window(self):
-        if self.person_df.empty:
-            print("no data")
-            return
-        else:
-            self.store_window = Store_Widget(self.video_name, self.video_images, self.person_df)
-            self.store_window.show()
-
     def keyPressEvent(self, event):
         if event.key() == ord('D') or event.key() == ord('d'):
             self.ui.frame_slider.setValue(self.ui.frame_slider.value() + 1)
@@ -478,29 +475,45 @@ class PoseVideoTabControl(QWidget):
             super().keyPressEvent(event)
        
     def correct_person_id(self):
-        # 檢查人員DataFrame是否為空
         if self.person_df.empty:
             return
-        # 獲取要更正的人員ID和更正後的人員ID
         before_correct_id = self.ui.before_correct_id.value()
         after_correct_id = self.ui.after_correct_id.value()
-        # 確保要更正的人員ID和更正後的人員ID都在DataFrame中存在
+        print(self.person_df['person_id'].unique())
         if (before_correct_id not in self.person_df['person_id'].unique()) or (after_correct_id not in self.person_df['person_id'].unique()):
             return
 
         frame_num = self.ui.frame_slider.value()
         if (before_correct_id in self.person_df['person_id'].unique()) and (after_correct_id in self.person_df['person_id'].unique()):
-            print("correct")
-            # 遍歷從當前帧數到最大處理帧數的範圍
-            for i in range(frame_num, max(self.processed_frames)):
-                # 尋找要交換的行
+            for i in range(0, max(self.processed_frames)):
                 condition_1 = (self.person_df['frame_number'] == i) & (self.person_df['person_id'] == before_correct_id)
-                # condition_2 = (self.person_df['frame_number'] == i) & (self.person_df['person_id'] == after_correct_id)
-                # 交換 remapped_id
                 self.person_df.loc[condition_1, 'person_id'] = after_correct_id
-                # self.person_df.loc[condition_2, 'person_id'] = before_correct_id
-        # 更新畫面
         self.update_frame()
+
+    def person_id_selector(self, x, y):
+        curr_person_df, _= self.obtain_curr_data()
+        if curr_person_df.empty:
+            return
+        
+        selected_id = None
+        max_area = -1
+
+        for _, row in curr_person_df.iterrows():
+            person_id = row['person_id']
+            bbox = row['bbox']
+            x1, y1, x2, y2 = map(int, bbox)
+
+            if x1 <= x <= x2 and y1 <= y <= y2:
+                w = x2 - x1
+                h = y2 - y1
+                area = w * h
+
+                if area > max_area:
+                    max_area = area
+                    selected_id = person_id
+
+        self.select_person_id = selected_id
+        print(self.select_person_id)
 
 
 if __name__ == "__main__":
