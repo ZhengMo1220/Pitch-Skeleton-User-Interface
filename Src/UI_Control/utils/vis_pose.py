@@ -157,7 +157,7 @@ def draw_skeleton(image, points, skeleton, color_palette='Set2', palette_samples
         ).astype(np.uint8)[:, -2::-1].tolist()
     right_skeleton = joints_dict()['haple']['right_points_indices']
     left_skeleton = joints_dict()['haple']['left_points_indices']
- 
+    
     for i, joint in enumerate(skeleton):
         pt1, pt2 = points[joint]
         pt1_unlabel = False if pt1[0] != 0 and pt1[1] != 0 else True
@@ -171,7 +171,7 @@ def draw_skeleton(image, points, skeleton, color_palette='Set2', palette_samples
         if pt1[2] > confidence_threshold and not pt1_unlabel and pt2[2] > confidence_threshold and not pt2_unlabel:
             image = cv2.line(
                 image, (int(pt1[1]), int(pt1[0])), (int(pt2[1]), int(pt2[0])),
-                skeleton_color , 2
+                skeleton_color , 4
             )
     return image
 
@@ -225,4 +225,39 @@ def df_to_points(person_df):
 def swap_values(kpts):
     return [[item[1], item[0], item[2]] for item in kpts]
 
+def draw_tracking_skeleton(image, person_kpt, skeleton, points_color_palette='tab20', points_palette_samples=16,
+                             skeleton_color_palette='Set2', skeleton_palette_samples=8, confidence_threshold=0.5):
+    """
+    Draws `points` and `skeleton` on `image`.
 
+    Args:
+        image: image in opencv format
+        points: list of points to be drawn.
+            Shape: (nof_points, 3)
+            Format: each point should contain (y, x, confidence)
+        skeleton: list of joints to be drawn
+            Shape: (nof_joints, 2)
+            Format: each joint should contain (point_a, point_b) where `point_a` and `point_b` are an index in `points`
+        points_color_palette: name of a matplotlib color palette
+            Default: 'tab20'
+        points_palette_samples: number of different colors sampled from the `color_palette`
+            Default: 16
+        skeleton_color_palette: name of a matplotlib color palette
+            Default: 'Set2'
+        skeleton_palette_samples: number of different colors sampled from the `color_palette`
+            Default: 8
+        person_index: index of the person in `image`
+            Default: 0
+        confidence_threshold: only points with a confidence higher than this threshold will be drawn. Range: [0, 1]
+            Default: 0.5
+
+    Returns:
+        A new image with overlaid joints
+
+    """
+    image = draw_skeleton(image, person_kpt, skeleton, color_palette=skeleton_color_palette,
+                        palette_samples=skeleton_palette_samples, person_index=0,
+                        confidence_threshold=confidence_threshold)
+    image = draw_points(image, person_kpt,person_idx=0, color_palette=points_color_palette, palette_samples=points_palette_samples,
+                        confidence_threshold=confidence_threshold)
+    return image
