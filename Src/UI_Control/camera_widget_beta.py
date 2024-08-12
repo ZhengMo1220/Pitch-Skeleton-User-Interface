@@ -51,7 +51,8 @@ class PoseCameraTabControl(QWidget):
         self.ui.camera_checkBox.clicked.connect(self.toggle_camera)
         self.ui.show_skeleton_checkBox.clicked.connect(self.toggle_analyze)
         self.ui.record_checkBox.clicked.connect(self.toggle_record)
-        
+        self.ui.select_checkBox.clicked.connect(self.toggle_select)
+             
     def init_model(self):
         self.detector = init_detector(
             self.detect_args.det_config, self.detect_args.det_checkpoint, device=self.detect_args.device)
@@ -72,6 +73,7 @@ class PoseCameraTabControl(QWidget):
         self.is_opened = False
         self.is_analyze = self.ui.show_skeleton_checkBox.isChecked()
         self.is_record = False
+        self.select_person_id = -1
         self.fps_control = 1
         self.pre_person_df = pd.DataFrame()
         self.camera_scene = QGraphicsScene()
@@ -98,15 +100,8 @@ class PoseCameraTabControl(QWidget):
     def toggle_record(self):
         if self.is_record:
             self.stop_recording()
-            frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
-
         else:
             self.start_recording()
-            frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
 
     def toggle_analyze(self):
         if self.is_analyze:
@@ -114,6 +109,10 @@ class PoseCameraTabControl(QWidget):
         else:
             self.is_analyze = True
 
+    def toggle_select(self):
+        if not self.ui.select_checkBox.isChecked():
+            self.select_person_id = -1
+        
     def open_camera(self):
         self.video_thread = VideoCaptureThread(camera_index=self.ui.camera_id_input.value())
         self.video_thread.frame_ready.connect(self.buffer_frame)
@@ -205,7 +204,9 @@ class PoseCameraTabControl(QWidget):
             img = frame.copy()
             if self.is_analyze:
                 self.timer.tic()
-                pred_instances, person_ids = process_one_image(self.detect_args, img, self.detector, self.detector_test_pipeline, self.pose_estimator, self.tracker)
+                pred_instances, person_ids = process_one_image(self.detect_args, img, self.detector,
+                                                                self.detector_test_pipeline, self.pose_estimator,
+                                                                  self.tracker, select_id=self.select_person_id)
                 average_time = self.timer.toc()
                 fps= int(1/max(average_time,0.00001))
                 if fps <10:
@@ -231,7 +232,7 @@ class PoseCameraTabControl(QWidget):
         self.show_image(image, self.camera_scene, self.ui.camer_frame_view)
         self.person_df = pd.DataFrame()
 
-    def smooth_kpt(self, person_ids):
+    def smooth_kpt(self, person_ids:list):
         if self.pre_person_df.empty :
             self.pre_person_df = self.person_df.copy()
 
@@ -269,6 +270,41 @@ class PoseCameraTabControl(QWidget):
         # 更新前一帧数据
         self.pre_person_df = self.person_df.copy()  # 确保拷贝数据
 
+    def mousePressEvent(self, event):
+        if self.ui.select_checkBox.isChecked():
+            pos = event.pos()
+            scene_pos = self.ui.camer_frame_view.mapToScene(pos)
+            x, y = scene_pos.x(), scene_pos.y()
+            if event.button() == Qt.LeftButton:
+                self.person_id_selector(x, y)
+
+    def person_id_selector(self, x, y):
+        if self.pre_person_df.empty:
+            return
+        
+        selected_id = None
+        max_area = -1
+
+        for _, row in self.pre_person_df.iterrows():
+            person_id = row['person_id']
+            bbox = row['bbox']
+            x1, y1, x2, y2 = map(int, bbox)
+
+            if x1 <= x <= x2 and y1 <= y <= y2:
+                w = x2 - x1
+                h = y2 - y1
+                area = w * h
+
+                if area > max_area:
+                    max_area = area
+                    selected_id = person_id
+
+        self.select_person_id = selected_id
+
+
+
+       
+        
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

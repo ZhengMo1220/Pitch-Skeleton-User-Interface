@@ -42,16 +42,17 @@ class PoseCameraTabControl(QWidget):
         self.ui = Ui_camera_ui()
         self.ui.setupUi(self)
         self.init_var()
-        # self.bind_ui()
+        self.bind_ui()
         self.init_model()
         self.video_writer = None
 
-    # def bind_ui(self):
-        # self.ui.record_checkBox.setDisabled(True)
-        # self.ui.open_camera_btn.clicked.connect(self.toggle_camera)
-        # self.ui.start_code_btn.clicked.connect(self.toggle_analyze)
-        # self.ui.record_btn.clicked.connect(self.toggle_record)
-        
+    def bind_ui(self):
+        self.ui.record_checkBox.setDisabled(True)
+        self.ui.camera_checkBox.clicked.connect(self.toggle_camera)
+        self.ui.show_skeleton_checkBox.clicked.connect(self.toggle_analyze)
+        self.ui.record_checkBox.clicked.connect(self.toggle_record)
+        self.ui.select_checkBox.clicked.connect(self.toggle_select)
+             
     def init_model(self):
         self.detector = init_detector(
             self.detect_args.det_config, self.detect_args.det_checkpoint, device=self.detect_args.device)
@@ -70,12 +71,15 @@ class PoseCameraTabControl(QWidget):
     def init_var(self):
         self.db_path = f"../../Db"
         self.is_opened = False
-        self.is_analyze = False
+        self.is_analyze = self.ui.show_skeleton_checkBox.isChecked()
         self.is_record = False
+        self.select_person_id = -1
+        self.fps_control = 1
         self.pre_person_df = pd.DataFrame()
         self.camera_scene = QGraphicsScene()
         self.person_df = pd.DataFrame()
         self.frame_buffer = queue.Queue()
+        self.frame_count = 0
         self.kpts_dict = joints_dict()['haple']['keypoints']
         self.detect_args = set_detect_parser()
         self.tracker_args = set_tracker_parser()
@@ -83,29 +87,32 @@ class PoseCameraTabControl(QWidget):
     def toggle_camera(self):
         if self.is_opened:
             self.close_camera()
-            self.ui.open_camera_btn.setText("開啟相機")
-            self.ui.record_btn.setDisabled(True)
+            self.ui.image_resolution_label.setText(f"(0, 0) - ")
+            self.ui.record_checkBox.setDisabled(True)
         else:
             self.open_camera()
-            self.ui.open_camera_btn.setText("關閉相機")
-            self.ui.record_btn.setEnabled(True)
+            frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
+            self.ui.image_resolution_label.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
+            self.ui.record_checkBox.setEnabled(True)
     
     def toggle_record(self):
         if self.is_record:
             self.stop_recording()
-            self.ui.record_btn.setText("開始錄影")
         else:
             self.start_recording()
-            self.ui.record_btn.setText("停止錄影")
 
     def toggle_analyze(self):
         if self.is_analyze:
             self.is_analyze = False
-            self.ui.start_code_btn.setText("開始分析")
         else:
             self.is_analyze = True
-            self.ui.start_code_btn.setText("停止分析")
 
+    def toggle_select(self):
+        if not self.ui.select_checkBox.isChecked():
+            self.select_person_id = -1
+        
     def open_camera(self):
         self.video_thread = VideoCaptureThread(camera_index=self.ui.camera_id_input.value())
         self.video_thread.frame_ready.connect(self.buffer_frame)
@@ -121,18 +128,27 @@ class PoseCameraTabControl(QWidget):
             self.video_writer.release()
             self.video_writer = None
 
-    def buffer_frame(self, frame:np.ndarray):      
-        if not self.frame_buffer.full():
+    def buffer_frame(self, frame:np.ndarray):
+        self.frame_count += 1
+        if self.is_analyze:
+            if self.is_record:
+                self.fps_control = 30
+            else:
+                self.fps_control = 15
+    
+        if not self.frame_buffer.full() and self.frame_count % self.fps_control ==0:     
             self.frame_buffer.put(frame)
             self.analyze_frame()
+
+
         if self.video_writer is not None:
             self.video_writer.write(frame)
     
     def start_recording(self):
-        output_dir = f'../../Db/record/'
-        os.makedirs(output_dir, exist_ok=True)
         current_time = datetime.now().strftime("%Y%m%d_%H%M")
-        video_filename = os.path.join(output_dir, f'C{self.ui.camera_id_input.value()}_{current_time}.mp4')
+        output_dir = f'../../Db/Record/C{self.ui.camera_id_input.value()}_Fps120_{current_time}'
+        os.makedirs(output_dir, exist_ok=True)
+        video_filename = os.path.join(output_dir, f'C{self.ui.camera_id_input.value()}_Fps120_{current_time}.mp4')
         frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
@@ -188,13 +204,15 @@ class PoseCameraTabControl(QWidget):
             img = frame.copy()
             if self.is_analyze:
                 self.timer.tic()
-                pred_instances, person_ids = process_one_image(self.detect_args, img, self.detector, self.detector_test_pipeline, self.pose_estimator, self.tracker)
+                pred_instances, person_ids = process_one_image(self.detect_args, img, self.detector,
+                                                                self.detector_test_pipeline, self.pose_estimator,
+                                                                  self.tracker, select_id=self.select_person_id)
                 average_time = self.timer.toc()
                 fps= int(1/max(average_time,0.00001))
                 if fps <10:
-                    self.ui.fps_label.setText(f"FPS: 0{fps}")
+                    self.ui.fps_info_label.setText(f"0{fps}")
                 else:
-                    self.ui.fps_label.setText(f"FPS: {fps}")
+                    self.ui.fps_info_label.setText(f"{fps}")
                 person_kpts = self.merge_keypoint_datas(pred_instances)
                 person_bboxes = pred_instances['bboxes']
                 self.merge_person_datas(person_ids, person_bboxes, person_kpts)
@@ -214,9 +232,13 @@ class PoseCameraTabControl(QWidget):
         self.show_image(image, self.camera_scene, self.ui.camer_frame_view)
         self.person_df = pd.DataFrame()
 
-    def smooth_kpt(self, person_ids):
-        if self.pre_person_df.empty or self.person_df.empty:
+    def smooth_kpt(self, person_ids:list):
+        if self.pre_person_df.empty :
+            self.pre_person_df = self.person_df.copy()
+
+        if self.person_df.empty:
             return  # 跳过当前 frame
+        
         for person_id in person_ids: 
             pre_person_data = self.pre_person_df.loc[self.pre_person_df['person_id'] == person_id]
             curr_person_data = self.person_df.loc[self.person_df['person_id'] == person_id]
@@ -248,6 +270,41 @@ class PoseCameraTabControl(QWidget):
         # 更新前一帧数据
         self.pre_person_df = self.person_df.copy()  # 确保拷贝数据
 
+    def mousePressEvent(self, event):
+        if self.ui.select_checkBox.isChecked():
+            pos = event.pos()
+            scene_pos = self.ui.camer_frame_view.mapToScene(pos)
+            x, y = scene_pos.x(), scene_pos.y()
+            if event.button() == Qt.LeftButton:
+                self.person_id_selector(x, y)
+
+    def person_id_selector(self, x, y):
+        if self.pre_person_df.empty:
+            return
+        
+        selected_id = None
+        max_area = -1
+
+        for _, row in self.pre_person_df.iterrows():
+            person_id = row['person_id']
+            bbox = row['bbox']
+            x1, y1, x2, y2 = map(int, bbox)
+
+            if x1 <= x <= x2 and y1 <= y <= y2:
+                w = x2 - x1
+                h = y2 - y1
+                area = w * h
+
+                if area > max_area:
+                    max_area = area
+                    selected_id = person_id
+
+        self.select_person_id = selected_id
+
+
+
+       
+        
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
