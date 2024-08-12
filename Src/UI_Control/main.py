@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout
 # from camera_widget import PoseCameraTabControl
 from camera_widget_beta import PoseCameraTabControl
-from video_widget import PoseVideoTabControl
+from video_widget_beta import PoseVideoTabControl
 from main_window import Ui_MainWindow
 
 class Main(QMainWindow):
@@ -23,3 +23,4 @@ if __name__ == '__main__':
     main_window = Main()
     main_window.show()
     sys.exit(app.exec_())
+
