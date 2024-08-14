@@ -259,7 +259,6 @@ def draw_inverted_triangle(image, center, size, color, border_color=(0, 0, 0), b
     cv2.fillPoly(image, [vertices], color)
 
 def draw_jump_speed(img,butt_kpt,jump_speed,jump_frame,frame_ratio):
-    # jump_speed = [jump_horizontal_speed , jump_vertical_speed]
     image = img.copy()
     color = (140, 199, 0)
     text_color = (0, 255, 127)
@@ -292,4 +291,45 @@ def draw_jump_speed(img,butt_kpt,jump_speed,jump_frame,frame_ratio):
     # 将 PIL 图像转换回 OpenCV 图像
     image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
     
+    return image
+
+def draw_traj(kpt_buffer, img):
+    if len(kpt_buffer) == 0 or len(kpt_buffer) == 1:
+        return img
+    image = img.copy()
+    
+    for i in range(1, len(kpt_buffer)):
+        f_kptx, f_kpty = map(int, kpt_buffer[i-1])
+        s_kptx, s_kpty = map(int, kpt_buffer[i])
+        cv2.line(image, (f_kptx, f_kpty), (s_kptx, s_kpty), (0, 255, 0), 5)
+
+    return image
+
+def draw_video_traj(img, person_df, person_id, kpt_id, frame_num, buffer_len):
+    if person_df.empty:
+        return img
+    
+    image = img.copy()
+
+    start_frame = frame_num - buffer_len
+
+    if start_frame < 0:
+        start_frame = 0
+
+    for i in range(start_frame, frame_num):
+        pre_person_data = person_df.loc[(person_df['frame_number'] == i-1) &
+                    (person_df['person_id'] == person_id)]
+        
+        curr_person_data = person_df.loc[(person_df['frame_number'] == i) &
+                    (person_df['person_id'] == person_id)]
+        
+        if pre_person_data.empty:
+            continue
+        if curr_person_data.empty:
+            continue
+        pre_kptx, pre_kpty, _, _ = pre_person_data['keypoints'].iloc[0][kpt_id]
+        curr_kptx, curr_kpty, _, _ = curr_person_data['keypoints'].iloc[0][kpt_id]
+
+        cv2.line(image, (int(pre_kptx), int(pre_kpty)), (int(curr_kptx), int(curr_kpty)), (0, 255, 0), 5)
+
     return image

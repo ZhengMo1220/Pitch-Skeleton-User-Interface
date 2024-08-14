@@ -50,7 +50,7 @@ def preprocess(image, input_size):
 
 
 class FastReIDInterface:
-    def __init__(self, config_file, weights_path, device, batch_size=8):
+    def __init__(self, config_file, weights_path, device='gpu', batch_size=8):
         super(FastReIDInterface, self).__init__()
         if device != 'cpu':
             self.device = 'cuda'

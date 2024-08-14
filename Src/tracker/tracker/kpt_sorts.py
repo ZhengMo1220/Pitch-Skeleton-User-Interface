@@ -16,17 +16,13 @@ from fast_reid.fast_reid_interfece import FastReIDInterface
 class STrack(BaseTrack):
     shared_kalman = KalmanFilter()
 
-    def __init__(self, tlwh, score, cls, feat=None, feat_history=50):
+    def __init__(self, tlwh, score, cls3x, feat=None, feat_history=50):
 
         # wait activate
         self._tlwh = np.asarray(tlwh, dtype=np.float)
         self.kalman_filter = None
         self.mean, self.covariance = None, None
         self.is_activated = False
-
-        self.cls = -1
-        self.cls_hist = []  # (cls id, freq)
-        self.update_cls(cls, score)
 
         self.score = score
         self.tracklet_len = 0
@@ -227,7 +223,7 @@ class STrack(BaseTrack):
         return 'OT_{}_({}-{})'.format(self.track_id, self.start_frame, self.end_frame)
 
 
-class BoTSORT(object):
+class KptSORT(object):
     def __init__(self, args, frame_rate=30):
 
         self.tracked_stracks = []  # type: list[STrack]
@@ -238,21 +234,9 @@ class BoTSORT(object):
         self.frame_id = 0
         self.args = args
 
-        self.track_high_thresh = args.track_high_thresh
-        self.track_low_thresh = args.track_low_thresh
-        self.new_track_thresh = args.new_track_thresh
-
         self.buffer_size = int(frame_rate / 30.0 * args.track_buffer)
         self.max_time_lost = self.buffer_size
         self.kalman_filter = KalmanFilter()
-
-        # ReID module
-        self.proximity_thresh = args.proximity_thresh
-        self.appearance_thresh = args.appearance_thresh
-        if args.with_reid:
-            self.encoder = FastReIDInterface(args.fast_reid_config, args.fast_reid_weights)
-
-        self.gmc = GMC(method=args.cmc_method, verbose=['exp', args.ablation])
 
     def update(self, output_results, img):
         self.frame_id += 1
@@ -265,41 +249,20 @@ class BoTSORT(object):
             bboxes = output_results[:, :4]
             scores = output_results[:, 4]
             classes = output_results[:, 5]
-            features = output_results[:, 6:]
+            kpts = output_results
 
-            # Remove bad detections
-            lowest_inds = scores > self.track_low_thresh
-            bboxes = bboxes[lowest_inds]
-            scores = scores[lowest_inds]
-            classes = classes[lowest_inds]
-            features = output_results[lowest_inds]
-
-            # Find high threshold detections
-            remain_inds = scores > self.args.track_high_thresh
-            dets = bboxes[remain_inds]
-            scores_keep = scores[remain_inds]
-            classes_keep = classes[remain_inds]
-            features_keep = features[remain_inds]
         else:
             bboxes = []
             scores = []
             classes = []
             dets = []
             scores_keep = []
-            classes_keep = []
-
-        '''Extract embeddings '''
-        if self.args.with_reid:
-            features_keep = self.encoder.inference(img, dets)
 
         if len(dets) > 0:
             '''Detections'''
-            if self.args.with_reid:
-                detections = [STrack(STrack.tlbr_to_tlwh(tlbr), s, c, f) for
-                              (tlbr, s, c, f) in zip(dets, scores_keep, classes_keep, features_keep)]
-            else:
-                detections = [STrack(STrack.tlbr_to_tlwh(tlbr), s, c) for
-                              (tlbr, s, c) in zip(dets, scores_keep, classes_keep)]
+       
+            detections = [STrack(STrack.tlbr_to_tlwh(tlbr), s) for
+                        (tlbr, s, c) in zip(dets, scores_keep)]
         else:
             detections = []
 
