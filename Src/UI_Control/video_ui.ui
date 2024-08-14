@@ -311,6 +311,13 @@
            </property>
           </widget>
          </item>
+         <item row="1" column="2">
+          <widget class="QCheckBox" name="select_kpt_checkbox">
+           <property name="text">
+            <string>選擇關節點</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </widget>
       </item>

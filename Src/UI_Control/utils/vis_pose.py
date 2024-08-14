@@ -171,7 +171,7 @@ def draw_skeleton(image, points, skeleton, color_palette='Set2', palette_samples
         if pt1[2] > confidence_threshold and not pt1_unlabel and pt2[2] > confidence_threshold and not pt2_unlabel:
             image = cv2.line(
                 image, (int(pt1[1]), int(pt1[0])), (int(pt2[1]), int(pt2[0])),
-                skeleton_color , 4
+                skeleton_color , 6
             )
     return image
 

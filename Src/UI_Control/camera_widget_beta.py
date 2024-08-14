@@ -13,7 +13,7 @@ from argparse import ArgumentParser
 from utils.cv_thread import VideoCaptureThread, VideoWriter
 from datetime import datetime
 from utils.timer import Timer
-from utils.vis_image import draw_grid, draw_bbox
+from utils.vis_image import draw_grid, draw_bbox, draw_traj
 from utils.vis_pose import draw_points_and_skeleton, joints_dict
 from utils.set_parser import set_detect_parser, set_tracker_parser
 from topdown_demo_with_mmdet import process_one_image
@@ -52,6 +52,8 @@ class PoseCameraTabControl(QWidget):
         self.ui.show_skeleton_checkBox.clicked.connect(self.toggle_analyze)
         self.ui.record_checkBox.clicked.connect(self.toggle_record)
         self.ui.select_checkBox.clicked.connect(self.toggle_select)
+        self.ui.select_keypoint_checkbox.clicked.connect(self.toggle_select_kpt)
+        # self.ui.keypoint_table.cellActivated.connect(self.on_cell_clicked)
              
     def init_model(self):
         self.detector = init_detector(
@@ -73,7 +75,11 @@ class PoseCameraTabControl(QWidget):
         self.is_opened = False
         self.is_analyze = self.ui.show_skeleton_checkBox.isChecked()
         self.is_record = False
+        self.is_select_kpt = False
         self.select_person_id = -1
+        self.select_kpt_id = -1
+        self.select_kpt_buffer = []
+        self.buffer_len = 15
         self.fps_control = 1
         self.pre_person_df = pd.DataFrame()
         self.camera_scene = QGraphicsScene()
@@ -112,6 +118,11 @@ class PoseCameraTabControl(QWidget):
     def toggle_select(self):
         if not self.ui.select_checkBox.isChecked():
             self.select_person_id = -1
+    
+    def toggle_select_kpt(self):
+        if not self.ui.select_keypoint_checkbox.isChecked():
+            self.select_kpt_id = -1
+            self.select_kpt_buffer = []
         
     def open_camera(self):
         self.video_thread = VideoCaptureThread(camera_index=self.ui.camera_id_input.value())
@@ -217,6 +228,8 @@ class PoseCameraTabControl(QWidget):
                 person_bboxes = pred_instances['bboxes']
                 self.merge_person_datas(person_ids, person_bboxes, person_kpts)
                 self.smooth_kpt(person_ids)
+                if self.select_kpt_id != -1:
+                    self.buffer_kpt_info(person_kpts[0])
             self.update_frame(img)
 
     def update_frame(self, image:np.ndarray):
@@ -227,6 +240,10 @@ class PoseCameraTabControl(QWidget):
                                                 points_palette_samples=10, confidence_threshold=0.3)
             if self.ui.show_bbox_checkbox.isChecked():
                 image = draw_bbox(self.person_df, image)
+                
+            if self.ui.select_keypoint_checkbox.isChecked():
+                image = draw_traj(self.select_kpt_buffer,image)
+
         if self.ui.show_line_checkBox.isChecked():
             image = draw_grid(image)
         self.show_image(image, self.camera_scene, self.ui.camer_frame_view)
@@ -278,6 +295,13 @@ class PoseCameraTabControl(QWidget):
             if event.button() == Qt.LeftButton:
                 self.person_id_selector(x, y)
 
+        if self.ui.select_keypoint_checkbox.isChecked():
+            pos = event.pos()
+            scene_pos = self.ui.camer_frame_view.mapToScene(pos)
+            x, y = scene_pos.x(), scene_pos.y()
+            if event.button() == Qt.LeftButton:
+                self.kpt_id_selector(x, y)
+
     def person_id_selector(self, x, y):
         if self.pre_person_df.empty:
             return
@@ -301,8 +325,37 @@ class PoseCameraTabControl(QWidget):
 
         self.select_person_id = selected_id
 
+    def kpt_id_selector(self, x, y):
+        def calculate_distance(point1, point2):
+            return np.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
+        
+        if self.pre_person_df.empty :
+            return
 
+        selected_id = None
+        min_distance = 10000
 
+        for _, row in self.pre_person_df.iterrows():
+            person_kpts = row['keypoints']
+            for kpt_id, kpt in enumerate(person_kpts):
+                
+                kptx, kpty, kpt_score, _= map(int, kpt)
+                
+                # if kpt_score
+                distance = calculate_distance([kptx, kpty], [x, y])
+                if distance < min_distance:
+                    min_distance = distance
+                    selected_id = kpt_id
+
+        self.select_kpt_id = selected_id
+
+    def buffer_kpt_info(self, person_kpts):
+        if len(self.select_kpt_buffer) > self.buffer_len:
+            _ = self.select_kpt_buffer.pop(0)
+        self.select_kpt_buffer.append(person_kpts[self.select_kpt_id][:2])
+
+        print(self.select_kpt_buffer)
+        print(len(self.select_kpt_buffer))
        
         
 

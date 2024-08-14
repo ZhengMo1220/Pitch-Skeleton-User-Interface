@@ -16,8 +16,8 @@ from utils.cv_thread import VideoToImagesThread
 from utils.util import DataType
 from utils.set_parser import set_detect_parser, set_tracker_parser
 from utils.timer import Timer
-from utils.vis_image import  draw_bbox
-from utils.vis_pose import draw_points_and_skeleton, joints_dict, draw_tracking_skeleton
+from utils.vis_image import  draw_bbox, draw_video_traj
+from utils.vis_pose import draw_points_and_skeleton, joints_dict
 from utils.store import save_video
 from topdown_demo_with_mmdet import process_one_image
 from image_demo import detect_image
@@ -30,7 +30,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(current_dir, "..", "tracker"))
 from pathlib import Path
 from tracker.mc_bot_sort import BoTSORT
-from tracker.kalman_filter import KalmanFilter_Skeleton
 from tracker.tracking_utils.timer import Timer
 from mmpose.apis import init_model as init_pose_estimator
 from mmpose.utils import adapt_mmdet_pipeline
@@ -59,6 +58,7 @@ class PoseVideoTabControl(QWidget):
 
     def bind_ui(self):
         self.ui.select_checkbox.setDisabled(True)
+        self.ui.select_kpt_checkbox.setDisabled(True)
         self.ui.load_original_video_btn.clicked.connect(
             lambda: self.load_video(self.ui.video_name_label, self.db_path + "/videos/"))
         self.ui.load_processed_video_btn.clicked.connect(
@@ -77,6 +77,7 @@ class PoseVideoTabControl(QWidget):
         self.ui.id_correct_btn.clicked.connect(self.correct_person_id)
         self.ui.start_code_btn.clicked.connect(self.toggle_detect)
         self.ui.select_checkbox.clicked.connect(self.toggle_select)
+        self.ui.select_kpt_checkbox.clicked.connect(self.toggle_select_kpt)
              
     def init_model(self):
         self.detector = init_detector(
@@ -91,9 +92,7 @@ class PoseVideoTabControl(QWidget):
         )
         self.tracker = BoTSORT(self.tracker_args, frame_rate=30.0)
         self.smooth_filter = OneEuroFilter()
-        self.kf_list = [KalmanFilter_Skeleton() for _ in range(26)]
         self.timer = Timer()
-
 
     def init_var(self):
         self.db_path = f"../../Db"
@@ -102,6 +101,9 @@ class PoseVideoTabControl(QWidget):
         self.is_detect = False
         
         self.select_person_id = -1
+        self.select_kpt_id = -1
+        self.select_kpt_buffer = []
+        self.buffer_len = 15
         self.processed_images=-1
         self.fps = 30
         self.video_images=[]
@@ -111,22 +113,22 @@ class PoseVideoTabControl(QWidget):
         self.video_scene.clear()
         self.correct_kpt_idx = 0
         self.video_name = ""
+        self.start_frame_num = 0
+        self.end_frame_num = 0
         self.processed_frames = set()
         self.person_df = pd.DataFrame()
-        self.tracking_person_df = pd.DataFrame()
         self.person_data = []
-        self.tracking_person_data = []
         self.label_kpt = False
         self.select_frame = 0
         self.detect_args = set_detect_parser()
         self.tracker_args = set_tracker_parser()
         self.kpts_dict = joints_dict()['haple']['keypoints']
-        self.foot_kpts_dict = [13, 14, 15, 16, 20, 21, 22, 23, 24, 25]
 
     def load_video(self, label_item, path: str, value_filter=None, mode=DataType.VIDEO):
         self.init_var()
         if self.ui.select_checkbox.isChecked():
             self.ui.select_checkbox.click()
+
         # 判斷是資料夾還是檔案
         if mode == DataType.FOLDER:
             data_path = QFileDialog.getExistingDirectory(self, mode.value['tips'], path)
@@ -289,7 +291,6 @@ class PoseVideoTabControl(QWidget):
             self.ui.play_btn.click()
             save_video(self.video_name, self.video_images, self.person_df, select_id=self.select_person_id)
 
-
         if frame_num not in self.processed_frames and self.is_detect:
             self.detect_kpt(image, frame_num)
             if self.select_person_id != -1:
@@ -298,8 +299,7 @@ class PoseVideoTabControl(QWidget):
         self.update_frame()
                  
     def update_frame(self):
-        curr_person_df, frame_num= self.obtain_curr_data(self.person_df)
-        curr_tracking_person_df, frame_num = self.obtain_curr_data(self.tracking_person_df)
+        curr_person_df, frame_num= self.obtain_curr_data()
         image = self.video_images[frame_num].copy()
         
         if not curr_person_df.empty and frame_num in self.processed_frames:
@@ -308,13 +308,13 @@ class PoseVideoTabControl(QWidget):
                 image = draw_points_and_skeleton(image, curr_person_df, joints_dict()['haple']['skeleton_links'], 
                                                 points_color_palette='gist_rainbow', skeleton_palette_samples='jet',
                                                 points_palette_samples=10, confidence_threshold=0.3)
-            # if self.select_person_id != -1:
-            #     image = draw_points_and_skeleton(image, curr_tracking_person_df, joints_dict()['haple']['skeleton_links'], 
-            #                                     points_color_palette='gist_rainbow', skeleton_palette_samples='jet',
-            #                                     points_palette_samples=10, confidence_threshold=0.3)
-
+                
             if self.ui.video_show_bbox_checkbox.isChecked():
                 image = draw_bbox(curr_person_df, image)
+
+            if self.ui.select_kpt_checkbox.isChecked():
+                image = draw_video_traj(image, self.person_df, self.select_person_id,
+                                         self.select_kpt_id, frame_num, self.buffer_len)
 
         # 将原始图像直接显示在 QGraphicsView 中
         self.show_image(image, self.video_scene, self.ui.video_frame_view)
@@ -334,23 +334,20 @@ class PoseVideoTabControl(QWidget):
         person_kpts = self.merge_keypoint_datas(pred_instances)
         person_bboxes = pred_instances['bboxes']
         self.merge_person_datas(frame_num, person_ids, person_bboxes, person_kpts)
-        if self.select_person_id != -1:
-            self.correct_kpt(self.select_person_id,threshold = 70)
-            self.predict_kpt(frame_num)
-
         self.smooth_kpt(person_ids)
         self.processed_frames.add(frame_num)
 
-    def obtain_curr_data(self, person_df):
+    def obtain_curr_data(self):
         curr_person_df = pd.DataFrame()
         frame_num = self.ui.frame_slider.value()
-        if not person_df.empty:
-            curr_person_df = person_df.loc[(person_df['frame_number'] == frame_num)]
+        if not self.person_df.empty:
+            curr_person_df = self.person_df.loc[(self.person_df['frame_number'] == frame_num)]
         return curr_person_df, frame_num
 
     def toggle_detect(self):
         self.is_detect = not self.is_detect
         self.ui.select_checkbox.setEnabled(True)
+        self.ui.select_kpt_checkbox.setEnabled(True)
         self.ui.play_btn.click()
 
     def toggle_select(self):
@@ -358,7 +355,13 @@ class PoseVideoTabControl(QWidget):
             self.select_person_id = -1
         else:
             self.ui.play_btn.click()
-            
+
+    def toggle_select_kpt(self):
+        if not self.ui.select_kpt_checkbox.isChecked():
+            self.select_kpt_id = -1
+        else:
+            self.ui.play_btn.click()
+
     def clear_table_view(self):
         # 清空表格視圖
         self.ui.video_keypoint_table.clear()
@@ -436,27 +439,35 @@ class PoseVideoTabControl(QWidget):
             kptx, kpty = scene_pos.x(), scene_pos.y()
             kpt_label = 1
             if event.button() == Qt.LeftButton:
-                self.send_to_table(kptx, kpty,kpt_label)
+                self.send_to_table(kptx, kpty, kpt_label)
             elif event.button() == Qt.RightButton:
                 kptx, kpty = 0, 0
                 self.send_to_table(kptx, kpty, 0)
             self.label_kpt = False
             self.update_frame()
 
-        if self.ui.select_checkbox.isChecked():
+        if self.ui.select_checkbox.isChecked() and not self.label_kpt:
             pos = event.pos()
             scene_pos = self.ui.video_frame_view.mapToScene(pos)
             x, y = scene_pos.x(), scene_pos.y()
             if event.button() == Qt.LeftButton:
                 self.person_id_selector(x, y)
-                self.init_kalman_filter()
-            if not self.is_play:
-                self.ui.play_btn.click()
-            
+        
+        if self.ui.select_kpt_checkbox.isChecked() and not self.label_kpt:
+            pos = event.pos()
+            scene_pos = self.ui.video_frame_view.mapToScene(pos)
+            x, y = scene_pos.x(), scene_pos.y()
+            if event.button() == Qt.LeftButton:
+                self.kpt_id_selector(x, y)
+
+
     def smooth_kpt(self,person_ids:list):
         for person_id in person_ids:
             pre_frame_num = 0
             person_kpt = self.person_df.loc[(self.person_df['person_id'] == person_id)]['keypoints']
+            if len(person_kpt) > 0 and self.start_frame_num == 0 :
+                self.start_frame_num = self.ui.frame_slider.value()
+            # if self.start_frame_num != 0:
             curr_frame = self.ui.frame_slider.value()
             if curr_frame != 0:
                 pre_frame_num = curr_frame - 1
@@ -474,64 +485,9 @@ class PoseVideoTabControl(QWidget):
                     if pre_kptx != 0 and pre_kpty != 0 and curr_kptx != 0 and curr_kpty !=0:
                         curr_kptx = self.smooth_filter(curr_kptx, pre_kptx)
                         curr_kpty = self.smooth_filter(curr_kpty, pre_kpty)
-                    smoothed_kpts.append([curr_kptx, curr_kpty, curr_conf, curr_label])
+                    smoothed_kpts.append([curr_kptx, curr_kpty, curr_conf, curr_label])  # 设置可信度为默认值
+                # 更新 DataFrame 中的数据
                 self.person_df.at[curr_person_data.index[0], 'keypoints'] = smoothed_kpts
-
-    def correct_kpt(self, person_id, threshold: int):
-        def calculate_distance(point1, point2):
-            return np.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
-
-        # 獲取當前幀和前一幀的 frame_number
-        curr_frame = self.ui.frame_slider.value()
-        if curr_frame == 0:
-            return  # 如果當前幀為0，不需要進行任何操作
-        pre_frame_num = curr_frame - 1
-
-        # 獲取該人的前一幀、當前幀的關節點數據，和追蹤數據
-        pre_person_data = self.person_df.loc[
-            (self.person_df['frame_number'] == pre_frame_num) & 
-            (self.person_df['person_id'] == person_id)
-        ]
-        curr_person_data = self.person_df.loc[
-            (self.person_df['frame_number'] == curr_frame) & 
-            (self.person_df['person_id'] == person_id)
-        ]
-        track_person_data = self.tracking_person_df.loc[
-            (self.tracking_person_df['frame_number'] == curr_frame) & 
-            (self.tracking_person_df['person_id'] == person_id)
-        ]
-
-        # 如果有任何數據缺失，則不進行修正
-        if curr_person_data.empty or pre_person_data.empty or track_person_data.empty:
-            return
-
-        pre_kpts = pre_person_data.iloc[0]['keypoints']
-        curr_kpts = curr_person_data.iloc[0]['keypoints']
-        track_kpts = track_person_data.iloc[0]['keypoints']
-        
-        # 初始化修正後的關節點列表
-        correct_kpts = []
-        i = 0
-        for pre_kpt, curr_kpt, track_kpt in zip(pre_kpts, curr_kpts, track_kpts): 
-            # 提取每個關節點的 x 和 y 坐標
-            pre_kptx, pre_kpty = pre_kpt[:2]
-            curr_kptx, curr_kpty, curr_conf, curr_label = curr_kpt
-            track_kptx, track_kpty = track_kpt[:2]
-
-            # 計算當前關節點與前一幀關節點的距離
-            if calculate_distance([pre_kptx, pre_kpty], [curr_kptx, curr_kpty]) > threshold and i in self.foot_kpts_dict:
-                if self.ui.frame_slider.value() == 201 or  self.ui.frame_slider.value() == 202:
-                    print(self.ui.frame_slider.value())
-                    print("correct")
-                # 若距離大於閾值，使用追蹤關節點進行修正
-                correct_kpts.append([track_kptx, track_kpty, curr_conf, curr_label])
-            else:
-                # 否則保持當前的關節點
-                correct_kpts.append([curr_kptx, curr_kpty, curr_conf, curr_label])
-            i += 1
-        # 更新 DataFrame 中的關節點數據
-        self.person_df.at[curr_person_data.index[0], 'keypoints'] = correct_kpts
-
 
     def keyPressEvent(self, event):
         if event.key() == ord('D') or event.key() == ord('d'):
@@ -546,7 +502,6 @@ class PoseVideoTabControl(QWidget):
             return
         before_correct_id = self.ui.before_correct_id.value()
         after_correct_id = self.ui.after_correct_id.value()
-        print(self.person_df['person_id'].unique())
         if (before_correct_id not in self.person_df['person_id'].unique()) or (after_correct_id not in self.person_df['person_id'].unique()):
             return
 
@@ -558,14 +513,11 @@ class PoseVideoTabControl(QWidget):
         self.update_frame()
 
     def person_id_selector(self, x, y):
-        curr_person_df, _= self.obtain_curr_data(self.person_df)
-
+        curr_person_df, _= self.obtain_curr_data()
         if curr_person_df.empty:
-            return
-        
+            return    
         selected_id = None
         max_area = -1
-
         for _, row in curr_person_df.iterrows():
             person_id = row['person_id']
             bbox = row['bbox']
@@ -583,54 +535,29 @@ class PoseVideoTabControl(QWidget):
         self.select_person_id = selected_id
         print(self.select_person_id)
 
-    def init_kalman_filter(self):
-        curr_person_df, _= self.obtain_curr_data(self.person_df)
+    def kpt_id_selector(self, x, y):
+        def calculate_distance(point1, point2):
+            return np.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
+        
+        curr_person_df, _= self.obtain_curr_data()
         if curr_person_df.empty:
             return
         
-        kpts_list = curr_person_df.loc[(self.person_df['person_id'] == self.select_person_id)]['keypoints'].iloc[0]
-        person_bboxes = curr_person_df.loc[(self.person_df['person_id'] == self.select_person_id)]['bbox'].iloc[0]
-        extracted_kpts = [kpt[:2] for kpt in kpts_list]
-        self.mean_cov_list = [kf.initiate(np.array(kpt)) for kf, kpt in zip(self.kf_list, extracted_kpts)]
-        
-        predicted_kpts = [mean[:2] for mean, _ in self.mean_cov_list]
-        predicted_kpts_list = [[np.round(kpt[0],2),np.round(kpt[1],2), 0.9, False] for kpt in predicted_kpts]
-        self.tracking_person_data.append({
-            'frame_number': self.ui.frame_slider.value() + 1,
-            'person_id': self.select_person_id,
-            'bbox': person_bboxes,
-            'keypoints':predicted_kpts_list
-        })
+        selected_id = None
+        min_distance = 10000
 
-        self.tracking_person_df = pd.DataFrame(self.tracking_person_data)
+        for _, row in curr_person_df.iterrows():
+            person_kpts = row['keypoints']
+            for kpt_id, kpt in enumerate(person_kpts):
+                kptx, kpty, _, _= map(int, kpt)
+                distance = calculate_distance([kptx, kpty], [x, y])
+                if distance < min_distance:
+                    min_distance = distance
+                    selected_id = kpt_id
 
-    def predict_kpt(self, frame_num):
-        curr_person_df, _= self.obtain_curr_data(self.person_df)
-        if curr_person_df.empty:
-            return
-        
-        new_kpts_list = curr_person_df.loc[(self.person_df['person_id'] == self.select_person_id)]['keypoints'].iloc[0]
-        person_bboxes = curr_person_df.loc[(self.person_df['person_id'] == self.select_person_id)]['bbox'].iloc[0]
-        extracted_kpts = [kpt[:2] for kpt in new_kpts_list]
+        self.select_kpt_id = selected_id
+        print(self.select_kpt_id)
 
-        self.mean_cov_list = [kf.predict(mean, cov) for kf, (mean, cov) in zip(self.kf_list, self.mean_cov_list)]
-
-        predicted_kpts = [mean[:2] for mean, _ in self.mean_cov_list]
-        predicted_kpts_list = [[np.round(kpt[0],2),np.round(kpt[1],2), 0.9, False] for kpt in predicted_kpts]
-
-        self.tracking_person_data.append({
-            'frame_number': frame_num + 1 ,
-            'person_id': self.select_person_id,
-            'bbox': person_bboxes,
-            'keypoints':predicted_kpts_list
-        })
-
-        self.tracking_person_df = pd.DataFrame(self.tracking_person_data)
-
-        self.mean_cov_list = [kf.update(mean, cov, np.array(kpt)) for kf, (mean, cov), kpt in zip(self.kf_list, self.mean_cov_list, extracted_kpts)]
-       
-        
-        
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
