@@ -29,13 +29,15 @@ except (ImportError, ModuleNotFoundError):
     has_mmdet = False
 
 
-def process_one_image(args,
+def process_one_image(model,
                       img,
-                      detector,
-                      test_pipeline,
-                      pose_estimator,
-                      tracker,
                       select_id=-1):
+    
+    args = model["Detector"]["args"]
+    detector = model["Detector"]["detector"]
+    test_pipeline = model["Detector"]["test_pipeline"]
+    pose_estimator = model["Pose Estimator"]["pose estimator"]
+    tracker = model["Tracker"]["tracker"]
     
     result = inference_detector(detector, img,test_pipeline=test_pipeline)
     det_result = result.pred_instances[

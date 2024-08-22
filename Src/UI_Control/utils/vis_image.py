@@ -53,59 +53,6 @@ def draw_grid(image:np.ndarray):
 
     return image
 
-def draw_analyze_infromation(image, analyze_information, jump_frame,
-                              show_jump_speed, length_ratio,frame_ratio):
-    # analyze_information = {'r_foot_kpt': [[x], [y], [peaks]],
-    #                         'l_foot_kpt': [[x], [y], [peaks]],
-    #                         'stride_time': [],
-    #                         'stride_length': [],
-    #                         'stride_pos': [],
-    #                         'stride_speed': []}
-    l_foot_kpt = analyze_information['l_foot_kpt']
-    r_foot_kpt = analyze_information['r_foot_kpt']
-    butt_kpt = analyze_information['butt_kpt']
-    stride_time = analyze_information['stride_time']
-    stride_pos = analyze_information['stride_pos']
-    stride_length = analyze_information['stride_length']
-    stride_speed = analyze_information['stride_speed']
-    run_side = analyze_information['run_side']
-    right_color = (240, 176, 0)
-    left_color = (0,0,255)
-    floor_point = [0,0]
-
-    butt_kpt_is_exist = len(butt_kpt[0])>0 and len(butt_kpt[1]) >0
-
-    if len(stride_pos)>0:
-        floor_point = stride_pos[0]
-
-    # draw stride point
-    for time in stride_time:
-        if time in l_foot_kpt[2]:
-            x = l_foot_kpt[0][time]
-            y = l_foot_kpt[1][time]
-            draw_inverted_triangle(image, (int(x), int(y)), 20, left_color)
-        elif time in r_foot_kpt[2]:
-            x = r_foot_kpt[0][time]
-            y = r_foot_kpt[1][time]
-            draw_inverted_triangle(image, (int(x), int(y)), 20, right_color)
-
-    image = draw_stride_length(image, stride_pos, stride_length)
-
-    image = draw_stride_speed(image,stride_pos , stride_speed)
-
-    image = draw_butt_point(image, butt_kpt, floor_point,length_ratio)
-
-    image = draw_foot_point(image, l_foot_kpt, left_color)
-    image = draw_foot_point(image, r_foot_kpt, right_color)
-
-    # print(show_jump_speed)
-    
-    if show_jump_speed and butt_kpt_is_exist:
-        jump_speed = [analyze_information['jump_horizontal_speed'] ,analyze_information['jump_vertical_speed']]
-        image = draw_jump_speed(image, butt_kpt ,jump_speed, jump_frame,frame_ratio)
-
-    return image
-
 def draw_stride_length(img, stride_pos, stride_length):
     image = img.copy()
     pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
@@ -157,82 +104,6 @@ def draw_bbox(person_data, image):
         image = cv2.putText(image, str(id), (x1, y1-10), cv2.FONT_HERSHEY_COMPLEX, 1.5, color, 2)
     return image
 
-def draw_butt_point(img,butt_kpt,floor_point,length_ratio):
-    image = img.copy()
-    i = 0
-    color = (255, 0, 255)
-    text_color = (255, 0, 255)
-    for x, y in zip(butt_kpt[0], butt_kpt[1]):
-        image = cv2.circle(image, (int(x), int(y)), 2, color, -1)
-        pos_f = np.array([x, y])
-        pos_s = np.array([x, floor_point[1]])
-        if i % 20 == 0 and i > 0 and floor_point != [0, 0]:
-            length = np.linalg.norm(pos_f - pos_s) * length_ratio
-            text = "{:.2f} 公尺".format(np.round(length, 2))
-
-            # 将 OpenCV 图像转换为 PIL 图像
-            pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-            draw = ImageDraw.Draw(pil_image)
-            # 确定文本位置
-            text_x = int(pos_f[0])
-            text_y = int((pos_f[1] + floor_point[1]) / 3)
-
-            # 绘制加粗文本
-            for dx in range(-1, 2):
-                for dy in range(-1, 2):
-                    draw.text((text_x + dx, text_y + dy), text, font=fontStyle, fill=text_color)
-
-            # 将 PIL 图像转换回 OpenCV 图像
-            image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-        i += 1
-
-    return image
-
-def draw_foot_point(img,foot_kpt,color):
-    image = img.copy()
-    # i = 0
-    for x,y in zip(foot_kpt[0], foot_kpt[1]):
-        image = cv2.circle(image, (int(x), int(y)), 2, color, -1)
-    return image
-
-def draw_butt_width(image, person_kpt, select_frame, length_ratio, run_side):
-    person_kpt = person_kpt.to_numpy()
-    butt_pos = np.array([person_kpt[select_frame][19][0], person_kpt[select_frame][19][1]])
-    if run_side:
-        if person_kpt[select_frame][24][0] > person_kpt[select_frame][25][0]:
-            ankle_pos = np.array([person_kpt[select_frame][24][0], person_kpt[select_frame][24][1]])
-        else:
-            ankle_pos = np.array([person_kpt[select_frame][25][0], person_kpt[select_frame][25][1]])
-    else:
-        if person_kpt[select_frame][24][0] > person_kpt[select_frame][25][0]:
-            ankle_pos = np.array([person_kpt[select_frame][25][0], person_kpt[select_frame][25][1]])
-        else:
-            ankle_pos = np.array([person_kpt[select_frame][24][0], person_kpt[select_frame][24][1]])
-
-    butt_width = np.abs(butt_pos[0] - ankle_pos[0]) * length_ratio * 100
-    image = cv2.circle(image, (int(butt_pos[0]), int(butt_pos[1])), 5, (255, 0, 0), -1)
-    draw_inverted_triangle(image, (int(butt_pos[0]), int(ankle_pos[1])), 20, (240, 176, 0))
-    draw_inverted_triangle(image, (int(ankle_pos[0]), int(ankle_pos[1])), 20, (240, 176, 0))
-    text = "{:.1f}公尺".format(np.round(butt_width, 1))
-
-    # 将 OpenCV 图像转换为 PIL 图像
-    pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    draw = ImageDraw.Draw(pil_image)
-
-    # 确定文本位置
-    text_x = int(butt_pos[0])
-    text_y = int(ankle_pos[1]) - 30
-
-    # 绘制加粗文本
-    for dx in range(-1, 2):
-        for dy in range(-1, 2):
-            draw.text((text_x + dx, text_y + dy), text, font=fontStyle, fill=(0, 0, 255))
-
-    # 将 PIL 图像转换回 OpenCV 图像
-    image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-    
-    return image
-
 def draw_inverted_triangle(image, center, size, color, border_color=(0, 0, 0), border_thickness=2):
     """
     在图像上绘制一个倒三角形，并添加黑色边框。
@@ -258,41 +129,6 @@ def draw_inverted_triangle(image, center, size, color, border_color=(0, 0, 0), b
     # 填充三角形
     cv2.fillPoly(image, [vertices], color)
 
-def draw_jump_speed(img,butt_kpt,jump_speed,jump_frame,frame_ratio):
-    image = img.copy()
-    color = (140, 199, 0)
-    text_color = (0, 255, 127)
-    butt_kpt = [butt_kpt[0][jump_frame[0]:jump_frame[1]], butt_kpt[1][jump_frame[0]:jump_frame[1]]]
-    for x,y in zip(butt_kpt[0], butt_kpt[1]):
-        image = cv2.circle(image, (int(x), int(y)), 2, color, -1)
-
-    draw_inverted_triangle(image, (int(butt_kpt[0][0]), int(butt_kpt[1][0])), 20, color)
-    h_mean = np.mean(jump_speed[0])
-    v_mean = np.mean(jump_speed[1])
-    t = (jump_frame[1] - jump_frame[0]) * frame_ratio
-    draw_inverted_triangle(image, (int(butt_kpt[0][-1]), int(butt_kpt[1][-1])), 20, color)
-    h_text = "水平速度: {:.2f} 公尺/秒".format(np.round(h_mean, 2))
-    v_text = "垂直速度: {:.2f} 公尺/秒".format(np.round(v_mean, 2))
-    t_text = "滯空時間: {:.2f}      秒".format(np.round(v_mean, 2))
-    x = int(butt_kpt[0][0] / 2 + butt_kpt[0][1] / 2)
-    y = int(butt_kpt[1][0]) 
-
-    # 将 OpenCV 图像转换为 PIL 图像
-    pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    draw = ImageDraw.Draw(pil_image)
-
-    # 绘制加粗文本
-    for dx in range(-1, 1):
-        for dy in range(-1, 1):
-            draw.text((x + dx, y + 30 + dy), h_text, font=fontStyle, fill=text_color)
-            draw.text((x + dx, y + 60 + dy), v_text, font=fontStyle, fill=text_color)
-            draw.text((x + dx, y + 90 + dy), t_text, font=fontStyle, fill=text_color)
-
-    # 将 PIL 图像转换回 OpenCV 图像
-    image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-    
-    return image
-
 def draw_traj(kpt_buffer, img):
     if len(kpt_buffer) == 0 or len(kpt_buffer) == 1:
         return img
@@ -305,18 +141,14 @@ def draw_traj(kpt_buffer, img):
 
     return image
 
-def draw_video_traj(img, person_df, person_id, kpt_id, frame_num, buffer_len):
+def draw_video_traj(img, person_df, person_id, kpt_id, frame_num):
     if person_df.empty:
         return img
     
     image = img.copy()
 
-    start_frame = frame_num - buffer_len
 
-    if start_frame < 0:
-        start_frame = 0
-
-    for i in range(start_frame, frame_num):
+    for i in range(0, frame_num):
         pre_person_data = person_df.loc[(person_df['frame_number'] == i-1) &
                     (person_df['person_id'] == person_id)]
         
@@ -332,4 +164,17 @@ def draw_video_traj(img, person_df, person_id, kpt_id, frame_num, buffer_len):
 
         cv2.line(image, (int(pre_kptx), int(pre_kpty)), (int(curr_kptx), int(curr_kpty)), (0, 255, 0), 5)
 
+    return image
+
+
+def draw_angle_info(img: np.ndarray, angle_information: dict):
+    image = img.copy()
+    
+    for _, info in angle_information.items():
+        angle = int(info[0])
+        pt1, pt2, pt3 = [tuple(map(int, point)) for point in info[1]]  # 將座標轉換為 tuple 並轉為 int
+        
+
+        image = cv2.putText(image, str(angle), (pt2[0] - 10, pt2[1] - 10), cv2.FONT_HERSHEY_COMPLEX, 1.5, (0, 255, 0), 2)
+    
     return image

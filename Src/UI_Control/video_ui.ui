@@ -179,33 +179,6 @@
          <string>檔案</string>
         </property>
         <layout class="QGridLayout" name="gridLayout">
-         <item row="0" column="0">
-          <layout class="QHBoxLayout" name="horizontalLayout_6">
-           <item>
-            <widget class="QLabel" name="name_label">
-             <property name="text">
-              <string>檔名:</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="video_name_label">
-             <property name="minimumSize">
-              <size>
-               <width>130</width>
-               <height>0</height>
-              </size>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
          <item row="1" column="0">
           <layout class="QHBoxLayout" name="horizontalLayout_2">
            <item>
@@ -233,19 +206,6 @@
            </item>
           </layout>
          </item>
-         <item row="2" column="1">
-          <widget class="QPushButton" name="start_code_btn">
-           <property name="minimumSize">
-            <size>
-             <width>150</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>處理和儲存</string>
-           </property>
-          </widget>
-         </item>
          <item row="2" column="0">
           <widget class="QPushButton" name="load_original_video_btn">
            <property name="minimumSize">
@@ -256,6 +216,19 @@
            </property>
            <property name="text">
             <string>載入原始影片</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QPushButton" name="start_code_btn">
+           <property name="minimumSize">
+            <size>
+             <width>150</width>
+             <height>40</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>處理和儲存</string>
            </property>
           </widget>
          </item>
@@ -272,6 +245,33 @@
            </property>
           </widget>
          </item>
+         <item row="0" column="0">
+          <layout class="QHBoxLayout" name="horizontalLayout_6">
+           <item>
+            <widget class="QLabel" name="name_label">
+             <property name="text">
+              <string>檔名:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="video_name_label">
+             <property name="minimumSize">
+              <size>
+               <width>130</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
         </layout>
        </widget>
       </item>
@@ -282,7 +282,7 @@
         </property>
         <layout class="QGridLayout" name="gridLayout_2">
          <item row="0" column="1">
-          <widget class="QCheckBox" name="video_show_skeleton_checkBox">
+          <widget class="QCheckBox" name="show_skeleton_checkbox">
            <property name="text">
             <string>人體骨架</string>
            </property>
@@ -292,7 +292,7 @@
           </widget>
          </item>
          <item row="0" column="2">
-          <widget class="QCheckBox" name="video_show_bbox_checkbox">
+          <widget class="QCheckBox" name="show_bbox_checkbox">
            <property name="text">
             <string>人物框</string>
            </property>
@@ -315,6 +315,13 @@
           <widget class="QCheckBox" name="select_kpt_checkbox">
            <property name="text">
             <string>選擇關節點</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QCheckBox" name="show_angle_checkbox">
+           <property name="text">
+            <string>顯示角度</string>
            </property>
           </widget>
          </item>
