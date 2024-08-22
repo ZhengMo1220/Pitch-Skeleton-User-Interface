@@ -45,7 +45,8 @@ def save_video(video_name, video_images, person_df, select_id = None):
 
     save_person_df.to_json(json_path, orient='records')
 
-    video_size = (1920, 1080)
+    video_size = (video_images[0].shape[1], video_images[0].shape[0])
+
     fps = 30.0
     save_location = os.path.join(output_folder, f"{video_name}_Sk26.mp4")
 

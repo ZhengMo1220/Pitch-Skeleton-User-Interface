@@ -11,40 +11,26 @@ import pandas as pd
 import queue
 from argparse import ArgumentParser
 from utils.cv_thread import VideoCaptureThread, VideoWriter
-from datetime import datetime
+from utils.one_euro_filter import OneEuroFilter
 from utils.timer import Timer
 from utils.vis_image import draw_grid, draw_bbox, draw_traj
 from utils.vis_pose import draw_points_and_skeleton, joints_dict
-from utils.set_parser import set_detect_parser, set_tracker_parser
+from datetime import datetime
+
 from topdown_demo_with_mmdet import process_one_image
-from image_demo import detect_image
-from mmcv.transforms import Compose
-from collections import deque
-from mmengine.logging import print_log
-import sys
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(current_dir, "..", "tracker"))
-from tracker.mc_bot_sort import BoTSORT
-from tracker.tracking_utils.timer import Timer
-from mmpose.apis import init_model as init_pose_estimator
-from mmpose.utils import adapt_mmdet_pipeline
-from utils.one_euro_filter import OneEuroFilter
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-try:
-    from mmdet.apis import inference_detector, init_detector
-    has_mmdet = True
-except (ImportError, ModuleNotFoundError):
-    has_mmdet = False
 
 class PoseCameraTabControl(QWidget):
-    def __init__(self):
-        super(PoseCameraTabControl, self).__init__()
+    def __init__(self, model, parent = None):
+        super(PoseCameraTabControl, self).__init__(parent)
         self.ui = Ui_camera_ui()
         self.ui.setupUi(self)
         self.init_var()
         self.bind_ui()
-        self.init_model()
         self.video_writer = None
+        self.model = model
+        self.timer = Timer()
+        self.smooth_filter = OneEuroFilter()
 
     def bind_ui(self):
         self.ui.record_checkBox.setDisabled(True)
@@ -53,22 +39,6 @@ class PoseCameraTabControl(QWidget):
         self.ui.record_checkBox.clicked.connect(self.toggle_record)
         self.ui.select_checkBox.clicked.connect(self.toggle_select)
         self.ui.select_keypoint_checkbox.clicked.connect(self.toggle_select_kpt)
-        # self.ui.keypoint_table.cellActivated.connect(self.on_cell_clicked)
-             
-    def init_model(self):
-        self.detector = init_detector(
-            self.detect_args.det_config, self.detect_args.det_checkpoint, device=self.detect_args.device)
-        self.detector.cfg.test_dataloader.dataset.pipeline[
-            0].type = 'mmdet.LoadImageFromNDArray'
-        self.detector_test_pipeline = Compose(self.detector.cfg.test_dataloader.dataset.pipeline)
-        self.pose_estimator = init_pose_estimator(
-            self.detect_args.pose_config,
-            self.detect_args.pose_checkpoint,
-            cfg_options=dict(model=dict(test_cfg=dict(output_heatmaps=self.detect_args.draw_heatmap)))
-        )
-        self.tracker = BoTSORT(self.tracker_args, frame_rate=30.0)
-        self.smooth_filter = OneEuroFilter()
-        self.timer = Timer()
 
     def init_var(self):
         self.db_path = f"../../Db"
@@ -87,8 +57,6 @@ class PoseCameraTabControl(QWidget):
         self.frame_buffer = queue.Queue()
         self.frame_count = 0
         self.kpts_dict = joints_dict()['haple']['keypoints']
-        self.detect_args = set_detect_parser()
-        self.tracker_args = set_tracker_parser()
 
     def toggle_camera(self):
         if self.is_opened:
@@ -215,9 +183,7 @@ class PoseCameraTabControl(QWidget):
             img = frame.copy()
             if self.is_analyze:
                 self.timer.tic()
-                pred_instances, person_ids = process_one_image(self.detect_args, img, self.detector,
-                                                                self.detector_test_pipeline, self.pose_estimator,
-                                                                  self.tracker, select_id=self.select_person_id)
+                pred_instances, person_ids = process_one_image(self.model, img, select_id=self.select_person_id)
                 average_time = self.timer.toc()
                 fps= int(1/max(average_time,0.00001))
                 if fps <10:
