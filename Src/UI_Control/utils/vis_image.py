@@ -53,45 +53,6 @@ def draw_grid(image:np.ndarray):
 
     return image
 
-def draw_stride_length(img, stride_pos, stride_length):
-    image = img.copy()
-    pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    draw = ImageDraw.Draw(pil_image)
-    for i in range(0, len(stride_length)):
-        x = int((stride_pos[i][0] + stride_pos[i+1][0]) / 2) - 120
-        y = int((stride_pos[i][1] + stride_pos[i+1][1]) / 2) + 50
-        text = "長度: {:.2f} 公尺".format(np.round(stride_length[i], 2))
-        
-        # 在 PIL 圖像上繪製文本
-        for dx in range(-1, 1):
-            for dy in range(-1, 1):
-                draw.text((x + dx, y + dy), text, font=fontStyle, fill=(0, 255, 0))
-        
-        # 將 PIL 圖像轉換回 OpenCV 圖像
-    image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-    
-    return image
-
-def draw_stride_speed(img, stride_pos, stride_speed):
-    image = img.copy()
-    pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    
-    # 創建一個繪圖對象
-    draw = ImageDraw.Draw(pil_image)
-
-    for i in range(0, len(stride_speed)):
-        x = int((stride_pos[i][0] + stride_pos[i+1][0]) / 2) - 120
-        y = int((stride_pos[i][1] + stride_pos[i+1][1]) / 2) + 80
-        text = "速度: {:.2f} 公尺/秒".format(np.round(stride_speed[i], 2))
-        
-        for dx in range(-1, 1):
-            for dy in range(-1, 1):
-                draw.text((x + dx, y + dy) , text, font=fontStyle, fill=(0, 255, 0))
-    
-    # 將 PIL 圖像轉換回 OpenCV 圖像
-    image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-
-    return image
 
 def draw_bbox(person_data, image):
     person_ids = person_data['person_id']
@@ -166,7 +127,6 @@ def draw_video_traj(img, person_df, person_id, kpt_id, frame_num):
 
     return image
 
-
 def draw_angle_info(img: np.ndarray, angle_information: dict):
     image = img.copy()
     
@@ -174,7 +134,10 @@ def draw_angle_info(img: np.ndarray, angle_information: dict):
         angle = int(info[0])
         pt1, pt2, pt3 = [tuple(map(int, point)) for point in info[1]]  # 將座標轉換為 tuple 並轉為 int
         
-
         image = cv2.putText(image, str(angle), (pt2[0] - 10, pt2[1] - 10), cv2.FONT_HERSHEY_COMPLEX, 1.5, (0, 255, 0), 2)
-    
+    return image
+
+def draw_region(img:np.ndarray):
+    image = img.copy()
+    cv2.rectangle(image, (100, 250), (450, 600), (0, 255, 0), -1)
     return image

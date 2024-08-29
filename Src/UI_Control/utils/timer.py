@@ -1,7 +1,7 @@
 import time
 
 
-class Timer(object):
+class FPS_Timer(object):
     """A simple timer."""
     def __init__(self):
         self.total_time = 0.
@@ -28,3 +28,23 @@ class Timer(object):
         self.calls = 0
         self.start_time = 0.
         self.diff = 0.
+
+
+import time
+
+class Timer:
+    def __init__(self, duration):
+        self.duration = duration
+        self.start_time = None
+    
+    def start(self):
+        self.start_time = time.time()
+    
+    def is_time_up(self):
+        if self.start_time is None:
+            return False
+        return (time.time() - self.start_time) > self.duration
+    
+    def reset(self):
+        self.start_time = None
+

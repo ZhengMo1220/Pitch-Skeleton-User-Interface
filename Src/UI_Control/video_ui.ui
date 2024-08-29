@@ -36,11 +36,21 @@
       </widget>
      </item>
      <item>
-      <widget class="QGraphicsView" name="video_frame_view">
+      <widget class="QGraphicsView" name="frame_view">
        <property name="minimumSize">
         <size>
          <width>480</width>
          <height>360</height>
+        </size>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGraphicsView" name="curve_view">
+       <property name="maximumSize">
+        <size>
+         <width>16777215</width>
+         <height>200</height>
         </size>
        </property>
       </widget>
@@ -182,14 +192,14 @@
          <item row="1" column="0">
           <layout class="QHBoxLayout" name="horizontalLayout_2">
            <item>
-            <widget class="QLabel" name="video_fps_label">
+            <widget class="QLabel" name="fps_label">
              <property name="text">
               <string>FPS:</string>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QLabel" name="video_fps_info_label">
+            <widget class="QLabel" name="fps_info_label">
              <property name="minimumSize">
               <size>
                <width>130</width>
@@ -417,13 +427,13 @@
        </widget>
       </item>
       <item>
-       <widget class="QGroupBox" name="video_kpt_adjust_groupbox">
+       <widget class="QGroupBox" name="kpt_adjust_groupbox">
         <property name="title">
          <string>手動關節點修正</string>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_9">
          <item>
-          <widget class="QTableWidget" name="video_keypoint_table">
+          <widget class="QTableWidget" name="keypoint_table">
            <property name="minimumSize">
             <size>
              <width>400</width>

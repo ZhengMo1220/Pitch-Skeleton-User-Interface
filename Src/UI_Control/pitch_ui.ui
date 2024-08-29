@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>auto_ui</class>
- <widget class="QWidget" name="auto_ui">
+ <class>pitch_ui</class>
+ <widget class="QWidget" name="pitch_ui">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -15,7 +15,7 @@
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout_2">
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,0">
+    <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,0,0">
      <item>
       <widget class="QLabel" name="image_resolution_label">
        <property name="maximumSize">
@@ -36,7 +36,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QGraphicsView" name="camer_frame_view">
+      <widget class="QGraphicsView" name="frame_view">
        <property name="minimumSize">
         <size>
          <width>480</width>
@@ -44,6 +44,109 @@
         </size>
        </property>
       </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_4">
+       <item>
+        <widget class="QPushButton" name="back_key_btn">
+         <property name="minimumSize">
+          <size>
+           <width>50</width>
+           <height>30</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>50</width>
+           <height>30</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>&lt;&lt;</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="play_btn">
+         <property name="minimumSize">
+          <size>
+           <width>50</width>
+           <height>30</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>50</width>
+           <height>30</height>
+          </size>
+         </property>
+         <property name="font">
+          <font>
+           <pointsize>20</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="layoutDirection">
+          <enum>Qt::RightToLeft</enum>
+         </property>
+         <property name="text">
+          <string>▶︎</string>
+         </property>
+         <property name="iconSize">
+          <size>
+           <width>20</width>
+           <height>20</height>
+          </size>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="forward_key_btn">
+         <property name="minimumSize">
+          <size>
+           <width>50</width>
+           <height>30</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>50</width>
+           <height>30</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>&gt;&gt;</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QSlider" name="frame_slider">
+         <property name="minimumSize">
+          <size>
+           <width>300</width>
+           <height>30</height>
+          </size>
+         </property>
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="frame_num_label">
+         <property name="minimumSize">
+          <size>
+           <width>20</width>
+           <height>20</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>0/0</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
     </layout>
    </item>
@@ -150,7 +253,7 @@
          <string>顯示資訊</string>
         </property>
         <layout class="QGridLayout" name="gridLayout_2">
-         <item row="0" column="0">
+         <item row="1" column="0">
           <widget class="QCheckBox" name="show_skeleton_checkbox">
            <property name="text">
             <string>人體骨架</string>
@@ -160,21 +263,7 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="0">
-          <widget class="QCheckBox" name="show_line_checkbox">
-           <property name="text">
-            <string>輔助線</string>
-           </property>
-          </widget>
-         </item>
          <item row="1" column="1">
-          <widget class="QCheckBox" name="select_checkbox">
-           <property name="text">
-            <string>選擇人</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1">
           <widget class="QCheckBox" name="show_bbox_checkbox">
            <property name="text">
             <string>人物框</string>
@@ -187,18 +276,56 @@
            </property>
           </widget>
          </item>
-         <item row="2" column="0">
+         <item row="3" column="0">
           <widget class="QCheckBox" name="select_keypoint_checkbox">
            <property name="text">
             <string>選擇關節點</string>
            </property>
           </widget>
          </item>
-         <item row="2" column="1">
+         <item row="3" column="1">
           <widget class="QCheckBox" name="show_kpt_angle_checkbox">
            <property name="text">
             <string>顯示角度</string>
            </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QCheckBox" name="select_checkbox">
+           <property name="text">
+            <string>選擇人</string>
+           </property>
+           <property name="checked">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QCheckBox" name="show_line_checkbox">
+           <property name="text">
+            <string>輔助線</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="QLabel" name="pitch_label">
+           <property name="text">
+            <string>投手:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QComboBox" name="pitch_input">
+           <item>
+            <property name="text">
+             <string>右投</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>左投</string>
+            </property>
+           </item>
           </widget>
          </item>
         </layout>

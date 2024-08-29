@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout
 
 from camera_widget_beta import PoseCameraTabControl
 from video_widget_beta_two import PoseVideoTabControl
-from auto_widget import PoseAutoTabControl
+from pitch_widget import PosePitchTabControl
 from main_window import Ui_MainWindow
 
 from utils.set_parser import set_detect_parser, set_tracker_parser
@@ -69,8 +69,8 @@ class Main(QMainWindow):
         self.ui.Two_d_Tab.addTab(self.camera_tab, "2D 相機")
         self.video_tab = PoseVideoTabControl(self.model)
         self.ui.Two_d_Tab.addTab(self.video_tab, "2D 影片")
-        self.auto_tab = PoseAutoTabControl(self.model)
-        self.ui.Two_d_Tab.addTab(self.auto_tab, "2D 自動")
+        self.pitch_tab = PosePitchTabControl(self.model)
+        self.ui.Two_d_Tab.addTab(self.pitch_tab, "2D 投手")
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

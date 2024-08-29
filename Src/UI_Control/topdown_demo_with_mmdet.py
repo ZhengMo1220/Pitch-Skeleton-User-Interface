@@ -31,7 +31,7 @@ except (ImportError, ModuleNotFoundError):
 
 def process_one_image(model,
                       img,
-                      select_id=-1):
+                      select_id = None):
     
     args = model["Detector"]["args"]
     detector = model["Detector"]["detector"]
@@ -48,7 +48,6 @@ def process_one_image(model,
     bboxes = bboxes[pred_instance.labels == args.det_cat_id]
     
     bboxes = bboxes[nms(bboxes, args.nms_thr), :4]
-    # print(bboxes)
     new_bboxes = np.zeros((bboxes.shape[0],6))
     new_bboxes[:, :4] = bboxes
     new_bboxes[:, -2] = 0.9
@@ -59,7 +58,7 @@ def process_one_image(model,
     for t in online_targets:
         tlwh = t.tlwh
         tid = t.track_id
-        if select_id == -1:
+        if select_id == None:
             if tlwh[2] * tlwh[3] > 10 :
                 # tracker assigned id
                 online_bbox.append(tlwh)
