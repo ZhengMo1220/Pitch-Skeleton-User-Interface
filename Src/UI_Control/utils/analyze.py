@@ -2,6 +2,9 @@ import numpy as np
 from scipy.signal import find_peaks, savgol_filter
 
 def obtain_analyze_information(person_kpt, angle_dict):
+    
+    if person_kpt.empty:
+        return
     person_kpt = person_kpt.to_numpy()[0]
     analyze_information = initialize_analyze_information()
     analyze_information = update_analyze_information(analyze_information, person_kpt, angle_dict)

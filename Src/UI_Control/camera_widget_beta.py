@@ -1,18 +1,16 @@
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QColor, QImage, QPixmap
+from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt
 import numpy as np
 import sys
 import cv2
 import os
-from threading import Lock
 from camera_ui import Ui_camera_ui
 import pandas as pd
 import queue
-from argparse import ArgumentParser
 from utils.cv_thread import VideoCaptureThread, VideoWriter
 from utils.one_euro_filter import OneEuroFilter
-from utils.timer import Timer
+from utils.timer import FPS_Timer
 from utils.vis_image import draw_grid, draw_bbox, draw_traj
 from utils.vis_pose import draw_points_and_skeleton, joints_dict
 from datetime import datetime
@@ -29,7 +27,7 @@ class PoseCameraTabControl(QWidget):
         self.bind_ui()
         self.video_writer = None
         self.model = model
-        self.timer = Timer()
+        self.fps_timer = FPS_Timer()
         self.smooth_filter = OneEuroFilter()
 
     def bind_ui(self):
@@ -46,7 +44,7 @@ class PoseCameraTabControl(QWidget):
         self.is_analyze = self.ui.show_skeleton_checkBox.isChecked()
         self.is_record = False
         self.is_select_kpt = False
-        self.select_person_id = -1
+        self.select_person_id = None
         self.select_kpt_id = -1
         self.select_kpt_buffer = []
         self.buffer_len = 15
@@ -85,7 +83,7 @@ class PoseCameraTabControl(QWidget):
 
     def toggle_select(self):
         if not self.ui.select_checkBox.isChecked():
-            self.select_person_id = -1
+            self.select_person_id = None
     
     def toggle_select_kpt(self):
         if not self.ui.select_keypoint_checkbox.isChecked():
@@ -182,9 +180,9 @@ class PoseCameraTabControl(QWidget):
             frame = self.frame_buffer.get()
             img = frame.copy()
             if self.is_analyze:
-                self.timer.tic()
+                self.fps_timer.tic()
                 pred_instances, person_ids = process_one_image(self.model, img, select_id=self.select_person_id)
-                average_time = self.timer.toc()
+                average_time = self.fps_timer.toc()
                 fps= int(1/max(average_time,0.00001))
                 if fps <10:
                     self.ui.fps_info_label.setText(f"0{fps}")

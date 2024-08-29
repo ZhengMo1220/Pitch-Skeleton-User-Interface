@@ -37,7 +37,6 @@ class VideoCaptureThread(QThread):
 
     def __init__(self, parent=None, camera_index=0):
         super().__init__(parent)
-        self.timer = Timer()
         self.cap = cv2.VideoCapture(camera_index)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
