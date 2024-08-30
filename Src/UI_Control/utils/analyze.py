@@ -1,26 +1,26 @@
 import numpy as np
+import pandas as pd
 from scipy.signal import find_peaks, savgol_filter
 
-def obtain_analyze_information(person_kpt, angle_dict):
+def obtain_analyze_information(person_df: pd.DataFrame, angle_dict: dict, curr_frame: int):
     
-    if person_kpt.empty:
+    if person_df.empty:
         return
-    person_kpt = person_kpt.to_numpy()[0]
-    analyze_information = initialize_analyze_information()
-    analyze_information = update_analyze_information(analyze_information, person_kpt, angle_dict)
 
-    return analyze_information
+    analyze_information = []
 
-def initialize_analyze_information():
-    return {
-        'l_elbow_angle': [],
-        'r_elbow_angle': [],
-        'l_shoulder_angle': [],
-        'r_shoulder_angle': [],
-        'l_knee_angle': [],
-        'r_knee_angle': []
-        }
+    for frame_num in range(0, curr_frame):
+        person_kpt = obtain_data(person_df, frame_num)
 
+        if person_kpt is None:
+            continue
+        info = {}
+        person_kpt = person_kpt.to_numpy()[0]
+        info['frame_number'] = frame_num
+        info['angle'] = update_analyze_information(person_kpt, angle_dict)
+        analyze_information.append(info) 
+
+    return pd.DataFrame(analyze_information)
 
 def calculate_angle(A, B, C):
     # 將點座標轉換為向量
@@ -43,12 +43,23 @@ def calculate_angle(A, B, C):
     
     return angle_deg
 
-def update_analyze_information(analyze_information, person_kpt, angle_dict):
-
+def update_analyze_information(person_kpt, angle_dict):
+    info = {}
     for angle_name, kpt_list in angle_dict.items():
         A = person_kpt[kpt_list[0]][:2]
         B = person_kpt[kpt_list[1]][:2]
         C = person_kpt[kpt_list[2]][:2]
-        analyze_information[angle_name] = [calculate_angle(A, B, C), [np.array(A), np.array(B), np.array(C)]]
+        info[angle_name] = [calculate_angle(A, B, C), [np.array(A), np.array(B), np.array(C)]]
+    return info
 
-    return analyze_information
+def obtain_data(person_df: pd.DataFrame, frame_num: int = None):
+    condition = pd.Series([True] * len(person_df), index=person_df.index)
+
+    if frame_num is not None:
+        condition &= (person_df['frame_number'] == frame_num)
+    
+    data = person_df.loc[condition]
+    if data.empty:
+        return None
+
+    return data['keypoints']

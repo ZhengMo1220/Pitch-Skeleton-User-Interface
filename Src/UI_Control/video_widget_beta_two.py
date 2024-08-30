@@ -15,11 +15,13 @@ from utils.cv_thread import VideoToImagesThread
 from utils.util import DataType
 from utils.timer import FPS_Timer
 from utils.vis_image import  draw_bbox, draw_video_traj, draw_angle_info
+from utils.vis_graph import init_graph, update_graph
 from utils.vis_pose import draw_points_and_skeleton, joints_dict
 from utils.analyze import obtain_analyze_information
 from utils.store import save_video
 from utils.one_euro_filter import OneEuroFilter
 from topdown_demo_with_mmdet import process_one_image
+import pyqtgraph as pg
 
 class PoseVideoTabControl(QWidget):
     def __init__(self, model, parent = None):
@@ -56,19 +58,23 @@ class PoseVideoTabControl(QWidget):
         self.ui.select_kpt_checkbox.clicked.connect(self.toggle_select_kpt)
              
     def init_var(self):
+        self.graph =  pg.PlotWidget()
         self.db_path = f"../../Db"
-        self.is_play=False
+        self.is_play = False
         self.is_detect = False
-        self.processed_images=-1
+        self.processed_images = -1
         self.select_person_id = None
         self.select_kpt_id = -1
         self.select_kpt_buffer = []
         self.video_images=[]
         self.video_path = ""
         self.json_path = ""
-        self.is_threading=False
+        self.is_threading = False
+        self.angle_info = None
         self.video_scene = QGraphicsScene()
+        self.curve_scene = QGraphicsScene()
         self.video_scene.clear()
+        self.curve_scene.clear()
         self.correct_kpt_idx = 0
         self.video_name = ""
         self.processed_frames = set()
@@ -77,6 +83,9 @@ class PoseVideoTabControl(QWidget):
         self.label_kpt = False
         self.select_frame = 0
         self.kpts_dict = joints_dict()['haple']['keypoints']
+        pg.setConfigOptions(foreground=QColor(113,148,116), antialias = True)
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 'k')
 
     def load_video(self, label_item, path: str, value_filter=None, mode=DataType.VIDEO):
         self.init_var()
@@ -161,6 +170,12 @@ class PoseVideoTabControl(QWidget):
         GraphicsView.setAlignment(Qt.AlignLeft)
         GraphicsView.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
 
+    def show_graph(self, graph, scene, graphicview):
+        graph.resize(graphicview.width(),graphicview.height())
+        scene.addWidget(graph)
+        graphicview.setScene(scene)
+        graphicview.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
+
     def video_to_frame(self, video_images, fps, count):
         self.total_images = count
         self.ui.frame_slider.setMinimum(0)
@@ -175,6 +190,8 @@ class PoseVideoTabControl(QWidget):
         self.ui.video_resolution_label.setText( "(0,0) -" + f" {self.video_images[0].shape[1]} x {self.video_images[0].shape[0]}")
         self.video_name = os.path.splitext(os.path.basename(self.video_path))[0]
         self.ui.video_name_label.setText(self.video_name)
+        self.graph = init_graph(self.total_images)
+        self.show_graph(self.graph, self.curve_scene, self.ui.curve_view)
         self.close_thread(self.v_t)
 
     def close_thread(self, thread):
@@ -259,12 +276,15 @@ class PoseVideoTabControl(QWidget):
 
         if self.select_person_id:
             self.import_data_to_table(self.select_person_id, frame_num)
+            person_data = self.obtain_data(person_id = self.select_person_id)
+            self.angle_info = obtain_analyze_information(person_data, joints_dict()['haple']['angle_dict'], frame_num)
+            self.graph = update_graph(self.graph, self.angle_info)
 
         self.update_frame()
               
     def update_frame(self):
         frame_num = self.ui.frame_slider.value()
-        curr_person_df = self.obtain_data(frame_num, self.select_person_id)
+        curr_person_df = self.obtain_data(frame_num = frame_num, person_id = self.select_person_id)
         image = self.video_images[frame_num].copy()
 
         if not curr_person_df.empty and frame_num in self.processed_frames:
@@ -287,9 +307,7 @@ class PoseVideoTabControl(QWidget):
                                         self.select_kpt_id, frame_num)
 
             if self.ui.show_angle_checkbox.isChecked():
-                person_kpt = self.obtain_data(frame_num, self.select_person_id, True)
-                angle_information = obtain_analyze_information(person_kpt, joints_dict()['haple']['angle_dict'])
-                image = draw_angle_info(image, angle_information)
+                image = draw_angle_info(image, self.angle_info, frame_num)
                 
         self.show_image(image, self.video_scene, self.ui.frame_view)
 
@@ -305,16 +323,20 @@ class PoseVideoTabControl(QWidget):
         if frame_num is not None:
             self.processed_frames.add(frame_num)
 
-    def obtain_data(self, frame_num, person_id=None, is_kpt = False):
-        frame_data = self.person_df[self.person_df['frame_number'] == frame_num]
+    def obtain_data(self, frame_num=None, person_id=None, is_kpt=False):
+        condition = pd.Series([True] * len(self.person_df))  # 初始條件設為全為 True
+        if frame_num is not None:
+            condition &= (self.person_df['frame_number'] == frame_num)
         
         if person_id is not None:
-            frame_data = frame_data[frame_data['person_id'] == person_id]
+            condition &= (self.person_df['person_id'] == person_id)
+ 
+        data = self.person_df.loc[condition]
         
         if is_kpt:
-            frame_data = frame_data['keypoints']
-        
-        return frame_data
+            data = data['keypoints']
+            
+        return data
     
     def toggle_detect(self):
         self.is_detect = not self.is_detect
@@ -409,7 +431,7 @@ class PoseVideoTabControl(QWidget):
             elif event.button() == Qt.RightButton:
                 self.send_to_table(0, 0, 0)
             self.label_kpt = False
-            
+
         self.update_frame()
 
     def smooth_kpt(self,person_ids:list):
@@ -459,8 +481,7 @@ class PoseVideoTabControl(QWidget):
         self.update_frame()
 
     def person_id_selector(self, x:float, y:float):
-
-        curr_person_df = self.obtain_data(self.ui.frame_slider.value())
+        curr_person_df = self.obtain_data(frame_num = self.ui.frame_slider.value())
         if curr_person_df.empty:
             return    
         selected_id = None

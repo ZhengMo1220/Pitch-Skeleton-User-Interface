@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 import os
 import sys
@@ -127,15 +128,27 @@ def draw_video_traj(img, person_df, person_id, kpt_id, frame_num):
 
     return image
 
-def draw_angle_info(img: np.ndarray, angle_information: dict):
-    image = img.copy()
+def draw_angle_info(img: np.ndarray, angle_info: pd.DataFrame, frame_num:int):
+    if angle_info is None:
+        return image
     
-    for _, info in angle_information.items():
+    image = img.copy()
+    data = angle_info.loc[angle_info['frame_number'] == (frame_num-1)]
+    data = data['angle'].iloc[0]
+
+    for _, info in data.items(): 
         angle = int(info[0])
-        pt1, pt2, pt3 = [tuple(map(int, point)) for point in info[1]]  # 將座標轉換為 tuple 並轉為 int
-        
+        pt1, pt2, pt3 = [tuple(map(int, point)) for point in info[1]]
         image = cv2.putText(image, str(angle), (pt2[0] - 10, pt2[1] - 10), cv2.FONT_HERSHEY_COMPLEX, 1.5, (0, 255, 0), 2)
+    
     return image
+
+# def obtain_curr_info(angle_info: pd.DataFrame, frame_num:int):
+#     print(angle_info)
+#     print(frame_num)
+#     data = angle_info.loc[angle_info['frame_number'] == (frame_num-1)]
+
+#     return data
 
 def draw_region(img:np.ndarray):
     image = img.copy()
