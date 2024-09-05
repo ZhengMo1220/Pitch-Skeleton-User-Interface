@@ -188,8 +188,35 @@
         <property name="title">
          <string>檔案</string>
         </property>
-        <layout class="QGridLayout" name="gridLayout">
-         <item row="1" column="0">
+        <layout class="QVBoxLayout" name="verticalLayout_2">
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_6">
+           <item>
+            <widget class="QLabel" name="name_label">
+             <property name="text">
+              <string>檔名:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="video_name_label">
+             <property name="minimumSize">
+              <size>
+               <width>130</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
           <layout class="QHBoxLayout" name="horizontalLayout_2">
            <item>
             <widget class="QLabel" name="fps_label">
@@ -216,67 +243,44 @@
            </item>
           </layout>
          </item>
-         <item row="2" column="0">
-          <widget class="QPushButton" name="load_original_video_btn">
-           <property name="minimumSize">
-            <size>
-             <width>150</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>載入原始影片</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QPushButton" name="start_code_btn">
-           <property name="minimumSize">
-            <size>
-             <width>150</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>處理和儲存</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="0">
-          <widget class="QPushButton" name="load_processed_video_btn">
-           <property name="minimumSize">
-            <size>
-             <width>150</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>載入處理過的影片</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="0">
-          <layout class="QHBoxLayout" name="horizontalLayout_6">
-           <item>
-            <widget class="QLabel" name="name_label">
-             <property name="text">
-              <string>檔名:</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="video_name_label">
+         <item>
+          <layout class="QGridLayout" name="gridLayout">
+           <item row="1" column="0">
+            <widget class="QPushButton" name="load_original_video_btn">
              <property name="minimumSize">
               <size>
-               <width>130</width>
-               <height>0</height>
+               <width>150</width>
+               <height>40</height>
               </size>
              </property>
              <property name="text">
-              <string/>
+              <string>載入原始影片</string>
              </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QPushButton" name="load_processed_video_btn">
+             <property name="minimumSize">
+              <size>
+               <width>150</width>
+               <height>40</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>載入處理過的影片</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QPushButton" name="start_code_btn">
+             <property name="minimumSize">
+              <size>
+               <width>150</width>
+               <height>40</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>處理和儲存</string>
              </property>
             </widget>
            </item>

@@ -59,6 +59,7 @@ class PoseVideoTabControl(QWidget):
              
     def init_var(self):
         self.graph =  pg.PlotWidget()
+        self.angle_info_pos = None
         self.db_path = f"../../Db"
         self.is_play = False
         self.is_detect = False
@@ -149,7 +150,6 @@ class PoseVideoTabControl(QWidget):
             self.person_df = pd.read_json(self.json_path)
             process_frame_nums = self.person_df['frame_number'].unique()
             self.processed_frames = sorted(set(frame_num for frame_num in process_frame_nums if frame_num!=0) )
-            
         except Exception as e:
             print(f"加载 JSON 文件时出错：{e}")
 
@@ -224,7 +224,6 @@ class PoseVideoTabControl(QWidget):
 
             new_kpts = np.full((len(self.kpts_dict), keypoints_data.shape[1]), 0.9)
             new_kpts[:26] = keypoints_data
-
             person_info = {
                 'person_id': pid,
                 'bbox': bbox,
@@ -275,10 +274,13 @@ class PoseVideoTabControl(QWidget):
             self.detect_kpt(image, frame_num = frame_num)
 
         if self.select_person_id:
+            if self.angle_info_pos is None:
+                person_kpt = self.obtain_data(frame_num,self.select_person_id, True)
+                self.set_angle_info_pos(person_kpt)
             self.import_data_to_table(self.select_person_id, frame_num)
             person_data = self.obtain_data(person_id = self.select_person_id)
             self.angle_info = obtain_analyze_information(person_data, joints_dict()['haple']['angle_dict'], frame_num)
-            self.graph = update_graph(self.graph, self.angle_info)
+            self.graph = update_graph(self.graph, self.angle_info, frame_num)
 
         self.update_frame()
               
@@ -290,6 +292,9 @@ class PoseVideoTabControl(QWidget):
         if not curr_person_df.empty and frame_num in self.processed_frames:
             if self.ui.select_checkbox.isChecked():
                 curr_person_df = curr_person_df[curr_person_df['person_id'] == self.select_person_id]
+
+            if self.ui.show_angle_checkbox.isChecked():
+                image = draw_angle_info(image, self.angle_info, frame_num, self.angle_info_pos)
 
             if self.ui.show_skeleton_checkbox.isChecked():
                 image = draw_points_and_skeleton(image, curr_person_df, 
@@ -306,8 +311,7 @@ class PoseVideoTabControl(QWidget):
                 image = draw_video_traj(image, self.person_df, self.select_person_id,
                                         self.select_kpt_id, frame_num)
 
-            if self.ui.show_angle_checkbox.isChecked():
-                image = draw_angle_info(image, self.angle_info, frame_num)
+        
                 
         self.show_image(image, self.video_scene, self.ui.frame_view)
 
@@ -434,7 +438,7 @@ class PoseVideoTabControl(QWidget):
 
         self.update_frame()
 
-    def smooth_kpt(self,person_ids:list):
+    def smooth_kpt(self, person_ids:list):
         for person_id in person_ids:
             pre_frame_num = 0
             curr_frame = self.ui.frame_slider.value()
@@ -523,6 +527,10 @@ class PoseVideoTabControl(QWidget):
 
         self.select_kpt_id = selected_id
 
+    def set_angle_info_pos(self, person_kpt):
+        person_kpt = person_kpt.iloc[0]
+        x, y, _, _ = person_kpt[19]
+        self.angle_info_pos = (int(x), int(y))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
