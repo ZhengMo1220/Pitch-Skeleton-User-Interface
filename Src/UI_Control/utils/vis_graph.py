@@ -5,7 +5,7 @@ import pandas as pd
 
 def init_graph(frame_range, kpt_name = "右手肘"):
     graph =  pg.PlotWidget()
-    title = f'<span style = "color: blue; font-size: 15px">{kpt_name}角度</span>'
+    title = f'<span style = "color: blue; font-size: 15px">{kpt_name}角度 (   度)</span>'
     graph.setTitle(f'{title}')
     
     font = QFont()
@@ -24,11 +24,16 @@ def init_graph(frame_range, kpt_name = "右手肘"):
 
     return graph
 
-def update_graph(graph, angle_info, kpt_name = 'r_elbow_angle'):
+def update_graph(graph, angle_info, curr_frame_num, kpt_name = 'r_elbow_angle'):
     graph.clear()
-    kpt_angle =  get_angle_info(angle_info, kpt_name)
-    kpt_time = angle_info['frame_number'].unique()
-    graph.plot(kpt_time, kpt_angle, pen='b')    
+    data = angle_info.loc[angle_info['frame_number'] == (curr_frame_num-1)]
+    data = data['angle'].iloc[0]
+    angle = int(data[kpt_name][0])
+    title = f'<span style = "color: blue; font-size: 15px">右手肘角度({angle:03}度)</span>'
+    graph.setTitle(f'{title}')
+    kpt_angles =  get_angle_info(angle_info, kpt_name)
+    kpt_times = angle_info['frame_number'].unique()
+    graph.plot(kpt_times, kpt_angles, pen='b')    
 
     return graph
 
@@ -38,7 +43,7 @@ def get_angle_info(analyze_info: pd.DataFrame, angle_name: str):
     for _, row in analyze_info.iterrows():
         angle_data = row['angle']
         if angle_name in angle_data:
-            angles.append(angle_data[angle_name][0],)
+            angles.append(angle_data[angle_name][0])
 
     return angles
    

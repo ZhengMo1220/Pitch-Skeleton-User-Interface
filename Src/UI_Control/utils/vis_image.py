@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 import os
+from scipy.signal import savgol_filter
 import sys
 try:
     colors = np.round(
@@ -103,52 +104,104 @@ def draw_traj(kpt_buffer, img):
 
     return image
 
-def draw_video_traj(img, person_df, person_id, kpt_id, frame_num):
-    if person_df.empty:
-        return img
+def draw_video_traj(img, person_df, person_id, kpt_id, frame_num, window_length=17, polyorder=2):
+    """
+    在圖片上繪製特定人物的關鍵點軌跡，並使用Savgol濾波器平滑軌跡。
+
+    參數：
+    - img: 原始圖片（NumPy陣列）
+    - person_df: 包含人物關鍵點信息的Pandas DataFrame
+    - person_id: 目標人物的ID
+    - kpt_id: 目標關鍵點的ID
+    - frame_num: 總幀數
+    - window_length: Savgol濾波器的窗口長度（默認17，需為奇數）
+    - polyorder: Savgol濾波器的多項式階數（默認2）
     
+    返回：
+    - image: 帶有繪製軌跡的圖片
+    """
+    
+    # 如果DataFrame為空，直接返回原圖
+    if person_df.empty:
+        return img.copy()
+    
+    # 複製原始圖片以避免修改原圖
     image = img.copy()
-
-
-    for i in range(0, frame_num):
-        pre_person_data = person_df.loc[(person_df['frame_number'] == i-1) &
-                    (person_df['person_id'] == person_id)]
-        
-        curr_person_data = person_df.loc[(person_df['frame_number'] == i) &
-                    (person_df['person_id'] == person_id)]
-        
-        if pre_person_data.empty:
-            continue
-        if curr_person_data.empty:
-            continue
-        pre_kptx, pre_kpty, _, _ = pre_person_data['keypoints'].iloc[0][kpt_id]
-        curr_kptx, curr_kpty, _, _ = curr_person_data['keypoints'].iloc[0][kpt_id]
-
-        cv2.line(image, (int(pre_kptx), int(pre_kpty)), (int(curr_kptx), int(curr_kpty)), (0, 255, 0), 5)
-
-    return image
-
-def draw_angle_info(img: np.ndarray, angle_info: pd.DataFrame, frame_num:int):
-    if angle_info is None:
+    
+    # 過濾DataFrame，僅保留目標人物和指定幀數範圍內的數據
+    filtered_df = person_df[
+        (person_df['person_id'] == person_id) & 
+        (person_df['frame_number'] < frame_num)
+    ]
+    
+    # 如果過濾後的DataFrame為空，返回原圖
+    if filtered_df.empty:
         return image
     
+    # 按幀數排序，確保軌跡的連貫性
+    filtered_df = filtered_df.sort_values(by='frame_number')
+    
+    # 提取指定關鍵點的(x, y)座標
+    # 假設 'keypoints' 列包含一個列表，每個元素是關鍵點的四元組 (x, y, visibility, ... )
+    kpt_buffer = [
+        (kpt[0], kpt[1]) 
+        for kpts in filtered_df['keypoints'] 
+        if kpts and kpt_id < len(kpts) and kpts[kpt_id] is not None
+        for kpt in [kpts[kpt_id]]
+    ]
+    
+    # 如果緩衝區長度大於等於窗口長度，則應用Savgol濾波器進行平滑
+    if len(kpt_buffer) >= window_length:
+        # 確保窗口長度為奇數且不超過緩衝區長度
+        if window_length > len(kpt_buffer):
+            window_length = len(kpt_buffer) if len(kpt_buffer) % 2 == 1 else len(kpt_buffer) - 1
+        # 確保多項式階數小於窗口長度
+        current_polyorder = min(polyorder, window_length - 1)
+        
+        # 分別提取x和y座標
+        x = np.array([point[0] for point in kpt_buffer])
+        y = np.array([point[1] for point in kpt_buffer])
+        
+        # 應用Savgol濾波器
+        x_smooth = savgol_filter(x, window_length=window_length, polyorder=current_polyorder)
+        y_smooth = savgol_filter(y, window_length=window_length, polyorder=current_polyorder)
+        
+        # 將平滑後的座標重新打包
+        smoothed_points = list(zip(x_smooth, y_smooth))
+    else:
+        # 緩衝區長度不足，直接使用原始座標
+        smoothed_points = kpt_buffer
+    
+    # 如果平滑後的點少於2個，無需繪製軌跡
+    if len(smoothed_points) < 2:
+        return image
+    
+    # 將座標轉換為整數並構造適合cv2.polylines的格式
+    points = np.array([(int(x), int(y)) for x, y in smoothed_points], dtype=np.int32).reshape(-1, 1, 2)
+    
+    # 使用cv2.polylines繪製連續的軌跡線
+    cv2.polylines(image, [points], isClosed=False, color=(0, 255, 0), thickness=5)
+    
+    return image
+
+
+def draw_angle_info(img: np.ndarray, angle_info: pd.DataFrame, frame_num:int, pos:tuple):
     image = img.copy()
+
+    if angle_info is None:
+        return image
     data = angle_info.loc[angle_info['frame_number'] == (frame_num-1)]
     data = data['angle'].iloc[0]
 
     for _, info in data.items(): 
         angle = int(info[0])
         pt1, pt2, pt3 = [tuple(map(int, point)) for point in info[1]]
-        image = cv2.putText(image, str(angle), (pt2[0] - 10, pt2[1] - 10), cv2.FONT_HERSHEY_COMPLEX, 1.5, (0, 255, 0), 2)
+        if pos is not None:
+            cv2.line(image, pt2, (pos[0] +20 , pos[1] + 180), (0, 0, 0), 1)
+            image = cv2.putText(image, str(angle), (pos[0] - 20, pos[1] + 200), cv2.FONT_HERSHEY_COMPLEX, 1.5, (0, 255, 0), 2)
     
     return image
 
-# def obtain_curr_info(angle_info: pd.DataFrame, frame_num:int):
-#     print(angle_info)
-#     print(frame_num)
-#     data = angle_info.loc[angle_info['frame_number'] == (frame_num-1)]
-
-#     return data
 
 def draw_region(img:np.ndarray):
     image = img.copy()
