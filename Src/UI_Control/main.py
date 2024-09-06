@@ -31,8 +31,7 @@ class Main(QMainWindow):
         self.ui.setupUi(self)
         self.model = self.init_model()
         self.init_tabs()
-        
-
+    
     def init_model(self):
         self.detect_args = set_detect_parser()
         self.tracker_args = set_tracker_parser()
