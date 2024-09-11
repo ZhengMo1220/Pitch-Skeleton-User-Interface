@@ -12,7 +12,8 @@
     pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
     # 需要去環境中將libiomp5md.dll刪除，不然會跳warning
     conda install -c conda-forge faiss-gpu
-
+    pip install cython_bbox
+    ```
 3. setup openmim
     ``` 
     pip install -U openmim
