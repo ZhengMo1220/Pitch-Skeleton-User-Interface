@@ -59,7 +59,9 @@ To obtain the vitpose、yolo and fast-reid wights, it can be downloaded from the
     `-- |-- Record (for output data)
             |-- {video_name}_Sk26.mp4 (將原始影片畫上骨架資訊)
             |-- {video_name}.json (將偵測出來的結果紀錄，裡面包含了人物的bounding box info. 和 26 個關節點位置)
+            
     |-- Src
+    
 ### Demo
 1. Demo command
     ```
