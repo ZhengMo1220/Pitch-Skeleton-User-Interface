@@ -290,9 +290,6 @@ class PoseVideoTabControl(QWidget):
         image = self.video_images[frame_num].copy()
 
         if not curr_person_df.empty and frame_num in self.processed_frames:
-            if self.ui.select_checkbox.isChecked():
-                curr_person_df = curr_person_df[curr_person_df['person_id'] == self.select_person_id]
-
             if self.ui.show_angle_checkbox.isChecked():
                 image = draw_angle_info(image, self.angle_info, frame_num, self.angle_info_pos)
 
@@ -424,19 +421,19 @@ class PoseVideoTabControl(QWidget):
         pos = event.pos()
         scene_pos = self.ui.frame_view.mapToScene(pos)
         x, y = scene_pos.x(), scene_pos.y()
+        if not self.person_df.empty :
+            if self.ui.select_checkbox.isChecked() and not self.label_kpt :
+                if event.button() == Qt.LeftButton:
+                    self.person_id_selector(x, y)
 
-        if self.ui.select_checkbox.isChecked() and not self.label_kpt:
-            if event.button() == Qt.LeftButton:
-                self.person_id_selector(x, y)
+            if self.label_kpt:
+                if event.button() == Qt.LeftButton:
+                    self.send_to_table(x, y, 1)
+                elif event.button() == Qt.RightButton:
+                    self.send_to_table(0, 0, 0)
+                self.label_kpt = False
 
-        if self.label_kpt:
-            if event.button() == Qt.LeftButton:
-                self.send_to_table(x, y, 1)
-            elif event.button() == Qt.RightButton:
-                self.send_to_table(0, 0, 0)
-            self.label_kpt = False
-
-        self.update_frame()
+            self.update_frame()
 
     def smooth_kpt(self, person_ids:list):
         for person_id in person_ids:

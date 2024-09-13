@@ -3,8 +3,6 @@ def set_detect_parser():
     parser = ArgumentParser()
     parser.add_argument('--det-config', default='../mmyolo_main/yolov7_x_syncbn_fast_8x16b-300e_coco.py', help='Config file for detection')
     parser.add_argument('--det-checkpoint', default='../../Db/pretrain/yolov7_x_syncbn_fast_8x16b-300e_coco_20221124_215331-ef949a68.pth', help='Checkpoint file for detection')
-    parser.add_argument('--pose-config', default='../mmpose_main/configs/body_2d_keypoint/topdown_heatmap/haple/ViTPose_base_simple_halpe_256x192.py', help='Config file for pose')
-    parser.add_argument('--pose-checkpoint', default='../../Db/pretrain/best_coco_AP_epoch_f9_8.pth', help='Checkpoint file for pose')
     parser.add_argument(
     '--device', default='cuda:0', help='Device used for inference')
     parser.add_argument(
@@ -46,19 +44,42 @@ def set_detect_parser():
         default=3,
         help='Keypoint radius for visualization')
     parser.add_argument(
-        '--thickness',
-        type=int,
-        default=1,
-        help='Link thickness for visualization')
-    parser.add_argument(
         '--show-interval', type=int, default=0, help='Sleep seconds per frame')
     parser.add_argument(
         '--alpha', type=float, default=0.8, help='The transparency of bboxes')
-    parser.add_argument(
-        '--draw-bbox', action='store_true', help='Draw bboxes of instances')
     args = parser.parse_args()
     return args
 
+def set_pose_parser():
+    parser = ArgumentParser()
+    parser.add_argument('--pose-config', default='../mmpose_main/configs/body_2d_keypoint/topdown_heatmap/haple/ViTPose_base_simple_halpe_256x192.py', help='Config file for pose')
+    parser.add_argument('--pose-checkpoint', default='../../Db/pretrain/vitpose_Sk26.pth', help='Checkpoint file for pose')
+    parser.add_argument(
+        '--device', default='cuda:0', help='Device used for inference')
+    parser.add_argument(
+        '--kpt-thr',
+        type=float,
+        default=0.3,
+        help='Visualizing keypoint thresholds')
+    parser.add_argument(
+        '--show-kpt-idx',
+        action='store_true',
+        default=False,
+        help='Whether to show the index of keypoints')
+    parser.add_argument(
+        '--skeleton-style',
+        default='mmpose',
+        type=str,
+        choices=['mmpose', 'openpose'],
+        help='Skeleton style selection')
+    parser.add_argument(
+        '--radius',
+        type=int,
+        default=3,
+        help='Keypoint radius for visualization')
+    args = parser.parse_args()
+    return args
+    
 def set_tracker_parser():
     parser = ArgumentParser()
     # tracking args

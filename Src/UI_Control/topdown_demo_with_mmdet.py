@@ -30,59 +30,34 @@ def process_one_image(model,
                       img,
                       select_id = None):
     fps_timer = FPS_Timer()
-    args = model["Detector"]["args"]
+    detect_args = model["Detector"]["args"]
     detector = model["Detector"]["detector"]
     test_pipeline = model["Detector"]["test_pipeline"]
+    pose_args = model["Pose Estimator"]["args"]
     pose_estimator = model["Pose Estimator"]["pose estimator"]
     tracker = model["Tracker"]["tracker"]
-    fps_timer.tic()
     result = inference_detector(detector, img,test_pipeline=test_pipeline)
-    average_time = fps_timer.toc()
-    print(average_time)
     det_result = result.pred_instances[
-        result.pred_instances.scores > args.score_thr].cpu().numpy()
+        result.pred_instances.scores > detect_args.score_thr].cpu().numpy()
     pred_instance = det_result
     bboxes = np.concatenate(
         (pred_instance.bboxes, pred_instance.scores[:, None]), axis=1)
-    bboxes = bboxes[pred_instance.labels == args.det_cat_id]
+    bboxes = bboxes[pred_instance.labels == detect_args.det_cat_id]
     
-    bboxes = bboxes[nms(bboxes, args.nms_thr), :4]
-    new_bboxes = np.zeros((bboxes.shape[0],6))
-    new_bboxes[:, :4] = bboxes
+    bboxes = bboxes[nms(bboxes, detect_args.nms_thr), :4]
+ # Update tracker with new detections
+    new_bboxes = np.hstack((bboxes, np.zeros((bboxes.shape[0], 2))))
     new_bboxes[:, -2] = 0.9
     new_bboxes[:, -1] = 0
-    online_targets = tracker.update(new_bboxes,img.copy())
-    online_ids = []
-    online_bbox = []
-    for t in online_targets:
-        tlwh = t.tlwh
-        tid = t.track_id
-        if select_id == None:
-            if tlwh[2] * tlwh[3] > 10 :
-                # tracker assigned id
-                online_bbox.append(tlwh)
-                online_ids.append(tid)
-        else:
-            if tlwh[2] * tlwh[3] > 10 :
-                if tid == select_id:
-                    online_bbox.append(tlwh)
-                    online_ids.append(tid)
-
-    new_online_box = []
-    for bbox in online_bbox:
-        x1, y1, w, h = bbox
-        x2 = x1 + w
-        y2 = y1 + h
-        new_online_box.append([x1, y1, x2, y2])
+    online_targets = tracker.update(new_bboxes, img.copy())
     
+    online_bbox = [t.tlwh for t in online_targets if (t.tlwh[2] * t.tlwh[3] > 10) and (select_id is None or t.track_id == select_id)]
+    online_ids = [t.track_id for t in online_targets if (t.tlwh[2] * t.tlwh[3] > 10) and (select_id is None or t.track_id == select_id)]
+    
+    new_online_box = [[x1, y1, x1 + w, y1 + h] for x1, y1, w, h in online_bbox]
     bboxes = np.array(new_online_box)
-    # bboxes = [left top corner pos, right bottom pos]
-
     
     pose_results = inference_topdown(pose_estimator, img, bboxes)
-    
     data_samples = merge_data_samples(pose_results)
-    # return bboxes, online_ids
-    # if there is no instance detected, return None
-    return data_samples.get('pred_instances', None), online_ids
     
+    return data_samples.get('pred_instances', None), online_ids

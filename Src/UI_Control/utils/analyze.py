@@ -8,8 +8,7 @@ def obtain_analyze_information(person_df: pd.DataFrame, angle_dict: dict, curr_f
         return
 
     analyze_information = []
-
-    for frame_num in range(0, curr_frame):
+    for frame_num in range(0, curr_frame + 1):
         person_kpt = obtain_data(person_df, frame_num)
 
         if person_kpt is None:

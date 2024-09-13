@@ -26,7 +26,7 @@ def init_graph(frame_range, kpt_name = "右手肘"):
 
 def update_graph(graph, angle_info, curr_frame_num, kpt_name = 'r_elbow_angle'):
     graph.clear()
-    data = angle_info.loc[angle_info['frame_number'] == (curr_frame_num-1)]
+    data = angle_info.loc[angle_info['frame_number'] == (curr_frame_num)]
     data = data['angle'].iloc[0]
     angle = int(data[kpt_name][0])
     title = f'<span style = "color: blue; font-size: 15px">右手肘角度({angle:03}度)</span>'
