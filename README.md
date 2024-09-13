@@ -1,4 +1,4 @@
-# pose_live
+# Pitch-Skeleton-User-Interface
 
 ## Usage
 ### Installation
