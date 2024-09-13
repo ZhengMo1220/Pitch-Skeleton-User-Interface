@@ -56,9 +56,21 @@ To obtain the vitpose、yolo and fast-reid wights, it can be downloaded from the
     `-- |-- pretrain
             |-- vitpose_Sk26.pth
             |-- yolov7_x_syncbn_fast_8x16b-300e_coco_20221124_215331-ef949a68.pth
+    `-- |-- Record (for output data)
+            |-- {video_name}_Sk26.mp4 (將原始影片畫上骨架資訊)
+            |-- {video_name}.json (將偵測出來的結果紀錄，裡面包含了人物的bounding box info. 和 26 個關節點位置)
     |-- Src
 ### Demo
-1. Demo 
+1. Demo command
     ```
     python Src\UI_Control\main.py
     ```
+2. 2D 相機
+    ```
+    利用相機去進行骨架偵測
+    ```
+3. 2D 影片
+    ```
+    利用影片進行骨架偵測
+    ```
+    
