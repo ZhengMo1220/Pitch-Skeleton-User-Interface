@@ -138,13 +138,11 @@ def draw_video_traj(img, person_df, person_id, kpt_id, frame_num, window_length=
     filtered_df = filtered_df.sort_values(by='frame_number')
     
     # 提取指定關鍵點的(x, y)座標
-    # 假設 'keypoints' 列包含一個列表，每個元素是關鍵點的四元組 (x, y, visibility, ... )
-    kpt_buffer = [
-        (kpt[0], kpt[1]) 
-        for kpts in filtered_df['keypoints'] 
-        if kpts and kpt_id < len(kpts) and kpts[kpt_id] is not None
-        for kpt in [kpts[kpt_id]]
-    ]
+    kpt_buffer = []
+    for kpts in filtered_df['keypoints']:
+        kpt = kpts[kpt_id]
+        if kpt is not None and len(kpt) >= 2:
+            kpt_buffer.append((kpt[0], kpt[1]))
     
     # 如果緩衝區長度大於等於窗口長度，則應用Savgol濾波器進行平滑
     if len(kpt_buffer) >= window_length:
@@ -186,7 +184,7 @@ def draw_angle_info(img: np.ndarray, angle_info: pd.DataFrame, frame_num:int, po
 
     if angle_info is None:
         return image
-    data = angle_info.loc[angle_info['frame_number'] == (frame_num-1)]
+    data = angle_info.loc[angle_info['frame_number'] == (frame_num)]
     data = data['angle'].iloc[0]
 
     for _, info in data.items(): 

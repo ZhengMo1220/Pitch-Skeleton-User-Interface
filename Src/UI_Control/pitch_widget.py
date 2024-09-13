@@ -231,31 +231,36 @@ class PosePitchTabControl(QWidget):
         
         image = self.record_buffer[frame_num].copy()
 
-        # if frame_num == len(self.record_buffer) - 1:
-        #     self.ui.play_btn.click()
-        #     save_video(self.video_name, self.record_buffer, self.person_df, select_id=self.select_person_id)
+        if frame_num == len(self.record_buffer) - 1:
+        #     print(self.person_df)
+            self.ui.play_btn.click()
+            # save_video(self.video_name, self.record_buffer, self.person_df, select_id=self.select_person_id)
+            save_video(self.video_name, self.record_buffer, self.person_df, select_id=self.select_person_id)
 
         if frame_num not in self.processed_frames:
             self.detect_kpt(image, frame_num= frame_num)
         
         # if self.select_person_id:
         #     self.import_data_to_table(self.select_person_id, frame_num)
+        curr_person_df = self.obtain_data(frame_num = frame_num, person_id = self.select_person_id)
+        self.update_frame(image, curr_person_df)
 
-        self.update_frame(image)
-
-    def update_frame(self, image: np.ndarray):
+    def update_frame(self, image: np.ndarray, curr_person_df:pd.DataFrame = None):
+        if curr_person_df is None:
+            curr_person_df = self.person_df
+        
         if not self.ui.record_checkbox.isChecked():
             image = draw_region(image)
 
         if not self.person_df.empty:
             if self.ui.show_skeleton_checkbox.isChecked():
-                image = draw_points_and_skeleton(image, self.person_df, joints_dict()['haple']['skeleton_links'],
+                image = draw_points_and_skeleton(image, curr_person_df, joints_dict()['haple']['skeleton_links'],
                                                 points_color_palette='gist_rainbow', skeleton_palette_samples='jet',
                                                 points_palette_samples=10, confidence_threshold=0.3)
             if self.ui.show_bbox_checkbox.isChecked():
-                image = draw_bbox(self.person_df, image)
-            if self.ui.select_keypoint_checkbox.isChecked():
-                image = draw_traj(self.select_kpt_buffer,image)
+                image = draw_bbox(curr_person_df, image)
+            # if self.ui.select_keypoint_checkbox.isChecked():
+            #     image = draw_traj(self.select_kpt_buffer,image)
 
         if self.ui.show_line_checkbox.isChecked():
             image = draw_grid(image)
@@ -473,6 +478,14 @@ class PosePitchTabControl(QWidget):
             self.play_frame(self.ui.frame_slider.value())
         else:
             self.ui.play_btn.setText("▶︎")
+
+    def keyPressEvent(self, event):
+        if event.key() == ord('D') or event.key() == ord('d'):
+            self.ui.frame_slider.setValue(self.ui.frame_slider.value() + 1)
+        elif event.key() == ord('A') or event.key() == ord('a'):
+            self.ui.frame_slider.setValue(self.ui.frame_slider.value() - 1)
+        else:
+            super().keyPressEvent(event)
 
     def play_frame(self, start_num = 0):
         for i in range(start_num, len(self.record_buffer)):

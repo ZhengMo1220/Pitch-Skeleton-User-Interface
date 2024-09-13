@@ -7,7 +7,7 @@ from video_widget_beta_two import PoseVideoTabControl
 from pitch_widget import PosePitchTabControl
 from main_window import Ui_MainWindow
 
-from utils.set_parser import set_detect_parser, set_tracker_parser
+from utils.set_parser import set_detect_parser, set_pose_parser, set_tracker_parser
 from mmcv.transforms import Compose
 from mmengine.logging import print_log
 import sys
@@ -34,16 +34,17 @@ class Main(QMainWindow):
     
     def init_model(self):
         self.detect_args = set_detect_parser()
+        self.pose_args = set_pose_parser()
         self.tracker_args = set_tracker_parser()
         self.detector = init_detector(
             self.detect_args.det_config, self.detect_args.det_checkpoint, device=self.detect_args.device)
         self.detector.cfg.test_dataloader.dataset.pipeline[
             0].type = 'mmdet.LoadImageFromNDArray'
         self.detector_test_pipeline = Compose(self.detector.cfg.test_dataloader.dataset.pipeline)
+
         self.pose_estimator = init_pose_estimator(
-            self.detect_args.pose_config,
-            self.detect_args.pose_checkpoint,
-            cfg_options=dict(model=dict(test_cfg=dict(output_heatmaps=self.detect_args.draw_heatmap)))
+            self.pose_args.pose_config,
+            self.pose_args.pose_checkpoint
         )
         self.tracker = BoTSORT(self.tracker_args, frame_rate=30.0)
         
@@ -59,6 +60,7 @@ class Main(QMainWindow):
                         "tracker": self.tracker
                         },
             "Pose Estimator": {
+                                "args" : self.pose_args,
                                 "pose estimator": self.pose_estimator
                             }
         }
