@@ -51,6 +51,7 @@
     ```
 ### Data Preparation
 To obtain the vitpose、yolo and fast-reid wights, it can be downloaded from the https://drive.google.com/drive/folders/1D7Q5bTnTAfKkfLuppqUo4_8W4t0wrCmP?usp=sharing. The resulting data directory should look like this:
+    ```
     ${POSE_ROOT}
     |-- Db
     `-- |-- pretrain
@@ -61,7 +62,7 @@ To obtain the vitpose、yolo and fast-reid wights, it can be downloaded from the
             |-- {video_name}.json (將偵測出來的結果紀錄，裡面包含了人物的bounding box info. 和 26 個關節點位置)
             
     |-- Src
-    
+    ```
 ### Demo
 1. Demo command
     ```
