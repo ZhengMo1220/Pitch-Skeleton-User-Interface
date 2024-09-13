@@ -51,14 +51,14 @@
     ```
 ### Data Preparation
 To obtain the vitpose、yolo and fast-reid wights, it can be downloaded from the https://drive.google.com/drive/folders/1D7Q5bTnTAfKkfLuppqUo4_8W4t0wrCmP?usp=sharing. The resulting data directory should look like this:
-
+    ```
     ${POSE_ROOT}
     |-- Db
     `-- |-- pretrain
             |-- vitpose_Sk26.pth
             |-- yolov7_x_syncbn_fast_8x16b-300e_coco_20221124_215331-ef949a68.pth
     |-- Src 
-
+    ```
 ### Demo
     ```
     python Src\UI_Control\main.py
