@@ -58,3 +58,8 @@ To obtain the vitpose、yolo and fast-reid wights, it can be downloaded from the
             |-- vitpose_Sk26.pth
             |-- yolov7_x_syncbn_fast_8x16b-300e_coco_20221124_215331-ef949a68.pth
     |-- Src 
+
+### Demo
+    ```
+    python Src\UI_Control\main.py
+    ```
