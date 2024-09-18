@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
+from .analyze import PoseAnalyzer
+from skeleton.detect_skeleton import PoseEstimater
 import os
 from scipy.signal import savgol_filter
 import sys
@@ -20,184 +22,295 @@ if getattr(sys, 'frozen', False):
 else:
     application_path = os.path.dirname(__file__)
 
-font_path = os.path.join(application_path, 'R-PMingLiU-TW-2.ttf')
-print("Font path:", font_path)  # 打印以确认路径
-fontStyle = ImageFont.truetype(font_path, 20)
-
-def draw_cross(image, x, y, length=5, color=(0, 0, 255), thickness=2):
-    cv2.line(image, (x, y - length), (x, y + length), color, thickness)
-    cv2.line(image, (x - length, y), (x + length, y), color, thickness)
-
-def draw_grid(image:np.ndarray):
-    #return image:np.ndarray
+class ImageDrawer():
+    def __init__(self, pose_estimater: PoseEstimater=None, pose_analyzer:PoseAnalyzer=None, angle_name:str = "右手肘"):
+        self.font_path = os.path.join(application_path, 'R-PMingLiU-TW-2.ttf')
+        self.fontStyle = ImageFont.truetype(self.font_path, 20)
+        self.pose_estimater = pose_estimater
+        self.pose_analyzer = pose_analyzer
+        self.angle_name = angle_name
+        self.show_grid = False
+        self.show_bbox = False
+        self.show_skeleton = False
+        self.show_traj = False
+        self.show_region = False
+        self.show_angle_info = False
+        self.angle_info_pos = (0,0)
+        self.region = [(100, 250), (450, 600)]
     
-    height, width = image.shape[:2]
-    draw_cross(image,int(width/2),int(height/2),length=20,color=(0,0,255),thickness = 3)
-    # 計算垂直線的位置
-    vertical_interval = width // 5
-    vertical_lines = [vertical_interval * i for i in range(1, 5)]
+    def draw_info(self, img:np.ndarray, frame_num:int=None, kpt_buffer:list = None):
+        curr_person_df = self.pose_estimater.get_person_df_data(frame_num = frame_num, is_select=True)
 
-    # 計算水平線的位置
-    horizontal_interval = height // 5
-    horizontal_lines = [horizontal_interval * i for i in range(1, 5)]
+        if self.show_region:
+            img = self.draw_region(img)
 
-    # 畫垂直線
-    for x in vertical_lines:
-        cv2.line(image, (x, 0), (x, height), (0, 255, 0), 2)
+        if self.show_grid :
+            img = self.draw_grid(img)
+        
+        if self.show_bbox:
+            img = self.draw_bbox(img, curr_person_df)
+        
+        if self.show_skeleton:
+            img = self.draw_points_and_skeleton(img, curr_person_df, self.pose_estimater.joints['haple']['skeleton_links'], 
+                                                points_palette_samples=10)
+        
+        if self.show_traj:
+            img = self.draw_traj(img, kpt_buffer)
 
-    # 畫水平線
-    for y in horizontal_lines:
-        cv2.line(image, (0, y), (width, y), (0, 255, 0), 2)
-
-    return image
-
-
-def draw_bbox(person_data, image):
-    person_ids = person_data['person_id']
-    person_bbox = person_data['bbox']
-    for id, bbox in zip(person_ids, person_bbox):
-        x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
-        color = tuple(colors[id % len(colors)])
-        color = (0,255,0)
-        image = cv2.rectangle(image, (x1, y1), (x2, y2), color, 4)
-        image = cv2.putText(image, str(id), (x1, y1-10), cv2.FONT_HERSHEY_COMPLEX, 1.5, color, 2)
-    return image
-
-def draw_inverted_triangle(image, center, size, color, border_color=(0, 0, 0), border_thickness=2):
-    """
-    在图像上绘制一个倒三角形，并添加黑色边框。
-
-    参数:
-    - image: 输入图像。
-    - center: 三角形的底部顶点（x, y）。
-    - size: 三角形的边长。
-    - color: 三角形的颜色（B, G, R）。
-    - border_color: 边框的颜色（默认黑色）。
-    - border_thickness: 边框的粗细（默认2）。
-    """
-    height = int(size * (np.sqrt(3) / 2))  # 计算三角形的高度
-    vertices = np.array([
-        [center[0], center[1]],  # 底部顶点
-        [center[0] - size // 2, center[1] - height],  # 左上顶点
-        [center[0] + size // 2, center[1] - height]   # 右上顶点
-    ], np.int32)
-    vertices = vertices.reshape((-1, 1, 2))
-    
-    # 先画边框
-    cv2.polylines(image, [vertices], isClosed=True, color=border_color, thickness=border_thickness)
-    # 填充三角形
-    cv2.fillPoly(image, [vertices], color)
-
-def draw_traj(kpt_buffer, img):
-    if len(kpt_buffer) == 0 or len(kpt_buffer) == 1:
+        if self.show_angle_info:
+            img = self.draw_angle_info(img,frame_num)
+        
         return img
-    image = img.copy()
-    
-    for i in range(1, len(kpt_buffer)):
-        f_kptx, f_kpty = map(int, kpt_buffer[i-1])
-        s_kptx, s_kpty = map(int, kpt_buffer[i])
-        cv2.line(image, (f_kptx, f_kpty), (s_kptx, s_kpty), (0, 255, 0), 5)
 
-    return image
+    def draw_cross(self, image, x, y, length=5, color=(0, 0, 255), thickness=2):
+        cv2.line(image, (x, y - length), (x, y + length), color, thickness)
+        cv2.line(image, (x - length, y), (x + length, y), color, thickness)
 
-def draw_video_traj(img, person_df, person_id, kpt_id, frame_num, window_length=17, polyorder=2):
-    """
-    在圖片上繪製特定人物的關鍵點軌跡，並使用Savgol濾波器平滑軌跡。
-
-    參數：
-    - img: 原始圖片（NumPy陣列）
-    - person_df: 包含人物關鍵點信息的Pandas DataFrame
-    - person_id: 目標人物的ID
-    - kpt_id: 目標關鍵點的ID
-    - frame_num: 總幀數
-    - window_length: Savgol濾波器的窗口長度（默認17，需為奇數）
-    - polyorder: Savgol濾波器的多項式階數（默認2）
-    
-    返回：
-    - image: 帶有繪製軌跡的圖片
-    """
-    
-    # 如果DataFrame為空，直接返回原圖
-    if person_df.empty:
-        return img.copy()
-    
-    # 複製原始圖片以避免修改原圖
-    image = img.copy()
-    
-    # 過濾DataFrame，僅保留目標人物和指定幀數範圍內的數據
-    filtered_df = person_df[
-        (person_df['person_id'] == person_id) & 
-        (person_df['frame_number'] < frame_num)
-    ]
-    
-    # 如果過濾後的DataFrame為空，返回原圖
-    if filtered_df.empty:
-        return image
-    
-    # 按幀數排序，確保軌跡的連貫性
-    filtered_df = filtered_df.sort_values(by='frame_number')
-    
-    # 提取指定關鍵點的(x, y)座標
-    kpt_buffer = []
-    for kpts in filtered_df['keypoints']:
-        kpt = kpts[kpt_id]
-        if kpt is not None and len(kpt) >= 2:
-            kpt_buffer.append((kpt[0], kpt[1]))
-    
-    # 如果緩衝區長度大於等於窗口長度，則應用Savgol濾波器進行平滑
-    if len(kpt_buffer) >= window_length:
-        # 確保窗口長度為奇數且不超過緩衝區長度
-        if window_length > len(kpt_buffer):
-            window_length = len(kpt_buffer) if len(kpt_buffer) % 2 == 1 else len(kpt_buffer) - 1
-        # 確保多項式階數小於窗口長度
-        current_polyorder = min(polyorder, window_length - 1)
+    def draw_grid(self, image:np.ndarray):
+        #return image:np.ndarray
         
-        # 分別提取x和y座標
-        x = np.array([point[0] for point in kpt_buffer])
-        y = np.array([point[1] for point in kpt_buffer])
-        
-        # 應用Savgol濾波器
-        x_smooth = savgol_filter(x, window_length=window_length, polyorder=current_polyorder)
-        y_smooth = savgol_filter(y, window_length=window_length, polyorder=current_polyorder)
-        
-        # 將平滑後的座標重新打包
-        smoothed_points = list(zip(x_smooth, y_smooth))
-    else:
-        # 緩衝區長度不足，直接使用原始座標
-        smoothed_points = kpt_buffer
-    
-    # 如果平滑後的點少於2個，無需繪製軌跡
-    if len(smoothed_points) < 2:
+        height, width = image.shape[:2]
+        self.draw_cross(image,int(width/2),int(height/2),length=20,color=(0,0,255),thickness = 3)
+        # 計算垂直線的位置
+        vertical_interval = width // 5
+        vertical_lines = [vertical_interval * i for i in range(1, 5)]
+
+        # 計算水平線的位置
+        horizontal_interval = height // 5
+        horizontal_lines = [horizontal_interval * i for i in range(1, 5)]
+
+        # 畫垂直線
+        for x in vertical_lines:
+            cv2.line(image, (x, 0), (x, height), (0, 255, 0), 2)
+
+        # 畫水平線
+        for y in horizontal_lines:
+            cv2.line(image, (0, y), (width, y), (0, 255, 0), 2)
+
         return image
-    
-    # 將座標轉換為整數並構造適合cv2.polylines的格式
-    points = np.array([(int(x), int(y)) for x, y in smoothed_points], dtype=np.int32).reshape(-1, 1, 2)
-    
-    # 使用cv2.polylines繪製連續的軌跡線
-    cv2.polylines(image, [points], isClosed=False, color=(0, 255, 0), thickness=5)
-    
-    return image
 
-
-def draw_angle_info(img: np.ndarray, angle_info: pd.DataFrame, frame_num:int, pos:tuple):
-    image = img.copy()
-
-    if angle_info is None:
+    def draw_bbox(self, image:np.ndarray, person_df:pd.DataFrame):
+        if person_df.empty:
+            return image
+        person_ids = person_df['person_id']
+        person_bbox = person_df['bbox']
+        for id, bbox in zip(person_ids, person_bbox):
+            x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+            color = tuple(colors[id % len(colors)])
+            color = (0,255,0)
+            image = cv2.rectangle(image, (x1, y1), (x2, y2), color, 4)
+            image = cv2.putText(image, str(id), (x1, y1-10), cv2.FONT_HERSHEY_COMPLEX, 1.5, color, 2)
         return image
-    data = angle_info.loc[angle_info['frame_number'] == (frame_num)]
-    data = data['angle'].iloc[0]
 
-    for _, info in data.items(): 
-        angle = int(info[0])
-        pt1, pt2, pt3 = [tuple(map(int, point)) for point in info[1]]
-        if pos is not None:
-            cv2.line(image, pt2, (pos[0] +20 , pos[1] + 180), (0, 0, 0), 1)
-            image = cv2.putText(image, str(angle), (pos[0] - 20, pos[1] + 200), cv2.FONT_HERSHEY_COMPLEX, 1.5, (0, 255, 0), 2)
+    def draw_traj(self, img: np.ndarray, kpt_buffer: list):
+        if not kpt_buffer or len(kpt_buffer) < 2:
+            return img
+
+        # 將座標轉換為整數
+        int_kpt_buffer = [tuple(map(int, kpt)) for kpt in kpt_buffer]
+        
+        # 迭代相鄰的兩個點，並畫出軌跡線
+        for (f_kptx, f_kpty), (s_kptx, s_kpty) in zip(int_kpt_buffer[:-1], int_kpt_buffer[1:]):
+            cv2.line(img, (f_kptx, f_kpty), (s_kptx, s_kpty), (0, 255, 0), 5)
+
+        return img
+
+    def draw_angle_info(self, img: np.ndarray, frame_num: int) -> np.ndarray:
+        # 从 pose_analyzer 获取角度数据
+        _, angle_info = self.pose_analyzer.get_frame_angle_data(frame_num, self.angle_name)
+        
+        # 提取角度值，并将其转换为整数
+        angle_value = int(angle_info[0])
+        
+        # 提取坐标并将其转换为整数元组
+        p = tuple(map(int, angle_info[1][1]))
+        # 使用 cv2.line 绘制线条
+        cv2.line(img, p, (self.angle_info_pos[0] + 20, self.angle_info_pos[1] + 180), (0, 0, 0), 1)
+        
+        # 使用 cv2.putText 绘制角度值
+        img = cv2.putText(img, str(angle_value), (self.angle_info_pos[0] - 20, self.angle_info_pos[1] + 200), 
+                        cv2.FONT_HERSHEY_COMPLEX, 1.5, (0, 255, 0), 2)
+        
+        return img
+
+    def draw_region(self, img:np.ndarray):
+        cv2.rectangle(img, self.region[0], self.region[1], (0, 255, 0), -1)
+        return img
+
+    def draw_points(self, image, points, person_idx, color_palette='gist_rainbow', palette_samples=10, confidence_threshold=0.3):
+        """
+        Draws `points` on `image`.
+
+        Args:
+            image: image in opencv format
+            points: list of points to be drawn.
+                Shape: (nof_points, 3)
+                Format: each point should contain (y, x, confidence)
+            color_palette: name of a matplotlib color palette
+                Default: 'tab20'
+            palette_samples: number of different colors sampled from the `color_palette`
+                Default: 16
+            confidence_threshold: only points with a confidence higher than this threshold will be drawn. Range: [0, 1]
+                Default: 0.5
+
+        Returns:
+            A new image with overlaid points
+
+        """
+        try:
+            colors = np.round(
+                np.array(plt.get_cmap(color_palette).colors) * 255
+            ).astype(np.uint8)[:, ::-1].tolist()
+        except AttributeError:  # if palette has not pre-defined colors
+            colors = np.round(
+                np.array(plt.get_cmap(color_palette)(np.linspace(0, 1, palette_samples))) * 255
+            ).astype(np.uint8)[:, -2::-1].tolist()
+
+        circle_size = max(1, min(image.shape[:2]) // 160)  # ToDo Shape it taking into account the size of the detection
+        # circle_size = max(2, int(np.sqrt(np.max(np.max(points, axis=0) - np.min(points, axis=0)) // 16)))
+        for i, pt in enumerate(points):
+        
+            unlabel = False if pt[0] != 0 and pt[1] != 0 else True
+            if pt[2] > confidence_threshold and not unlabel:
+                image = cv2.circle(image, (int(pt[1]), int(pt[0])), circle_size, tuple(colors[person_idx % len(colors)]), -1)
+
+        return image
+
+    def draw_skeleton(self, image, points, skeleton, color_palette='Set2', palette_samples='jet', person_index=0,
+                    confidence_threshold=0.5):
+        """
+        Draws a `skeleton` on `image`.
+
+        Args:
+            image: image in opencv format
+            points: list of points to be drawn.
+                Shape: (nof_points, 3)
+                Format: each point should contain (y, x, confidence)
+            skeleton: list of joints to be drawn
+                Shape: (nof_joints, 2)
+                Format: each joint should contain (point_a, point_b) where `point_a` and `point_b` are an index in `points`
+            color_palette: name of a matplotlib color palette
+                Default: 'Set2'
+            palette_samples: number of different colors sampled from the `color_palette`
+                Default: 8
+            person_index: index of the person in `image`
+                Default: 0
+            confidence_threshold: only points with a confidence higher than this threshold will be drawn. Range: [0, 1]
+                Default: 0.5
+
+        Returns:
+            A new image with overlaid joints
+
+        """
+        try:
+            colors = np.round(
+                np.array(plt.get_cmap(color_palette).colors) * 255
+            ).astype(np.uint8)[:, ::-1].tolist()
+        except AttributeError:  # if palette has not pre-defined colors
+            colors = np.round(
+                np.array(plt.get_cmap(color_palette)(np.linspace(0, 1, palette_samples))) * 255
+            ).astype(np.uint8)[:, -2::-1].tolist()
+        right_skeleton = self.pose_estimater.joints['haple']['right_points_indices']
+        left_skeleton = self.pose_estimater.joints['haple']['left_points_indices']
+        
+        for i, joint in enumerate(skeleton):
+            pt1, pt2 = points[joint]
+            pt1_unlabel = False if pt1[0] != 0 and pt1[1] != 0 else True
+            pt2_unlabel = False if pt2[0] != 0 and pt2[1] != 0 else True
+            skeleton_color = tuple(colors[person_index % len(colors)])
+            skeleton_color = (0,255,0)
+            if joint in right_skeleton:
+                skeleton_color = (240, 176, 0)
+            elif joint in left_skeleton:
+                skeleton_color = (0, 0, 255)
+            if pt1[2] > confidence_threshold and not pt1_unlabel and pt2[2] > confidence_threshold and not pt2_unlabel:
+                image = cv2.line(
+                    image, (int(pt1[1]), int(pt1[0])), (int(pt2[1]), int(pt2[0])),
+                    skeleton_color , 6
+                )
+        return image
+
+    def draw_points_and_skeleton(self, image, person_df, skeleton, points_color_palette='gist_rainbow', points_palette_samples=10,
+                                skeleton_color_palette='Set2', skeleton_palette_samples='jet', confidence_threshold=0.3):
+        """
+        Draws `points` and `skeleton` on `image`.
+
+        Args:
+            image: image in opencv format
+            points: list of points to be drawn.
+                Shape: (nof_points, 3)
+                Format: each point should contain (y, x, confidence)
+            skeleton: list of joints to be drawn
+                Shape: (nof_joints, 2)
+                Format: each joint should contain (point_a, point_b) where `point_a` and `point_b` are an index in `points`
+            points_color_palette: name of a matplotlib color palette
+                Default: 'tab20'
+            points_palette_samples: number of different colors sampled from the `color_palette`
+                Default: 16
+            skeleton_color_palette: name of a matplotlib color palette
+                Default: 'Set2'
+            skeleton_palette_samples: number of different colors sampled from the `color_palette`
+                Default: 8
+            person_index: index of the person in `image`
+                Default: 0
+            confidence_threshold: only points with a confidence higher than this threshold will be drawn. Range: [0, 1]
+                Default: 0.5
+
+        Returns:
+            A new image with overlaid joints
+
+        """
+        if person_df is None:
+            return image
+        if person_df.empty:
+            return image
+        person_data = self.df_to_points(person_df)
+        for person_id, points in person_data.items(): 
+            image = self.draw_skeleton(image, points, skeleton,person_index=person_id)
+            image = self.draw_points(image, points,person_idx=person_id)
+        return image
+
+    def df_to_points(self, person_df):
+        person_data = {}
+        person_ids = person_df['person_id']
+        person_kpts = person_df['keypoints']
+        for id, kpts in zip(person_ids, person_kpts):
+            person_data[id] = np.array(self.swap_values(kpts))
+        return person_data
+
+    def swap_values(self, kpts):
+        return [[item[1], item[0], item[2]] for item in kpts]
+
+    def set_show_bbox(self, status:bool):
+        self.show_bbox = status
     
-    return image
+    def set_show_skeleton(self, status:bool):
+        self.show_skeleton = status
+    
+    def set_show_grid(self, status:bool):
+        self.show_grid = status
+        
+    def set_show_region(self, status:bool):
+        self.show_region = status
 
+    def set_show_traj(self, status:bool):
+        self.show_traj = status
 
-def draw_region(img:np.ndarray):
-    image = img.copy()
-    cv2.rectangle(image, (100, 250), (450, 600), (0, 255, 0), -1)
-    return image
+    def set_show_angle_info(self, status:bool):
+        self.show_angle_info = status
+        self.set_angle_info_pos()
+
+    def set_angle_info_pos(self):
+        person_df = self.pose_estimater.get_person_df_data(is_select=True)
+        if person_df is None:
+            return
+        self.angle_info_pos = person_df.iloc[0]['keypoints'][19]
+        self.angle_info_pos = tuple(map(int,self.angle_info_pos))
+
+    def reset(self):
+        self.show_grid = False
+        self.show_bbox = False
+        self.show_skeleton = True
+        self.show_traj = False
+        self.show_angle_info = False
+        self.angle_info_pos = (0,0)

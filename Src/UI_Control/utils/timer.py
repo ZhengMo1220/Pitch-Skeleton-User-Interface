@@ -43,7 +43,11 @@ class Timer:
     def is_time_up(self):
         if self.start_time is None:
             return False
-        return (time.time() - self.start_time) > self.duration
+        diff_time = time.time() - self.start_time
+        if (diff_time) < self.duration:
+            return False
+        return True
+        
     
     def reset(self):
         self.start_time = None

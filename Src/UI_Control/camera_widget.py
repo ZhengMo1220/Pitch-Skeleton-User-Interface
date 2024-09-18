@@ -1,50 +1,33 @@
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QColor, QImage, QPixmap
+from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt
 import numpy as np
 import sys
 import cv2
 import os
-from threading import Lock
 from camera_ui import Ui_camera_ui
 import pandas as pd
 import queue
-from argparse import ArgumentParser
 from utils.cv_thread import VideoCaptureThread, VideoWriter
-from datetime import datetime
-from utils.timer import Timer
-from utils.vis_image import draw_grid, draw_bbox
-from utils.vis_pose import draw_points_and_skeleton, joints_dict
-from utils.set_parser import set_detect_parser, set_tracker_parser
-from topdown_demo_with_mmdet import process_one_image
-from image_demo import detect_image
-from mmcv.transforms import Compose
-from collections import deque
-from mmengine.logging import print_log
-import sys
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(current_dir, "..", "tracker"))
-from tracker.mc_bot_sort import BoTSORT
-from tracker.tracking_utils.timer import Timer
-from mmpose.apis import init_model as init_pose_estimator
-from mmpose.utils import adapt_mmdet_pipeline
 from utils.one_euro_filter import OneEuroFilter
+from utils.timer import FPS_Timer
+from utils.vis_image import draw_grid, draw_bbox, draw_traj
+from utils.vis_pose import draw_points_and_skeleton, joints_dict
+from datetime import datetime
+from topdown_demo_with_mmdet import process_one_image
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-try:
-    from mmdet.apis import inference_detector, init_detector
-    has_mmdet = True
-except (ImportError, ModuleNotFoundError):
-    has_mmdet = False
 
 class PoseCameraTabControl(QWidget):
-    def __init__(self):
-        super(PoseCameraTabControl, self).__init__()
+    def __init__(self, model, parent = None):
+        super(PoseCameraTabControl, self).__init__(parent)
         self.ui = Ui_camera_ui()
         self.ui.setupUi(self)
         self.init_var()
         self.bind_ui()
-        self.init_model()
         self.video_writer = None
+        self.model = model
+        self.fps_timer = FPS_Timer()
+        self.smooth_filter = OneEuroFilter()
 
     def bind_ui(self):
         self.ui.record_checkBox.setDisabled(True)
@@ -52,27 +35,18 @@ class PoseCameraTabControl(QWidget):
         self.ui.show_skeleton_checkBox.clicked.connect(self.toggle_analyze)
         self.ui.record_checkBox.clicked.connect(self.toggle_record)
         self.ui.select_checkBox.clicked.connect(self.toggle_select)
-             
-    def init_model(self):
-        self.detector = init_detector(
-            self.detect_args.det_config, self.detect_args.det_checkpoint, device=self.detect_args.device)
-        self.detector.cfg.test_dataloader.dataset.pipeline[
-            0].type = 'mmdet.LoadImageFromNDArray'
-        self.detector_test_pipeline = Compose(self.detector.cfg.test_dataloader.dataset.pipeline)
-        self.pose_estimator = init_pose_estimator(
-            self.detect_args.pose_config,
-            self.detect_args.pose_checkpoint,
-            cfg_options=dict(model=dict(test_cfg=dict(output_heatmaps=self.detect_args.draw_heatmap)))
-        )
-        self.tracker = BoTSORT(self.tracker_args, frame_rate=30.0)
-        self.smooth_filter = OneEuroFilter()
-        self.timer = Timer()
+        self.ui.select_keypoint_checkbox.clicked.connect(self.toggle_select_kpt)
 
     def init_var(self):
+        self.db_path = f"../../Db"
         self.is_opened = False
         self.is_analyze = self.ui.show_skeleton_checkBox.isChecked()
         self.is_record = False
-        self.select_person_id = -1
+        self.is_select_kpt = False
+        self.select_person_id = None
+        self.select_kpt_id = -1
+        self.select_kpt_buffer = []
+        self.buffer_len = 15
         self.fps_control = 1
         self.pre_person_df = pd.DataFrame()
         self.camera_scene = QGraphicsScene()
@@ -80,8 +54,6 @@ class PoseCameraTabControl(QWidget):
         self.frame_buffer = queue.Queue()
         self.frame_count = 0
         self.kpts_dict = joints_dict()['haple']['keypoints']
-        self.detect_args = set_detect_parser()
-        self.tracker_args = set_tracker_parser()
 
     def toggle_camera(self):
         if self.is_opened:
@@ -110,7 +82,12 @@ class PoseCameraTabControl(QWidget):
 
     def toggle_select(self):
         if not self.ui.select_checkBox.isChecked():
-            self.select_person_id = -1
+            self.select_person_id = None
+    
+    def toggle_select_kpt(self):
+        if not self.ui.select_keypoint_checkbox.isChecked():
+            self.select_kpt_id = -1
+            self.select_kpt_buffer = []
         
     def open_camera(self):
         self.video_thread = VideoCaptureThread(camera_index=self.ui.camera_id_input.value())
@@ -202,11 +179,9 @@ class PoseCameraTabControl(QWidget):
             frame = self.frame_buffer.get()
             img = frame.copy()
             if self.is_analyze:
-                self.timer.tic()
-                pred_instances, person_ids = process_one_image(self.detect_args, img, self.detector,
-                                                                self.detector_test_pipeline, self.pose_estimator,
-                                                                  self.tracker, select_id=self.select_person_id)
-                average_time = self.timer.toc()
+                self.fps_timer.tic()
+                pred_instances, person_ids = process_one_image(self.model, img, select_id=self.select_person_id)
+                average_time = self.fps_timer.toc()
                 fps= int(1/max(average_time,0.00001))
                 if fps <10:
                     self.ui.fps_info_label.setText(f"0{fps}")
@@ -216,6 +191,8 @@ class PoseCameraTabControl(QWidget):
                 person_bboxes = pred_instances['bboxes']
                 self.merge_person_datas(person_ids, person_bboxes, person_kpts)
                 self.smooth_kpt(person_ids)
+                if self.select_kpt_id != -1:
+                    self.buffer_kpt_info(person_kpts[0])
             self.update_frame(img)
 
     def update_frame(self, image:np.ndarray):
@@ -226,6 +203,10 @@ class PoseCameraTabControl(QWidget):
                                                 points_palette_samples=10, confidence_threshold=0.3)
             if self.ui.show_bbox_checkbox.isChecked():
                 image = draw_bbox(self.person_df, image)
+                
+            if self.ui.select_keypoint_checkbox.isChecked():
+                image = draw_traj(self.select_kpt_buffer,image)
+
         if self.ui.show_line_checkBox.isChecked():
             image = draw_grid(image)
         self.show_image(image, self.camera_scene, self.ui.camer_frame_view)
@@ -277,6 +258,13 @@ class PoseCameraTabControl(QWidget):
             if event.button() == Qt.LeftButton:
                 self.person_id_selector(x, y)
 
+        if self.ui.select_keypoint_checkbox.isChecked():
+            pos = event.pos()
+            scene_pos = self.ui.camer_frame_view.mapToScene(pos)
+            x, y = scene_pos.x(), scene_pos.y()
+            if event.button() == Qt.LeftButton:
+                self.kpt_id_selector(x, y)
+
     def person_id_selector(self, x, y):
         if self.pre_person_df.empty:
             return
@@ -300,9 +288,34 @@ class PoseCameraTabControl(QWidget):
 
         self.select_person_id = selected_id
 
+    def kpt_id_selector(self, x, y):
+        def calculate_distance(point1, point2):
+            return np.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
+        
+        if self.pre_person_df.empty :
+            return
 
+        selected_id = None
+        min_distance = 10000
 
-       
+        for _, row in self.pre_person_df.iterrows():
+            person_kpts = row['keypoints']
+            for kpt_id, kpt in enumerate(person_kpts):
+                
+                kptx, kpty, kpt_score, _= map(int, kpt)
+                
+                # if kpt_score
+                distance = calculate_distance([kptx, kpty], [x, y])
+                if distance < min_distance:
+                    min_distance = distance
+                    selected_id = kpt_id
+
+        self.select_kpt_id = selected_id
+
+    def buffer_kpt_info(self, person_kpts):
+        if len(self.select_kpt_buffer) > self.buffer_len:
+            _ = self.select_kpt_buffer.pop(0)
+        self.select_kpt_buffer.append(person_kpts[self.select_kpt_id][:2])
         
 
 if __name__ == "__main__":

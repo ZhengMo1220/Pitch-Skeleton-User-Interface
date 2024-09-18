@@ -3,8 +3,8 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout
 # from camera_widget import PoseCameraTabControl
 
 from camera_widget_beta import PoseCameraTabControl
-from video_widget_beta_two import PoseVideoTabControl
-from pitch_widget import PosePitchTabControl
+from video_widget_beta import PoseVideoTabControl
+from pitch_widget_beta import PosePitchTabControl
 from main_window import Ui_MainWindow
 
 from utils.set_parser import set_detect_parser, set_pose_parser, set_tracker_parser
@@ -72,6 +72,12 @@ class Main(QMainWindow):
         self.ui.Two_d_Tab.addTab(self.video_tab, "2D 影片")
         self.pitch_tab = PosePitchTabControl(self.model)
         self.ui.Two_d_Tab.addTab(self.pitch_tab, "2D 投手")
+
+
+    def reset_tracker_model(self):
+        self.tracker = BoTSORT(self.tracker_args, frame_rate=30.0)
+        return self.tracker
+    
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

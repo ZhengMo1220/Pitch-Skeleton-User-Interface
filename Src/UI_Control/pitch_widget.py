@@ -11,7 +11,6 @@ import queue
 from utils.cv_thread import VideoCaptureThread, VideoWriter
 from datetime import datetime
 from utils.timer import FPS_Timer, Timer
-import time
 from utils.vis_image import draw_grid, draw_bbox, draw_traj, draw_region
 from utils.vis_pose import draw_points_and_skeleton, joints_dict
 from utils.store import save_video
@@ -33,7 +32,6 @@ class PosePitchTabControl(QWidget):
         self.fps_timer = FPS_Timer()
 
     def bind_ui(self):
-        self.ui.record_checkbox.setDisabled(True)
         self.ui.camera_checkbox.clicked.connect(self.toggle_camera)
         self.ui.record_checkbox.clicked.connect(self.toggle_record)
         self.ui.select_checkbox.clicked.connect(self.toggle_select)
@@ -50,8 +48,8 @@ class PosePitchTabControl(QWidget):
     def init_var(self):
         self.select_person_id = None
         self.select_kpt_id = None
-        self.trigger_record_timer = Timer(3)
-        self.trigger_pitch_timer = Timer(3)
+        self.trigger_record_timer = Timer(1)
+        self.trigger_pitch_timer = Timer(1)
         self.select_kpt_buffer = []
         self.record_buffer = []
         self.is_play = False
@@ -75,15 +73,16 @@ class PosePitchTabControl(QWidget):
             frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
             self.ui.image_resolution_label.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
-            self.ui.record_checkbox.setEnabled(True)
             self.video_silder(visible=False)
         else:
             self.close_camera()
             self.ui.image_resolution_label.setText(f"(0, 0) - ")
-            self.ui.record_checkbox.setDisabled(True)
             self.video_silder(visible=True)
 
     def toggle_record(self):
+        if not self.ui.camera_checkbox.isChecked():
+            print("Need to open camera first")
+            return
         if self.ui.record_checkbox.isChecked():
             self.start_recording()
         else:
@@ -92,6 +91,7 @@ class PosePitchTabControl(QWidget):
     def toggle_select(self):
         if not self.ui.select_checkbox.isChecked():
             self.select_person_id = None
+            
         else:
             self.person_id_selector(0.0, 0.0)
     
@@ -107,7 +107,7 @@ class PosePitchTabControl(QWidget):
 
     def toggle_analyze_video(self, video):
         self.video_ui_set(video)
-        self.checkbox_controller(record=False, show_skeleton=True, show_bbox=False)
+        self.checkbox_controller(camera= False, record=False, show_skeleton=True, show_bbox=False)
                                     #   select_person=True, select_kpt=True, show_kpt_angle= True)
         self.processed_frames = set()
         self.ui.play_btn.click()
@@ -160,7 +160,7 @@ class PosePitchTabControl(QWidget):
         output_dir = f'../../Db/Record/C{self.ui.camera_id_input.value()}_Fps120_{current_time}'
         os.makedirs(output_dir, exist_ok=True)
         video_filename = os.path.join(output_dir, f'C{self.ui.camera_id_input.value()}_Fps120_{current_time}.mp4')
-        self.video_name = video_filename
+        self.video_name = f'C{self.ui.camera_id_input.value()}_Fps120_{current_time}'
         frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
@@ -249,7 +249,7 @@ class PosePitchTabControl(QWidget):
         if curr_person_df is None:
             curr_person_df = self.person_df
         
-        if not self.ui.record_checkbox.isChecked():
+        if not self.ui.record_checkbox.isChecked() and self.ui.camera_checkbox.isChecked():
             image = draw_region(image)
 
         if not self.person_df.empty:
@@ -416,6 +416,9 @@ class PosePitchTabControl(QWidget):
             self.ui.camera_checkbox.click()
 
         if record is not None and record != self.ui.record_checkbox.isChecked():
+            print(record)
+            print(self.ui.record_checkbox.isChecked())
+            print("trigger record")
             self.ui.record_checkbox.click()
 
         if show_skeleton is not None and show_skeleton != self.ui.show_skeleton_checkbox.isChecked():

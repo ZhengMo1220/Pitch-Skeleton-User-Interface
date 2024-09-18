@@ -9,59 +9,38 @@ import os
 from video_ui import Ui_video_widget
 import matplotlib.pyplot as plt
 import pandas as pd
-from argparse import ArgumentParser
 import cv2
 import numpy as np
 from utils.cv_thread import VideoToImagesThread
 from utils.util import DataType
-from utils.set_parser import set_detect_parser, set_tracker_parser
-from utils.timer import Timer
-from utils.vis_image import  draw_bbox
+from utils.timer import FPS_Timer
+from utils.vis_image import  draw_bbox, draw_video_traj, draw_angle_info
+from utils.vis_graph import init_graph, update_graph
 from utils.vis_pose import draw_points_and_skeleton, joints_dict
+from utils.analyze import obtain_analyze_information
 from utils.store import save_video
-from topdown_demo_with_mmdet import process_one_image
-from image_demo import detect_image
-from mmcv.transforms import Compose
-from mmengine.logging import print_log
-import sys
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# 添加相對於當前文件的父目錄的子目錄到系統路徑
-sys.path.append(os.path.join(current_dir, "..", "tracker"))
-from pathlib import Path
-from tracker.mc_bot_sort import BoTSORT
-from tracker.tracking_utils.timer import Timer
-from mmpose.apis import init_model as init_pose_estimator
-from mmpose.utils import adapt_mmdet_pipeline
 from utils.one_euro_filter import OneEuroFilter
+from topdown_demo_with_mmdet import process_one_image
 import pyqtgraph as pg
-# 設置背景和前景顏色
-
-# from pyqtgraph import LabelItem
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-
-try:
-    from mmdet.apis import inference_detector, init_detector
-    has_mmdet = True
-except (ImportError, ModuleNotFoundError):
-    has_mmdet = False
-
 
 class PoseVideoTabControl(QWidget):
-    def __init__(self):
-        super(PoseVideoTabControl, self).__init__()
+    def __init__(self, model, parent = None):
+        super(PoseVideoTabControl, self).__init__(parent)
         self.ui = Ui_video_widget()
         self.ui.setupUi(self)
         self.init_var()
         self.bind_ui()
-        self.init_model()
+        self.model = model
+        self.smooth_filter = OneEuroFilter()
+        self.fps_timer = FPS_Timer()
 
     def bind_ui(self):
         self.ui.select_checkbox.setDisabled(True)
+        self.ui.select_kpt_checkbox.setDisabled(True)
         self.ui.load_original_video_btn.clicked.connect(
             lambda: self.load_video(self.ui.video_name_label, self.db_path + "/videos/"))
         self.ui.load_processed_video_btn.clicked.connect(
-            lambda: self.load_video(self.ui.video_name_label, self.db_path + "/videos/"))
+            lambda: self.load_process_video(self.ui.video_name_label, self.db_path + "/videos/"))
         
         self.ui.play_btn.clicked.connect(self.play_btn_clicked)
         self.ui.back_key_btn.clicked.connect(
@@ -71,58 +50,49 @@ class PoseVideoTabControl(QWidget):
             lambda: self.ui.frame_slider.setValue(self.ui.frame_slider.value() + 1)
         )
         self.ui.frame_slider.valueChanged.connect(self.analyze_frame)
-        self.ui.video_keypoint_table.cellActivated.connect(self.on_cell_clicked)
-        self.ui.video_frame_view.mousePressEvent = self.mousePressEvent
+        self.ui.keypoint_table.cellActivated.connect(self.on_cell_clicked)
+        self.ui.frame_view.mousePressEvent = self.mousePressEvent
         self.ui.id_correct_btn.clicked.connect(self.correct_person_id)
         self.ui.start_code_btn.clicked.connect(self.toggle_detect)
         self.ui.select_checkbox.clicked.connect(self.toggle_select)
+        self.ui.select_kpt_checkbox.clicked.connect(self.toggle_select_kpt)
              
-    def init_model(self):
-        self.detector = init_detector(
-            self.detect_args.det_config, self.detect_args.det_checkpoint, device=self.detect_args.device)
-        self.detector.cfg.test_dataloader.dataset.pipeline[
-            0].type = 'mmdet.LoadImageFromNDArray'
-        self.detector_test_pipeline = Compose(self.detector.cfg.test_dataloader.dataset.pipeline)
-        self.pose_estimator = init_pose_estimator(
-            self.detect_args.pose_config,
-            self.detect_args.pose_checkpoint,
-            cfg_options=dict(model=dict(test_cfg=dict(output_heatmaps=self.detect_args.draw_heatmap)))
-        )
-        self.tracker = BoTSORT(self.tracker_args, frame_rate=30.0)
-        self.smooth_filter = OneEuroFilter()
-        self.timer = Timer()
-
     def init_var(self):
+        self.graph =  pg.PlotWidget()
+        self.angle_info_pos = None
         self.db_path = f"../../Db"
-        self.is_play=False
-        self.is_analyze = False
+        self.is_play = False
         self.is_detect = False
-        
-        self.select_person_id = -1
-        self.processed_images=-1
-        self.fps = 30
+        self.processed_images = -1
+        self.select_person_id = None
+        self.select_kpt_id = -1
+        self.select_kpt_buffer = []
         self.video_images=[]
         self.video_path = ""
-        self.is_threading=False
+        self.json_path = ""
+        self.is_threading = False
+        self.angle_info = None
         self.video_scene = QGraphicsScene()
+        self.curve_scene = QGraphicsScene()
         self.video_scene.clear()
+        self.curve_scene.clear()
         self.correct_kpt_idx = 0
         self.video_name = ""
-        self.start_frame_num = 0
-        self.end_frame_num = 0
         self.processed_frames = set()
         self.person_df = pd.DataFrame()
         self.person_data = []
         self.label_kpt = False
         self.select_frame = 0
-        self.detect_args = set_detect_parser()
-        self.tracker_args = set_tracker_parser()
         self.kpts_dict = joints_dict()['haple']['keypoints']
+        pg.setConfigOptions(foreground=QColor(113,148,116), antialias = True)
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 'k')
 
     def load_video(self, label_item, path: str, value_filter=None, mode=DataType.VIDEO):
         self.init_var()
         if self.ui.select_checkbox.isChecked():
             self.ui.select_checkbox.click()
+
         # 判斷是資料夾還是檔案
         if mode == DataType.FOLDER:
             data_path = QFileDialog.getExistingDirectory(self, mode.value['tips'], path)
@@ -145,29 +115,44 @@ class PoseVideoTabControl(QWidget):
         self.v_t.emit_signal.connect(self.video_to_frame)
         self.v_t.start()
 
-    def load_process_video(self, label_item, path: str, value_filter=None, mode=DataType.VIDEO):
+    def load_process_video(self, label_item, path: str, value_filter=None, mode=DataType.FOLDER):
         self.init_var()
+        self.ui.select_checkbox.setEnabled(True)
+        self.ui.select_kpt_checkbox.setEnabled(True)
         if self.ui.select_checkbox.isChecked():
             self.ui.select_checkbox.click()
-        # 判斷是資料夾還是檔案
-        if mode == DataType.FOLDER:
-            data_path = QFileDialog.getExistingDirectory(self, mode.value['tips'], path)
-        else:
-            name_filter = value_filter or mode.value['filter']
-            data_path, _ = QFileDialog.getOpenFileName(None, mode.value['tips'], path, name_filter)
 
-        # 檢查是否有選取檔案或資料夾
+        data_path = QFileDialog.getExistingDirectory(self, mode.value['tips'], path)
+
         if not data_path:
             return
 
+        # 搜尋資料夾內的 .mp4 和 .json 檔案
+        mp4_files = [os.path.join(data_path, f) for f in os.listdir(data_path) if f.endswith('.mp4') and not f.endswith('Sk26.mp4') ]
+        json_files = [os.path.join(data_path, f) for f in os.listdir(data_path) if f.endswith('.json')]
+        print(mp4_files)
+        print(json_files)
+        # 檢查是否有找到檔案
+        if not mp4_files or not json_files:
+            label_item.setText("未找到 .mp4 或 .json 檔案")
+            return
+
         # 更新 UI 顯示
-        label_item.setText(os.path.basename(data_path))
+        label_item.setText(f"找到 {len(mp4_files)} 個影片和 {len(json_files)} 個 JSON 檔案")
         label_item.setToolTip(data_path)
 
-        self.video_path = data_path
-        label_item.setText("讀取影片中...")
-        
-        # 啟動影像處理執行緒
+        self.video_path = mp4_files[0]  # 儲存影片路徑列表
+        self.json_path = json_files[0]  # 儲存 JSON 路徑列表
+        label_item.setText("讀取資料夾中的檔案中...")
+
+        try:       
+            self.person_df = pd.DataFrame()
+            self.person_df = pd.read_json(self.json_path)
+            process_frame_nums = self.person_df['frame_number'].unique()
+            self.processed_frames = sorted(set(frame_num for frame_num in process_frame_nums if frame_num!=0) )
+        except Exception as e:
+            print(f"加载 JSON 文件时出错：{e}")
+
         self.v_t = VideoToImagesThread(self.video_path)
         self.v_t.emit_signal.connect(self.video_to_frame)
         self.v_t.start()
@@ -185,6 +170,12 @@ class PoseVideoTabControl(QWidget):
         GraphicsView.setAlignment(Qt.AlignLeft)
         GraphicsView.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
 
+    def show_graph(self, graph, scene, graphicview):
+        graph.resize(graphicview.width(),graphicview.height())
+        scene.addWidget(graph)
+        graphicview.setScene(scene)
+        graphicview.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
+
     def video_to_frame(self, video_images, fps, count):
         self.total_images = count
         self.ui.frame_slider.setMinimum(0)
@@ -192,12 +183,16 @@ class PoseVideoTabControl(QWidget):
         self.ui.frame_slider.setValue(0)
         self.ui.frame_num_label.setText(f'0/{count-1}')
         self.video_images = video_images
-        self.show_image(self.video_images[0], self.video_scene, self.ui.video_frame_view)
+        image = self.video_images[0].copy()
+        if self.ui.show_skeleton_checkbox.isChecked() and self.json_path == "":
+            self.detect_kpt(image, frame_num = 0)
+        self.update_frame()
         self.ui.video_resolution_label.setText( "(0,0) -" + f" {self.video_images[0].shape[1]} x {self.video_images[0].shape[0]}")
         self.video_name = os.path.splitext(os.path.basename(self.video_path))[0]
         self.ui.video_name_label.setText(self.video_name)
+        self.graph = init_graph(self.total_images)
+        self.show_graph(self.graph, self.curve_scene, self.ui.curve_view)
         self.close_thread(self.v_t)
-        self.fps = fps
 
     def close_thread(self, thread):
         thread.stop()
@@ -206,42 +201,41 @@ class PoseVideoTabControl(QWidget):
    
     def play_frame(self, start_num=0):
         for i in range(start_num, self.total_images):
+            self.ui.frame_slider.setValue(i)
             if not self.is_play:
                 break
             if i > self.processed_images:
                 self.processed_images = i
-            self.ui.frame_slider.setValue(i)
-            # to the last frame ,stop playing
             if i == self.total_images - 1 and self.is_play:
                 self.play_btn_clicked()
-            # time.sleep(0.1)
             cv2.waitKey(15)
 
-    def merge_keypoint_datas(self, pred_instances):
-        return [
-            np.hstack(
-                (
-                    np.round(person['keypoints'][0], 2),
-                    np.round(person['keypoint_scores'][0], 2).reshape(-1, 1),
-                    np.full((len(person['keypoints'][0]), 1), False, dtype=bool)
-                )
-            )
-            for person in pred_instances
-        ]
+    def merge_person_data(self, pred_instances, person_ids: list, frame_num: int = None):
+        person_bboxes = pred_instances['bboxes']
+        if frame_num is None:
+            self.person_data = []
 
-    def merge_person_datas(self, frame_num, person_ids, person_bboxes, person_kpts):
-        for pid, bbox, kpts in zip(person_ids, person_bboxes, person_kpts):
-            new_kpts = np.zeros((len(self.kpts_dict),kpts.shape[1]))
-            # haple
-            new_kpts[:26] = kpts
-            new_kpts[26:, 2] = 0.9
-            self.person_data.append({
-                'frame_number': frame_num,
+        for person, pid, bbox in zip(pred_instances, person_ids, person_bboxes):
+            keypoints_data = np.hstack((
+                np.round(person['keypoints'][0], 2),
+                np.round(person['keypoint_scores'][0], 2).reshape(-1, 1),
+                np.full((len(person['keypoints'][0]), 1), False, dtype=bool)
+            ))
+
+            new_kpts = np.full((len(self.kpts_dict), keypoints_data.shape[1]), 0.9)
+            new_kpts[:26] = keypoints_data
+            person_info = {
                 'person_id': pid,
                 'bbox': bbox,
                 'keypoints': new_kpts
-            })
-        self.person_df = pd.DataFrame(self.person_data)
+            }
+
+            if frame_num is not None:
+                person_info['frame_number'] = frame_num
+
+            self.person_data.append(person_info)
+
+        return pd.DataFrame(self.person_data)
 
     def play_btn_clicked(self):
         if self.video_path == "":
@@ -254,129 +248,137 @@ class PoseVideoTabControl(QWidget):
         else:
             self.ui.play_btn.setText("▶︎")
 
-    def update_person_df(self):
+    def update_person_df(self, x, y, label):
         person_id = self.select_person_id
         # 获取当前帧数
         frame_num = self.ui.frame_slider.value()
-        # 获取表格中的数据并更新到 DataFrame 中
-        for kpt_idx in range(self.ui.video_keypoint_table.rowCount()):
-            kpt_name = self.ui.video_keypoint_table.item(kpt_idx, 0).text()
-            kpt_x = float(self.ui.video_keypoint_table.item(kpt_idx, 1).text())
-            kpt_y = float(self.ui.video_keypoint_table.item(kpt_idx, 2).text())
-            # 更新 DataFrame 中对应的值
-            self.person_df.loc[(self.person_df['frame_number'] == frame_num) &
-                                (self.person_df['person_id'] == person_id), 'keypoints'].iloc[0][kpt_idx][:2] = [kpt_x, kpt_y]
-        
+        self.person_df.loc[(self.person_df['frame_number'] == frame_num) &
+                            (self.person_df['person_id'] == person_id), 'keypoints'].iloc[0][self.correct_kpt_idx] = [x, y, 0.9, label]
         self.update_frame()
 
     def analyze_frame(self):
         frame_num = self.ui.frame_slider.value()
 
-        self.ui.frame_num_label.setText(
-            f'{frame_num}/{self.total_images - 1}')
+        self.ui.frame_num_label.setText(f'{frame_num}/{self.total_images - 1}')
 
-        # no image to analyze
-        if len(self.video_images) <= 0:
+        if not self.video_images:
             return
-        
+
         image = self.video_images[frame_num].copy()
-    
-        if self.ui.frame_slider.value() == (self.total_images-1):
+
+        if frame_num == self.total_images - 1:
             self.ui.play_btn.click()
             save_video(self.video_name, self.video_images, self.person_df, select_id=self.select_person_id)
 
-
         if frame_num not in self.processed_frames and self.is_detect:
-            self.detect_kpt(image, frame_num)
-            if self.select_person_id != -1:
-                self.import_data_to_table(self.select_person_id, frame_num)
+            self.detect_kpt(image, frame_num = frame_num)
+
+        if self.select_person_id:
+            if self.angle_info_pos is None:
+                person_kpt = self.obtain_data(frame_num,self.select_person_id, True)
+                self.set_angle_info_pos(person_kpt)
+            self.import_data_to_table(self.select_person_id, frame_num)
+            person_data = self.obtain_data(person_id = self.select_person_id)
+            self.angle_info = obtain_analyze_information(person_data, joints_dict()['haple']['angle_dict'], frame_num)
+            self.graph = update_graph(self.graph, self.angle_info, frame_num)
 
         self.update_frame()
-                 
+              
     def update_frame(self):
-        curr_person_df, frame_num= self.obtain_curr_data()
+        frame_num = self.ui.frame_slider.value()
+        curr_person_df = self.obtain_data(frame_num = frame_num, person_id = self.select_person_id)
         image = self.video_images[frame_num].copy()
-        
+
         if not curr_person_df.empty and frame_num in self.processed_frames:
-            #haple
-            if self.ui.video_show_skeleton_checkBox.isChecked():
-                image = draw_points_and_skeleton(image, curr_person_df, joints_dict()['haple']['skeleton_links'], 
-                                                points_color_palette='gist_rainbow', skeleton_palette_samples='jet',
-                                                points_palette_samples=10, confidence_threshold=0.3)
-            if self.ui.video_show_bbox_checkbox.isChecked():
+            if self.ui.show_angle_checkbox.isChecked():
+                image = draw_angle_info(image, self.angle_info, frame_num, self.angle_info_pos)
+
+            if self.ui.show_skeleton_checkbox.isChecked():
+                image = draw_points_and_skeleton(image, curr_person_df, 
+                                                joints_dict()['haple']['skeleton_links'], 
+                                                points_color_palette='gist_rainbow', 
+                                                skeleton_palette_samples='jet',
+                                                points_palette_samples=10, 
+                                                confidence_threshold=0.3)
+            
+            if self.ui.show_bbox_checkbox.isChecked():
                 image = draw_bbox(curr_person_df, image)
 
-        # 将原始图像直接显示在 QGraphicsView 中
-        self.show_image(image, self.video_scene, self.ui.video_frame_view)
+            if self.ui.select_kpt_checkbox.isChecked():
+                image = draw_video_traj(image, self.person_df, self.select_person_id,
+                                        self.select_kpt_id, frame_num)
 
-    def detect_kpt(self,image,frame_num:int):
-        self.timer.tic()
-        pred_instances, person_ids = process_one_image(self.detect_args,image,self.detector,
-                                                       self.detector_test_pipeline,self.pose_estimator,
-                                                       self.tracker, select_id= self.select_person_id)
-        average_time = self.timer.toc()
-        fps= int(1/max(average_time,0.00001))
-        if fps <10:
-            self.ui.video_fps_info_label.setText(f"0{fps}")
-        else:
-            self.ui.video_fps_info_label.setText(f"{fps}")
         
-        person_kpts = self.merge_keypoint_datas(pred_instances)
-        person_bboxes = pred_instances['bboxes']
-        self.merge_person_datas(frame_num, person_ids, person_bboxes, person_kpts)
+                
+        self.show_image(image, self.video_scene, self.ui.frame_view)
+
+    def detect_kpt(self, image:np.ndarray, frame_num:int = None):
+        self.fps_timer.tic()
+        pred_instances, person_ids = process_one_image(self.model, image, select_id=self.select_person_id)
+        average_time = self.fps_timer.toc()
+        fps = int(1/max(average_time, 0.00001))
+        self.ui.fps_info_label.setText(f"{fps:02}")
+        self.person_df = self.merge_person_data(pred_instances, person_ids, frame_num)
         self.smooth_kpt(person_ids)
-        self.processed_frames.add(frame_num)
+        
+        if frame_num is not None:
+            self.processed_frames.add(frame_num)
 
-    def obtain_curr_data(self):
-        curr_person_df = pd.DataFrame()
-        frame_num = self.ui.frame_slider.value()
-        if not self.person_df.empty:
-            curr_person_df = self.person_df.loc[(self.person_df['frame_number'] == frame_num)]
-        return curr_person_df, frame_num
-
+    def obtain_data(self, frame_num=None, person_id=None, is_kpt=False):
+        condition = pd.Series([True] * len(self.person_df))  # 初始條件設為全為 True
+        if frame_num is not None:
+            condition &= (self.person_df['frame_number'] == frame_num)
+        
+        if person_id is not None:
+            condition &= (self.person_df['person_id'] == person_id)
+ 
+        data = self.person_df.loc[condition]
+        
+        if is_kpt:
+            data = data['keypoints']
+            
+        return data
+    
     def toggle_detect(self):
         self.is_detect = not self.is_detect
         self.ui.select_checkbox.setEnabled(True)
+        self.ui.select_kpt_checkbox.setEnabled(True)
         self.ui.play_btn.click()
 
     def toggle_select(self):
         if not self.ui.select_checkbox.isChecked():
-            self.select_person_id = -1
+            self.select_person_id = None
         else:
-            self.ui.play_btn.click()
-            
+            self.person_id_selector(0,0)
+
+    def toggle_select_kpt(self):
+        if not self.ui.select_kpt_checkbox.isChecked():
+            self.select_kpt_id = -1
+        else:
+            self.select_kpt_id = 10
+
     def clear_table_view(self):
-        # 清空表格視圖
-        self.ui.video_keypoint_table.clear()
-        # 設置列數
-        self.ui.video_keypoint_table.setColumnCount(4)
-        # 設置列標題
+        self.ui.keypoint_table.clear()
+        self.ui.keypoint_table.setColumnCount(4)
         title = ["關節點", "X", "Y", "有無更改"]
-        self.ui.video_keypoint_table.setHorizontalHeaderLabels(title)
-        # 將列的對齊方式設置為左對齊
-        header = self.ui.video_keypoint_table.horizontalHeader()
+        self.ui.keypoint_table.setHorizontalHeaderLabels(title)
+        header = self.ui.keypoint_table.horizontalHeader()
         for i in range(4):
             header.setDefaultAlignment(Qt.AlignLeft)
 
-    def import_data_to_table(self, person_id, frame_num):
-        # 清空表格視圖
+    def import_data_to_table(self, person_id:int, frame_num:int):
         self.clear_table_view()
-
-        # 獲取特定人員在特定幀的數據
         person_data = self.person_df.loc[(self.person_df['frame_number'] == frame_num) & (self.person_df['person_id'] == person_id)]
 
         if person_data.empty:
-            # print("未找到特定人員在特定幀的數據")
             self.clear_table_view()
             self.ui.select_checkbox.click()
             return
-
-        # 確保表格視圖大小足夠
+        
         num_keypoints = len(self.kpts_dict)
-        if self.ui.video_keypoint_table.rowCount() < num_keypoints:
-            self.ui.video_keypoint_table.setRowCount(num_keypoints)
+        if self.ui.keypoint_table.rowCount() < num_keypoints:
+            self.ui.keypoint_table.setRowCount(num_keypoints)
 
-        # 將關鍵點數據匯入到表格視圖中
         for kpt_idx, kpt in enumerate(person_data['keypoints'].iloc[0]): 
             kptx, kpty, kpt_label = kpt[0], kpt[1], kpt[3]
             kpt_name = self.kpts_dict[kpt_idx]
@@ -391,16 +393,16 @@ class PoseVideoTabControl(QWidget):
             kptx_item.setTextAlignment(Qt.AlignRight)
             kpty_item.setTextAlignment(Qt.AlignRight)
             kpt_label_item.setTextAlignment(Qt.AlignRight)
-            self.ui.video_keypoint_table.setItem(kpt_idx, 0, kpt_name_item)
-            self.ui.video_keypoint_table.setItem(kpt_idx, 1, kptx_item)
-            self.ui.video_keypoint_table.setItem(kpt_idx, 2, kpty_item)
-            self.ui.video_keypoint_table.setItem(kpt_idx, 3, kpt_label_item)
+            self.ui.keypoint_table.setItem(kpt_idx, 0, kpt_name_item)
+            self.ui.keypoint_table.setItem(kpt_idx, 1, kptx_item)
+            self.ui.keypoint_table.setItem(kpt_idx, 2, kpty_item)
+            self.ui.keypoint_table.setItem(kpt_idx, 3, kpt_label_item)
 
     def on_cell_clicked(self, row, column):
         self.correct_kpt_idx = row
         self.label_kpt = True
-    
-    def send_to_table(self, kptx, kpty, kpt_label):
+     
+    def send_to_table(self, kptx:float, kpty:float, kpt_label:int):
         kptx_item = QTableWidgetItem(str(kptx))
         kpty_item = QTableWidgetItem(str(kpty))
         if kpt_label :
@@ -410,41 +412,32 @@ class PoseVideoTabControl(QWidget):
         kptx_item.setTextAlignment(Qt.AlignRight)
         kpty_item.setTextAlignment(Qt.AlignRight)
         kpt_label_item.setTextAlignment(Qt.AlignRight)
-        self.ui.video_keypoint_table.setItem(self.correct_kpt_idx, 1, kptx_item)
-        self.ui.video_keypoint_table.setItem(self.correct_kpt_idx, 2, kpty_item)
-        self.ui.video_keypoint_table.setItem(self.correct_kpt_idx, 3, kpt_label_item)
-        self.update_person_df()
+        self.ui.keypoint_table.setItem(self.correct_kpt_idx, 1, kptx_item)
+        self.ui.keypoint_table.setItem(self.correct_kpt_idx, 2, kpty_item)
+        self.ui.keypoint_table.setItem(self.correct_kpt_idx, 3, kpt_label_item)
+        self.update_person_df(kptx, kpty, kpt_label)
 
     def mousePressEvent(self, event):
-        if self.label_kpt:
-            pos = event.pos()
-            scene_pos = self.ui.video_frame_view.mapToScene(pos)
-            kptx, kpty = scene_pos.x(), scene_pos.y()
-            kpt_label = 1
-            if event.button() == Qt.LeftButton:
-                self.send_to_table(kptx, kpty,kpt_label)
-            elif event.button() == Qt.RightButton:
-                kptx, kpty = 0, 0
-                self.send_to_table(kptx, kpty, 0)
-            self.label_kpt = False
+        pos = event.pos()
+        scene_pos = self.ui.frame_view.mapToScene(pos)
+        x, y = scene_pos.x(), scene_pos.y()
+        if not self.person_df.empty :
+            if self.ui.select_checkbox.isChecked() and not self.label_kpt :
+                if event.button() == Qt.LeftButton:
+                    self.person_id_selector(x, y)
+
+            if self.label_kpt:
+                if event.button() == Qt.LeftButton:
+                    self.send_to_table(x, y, 1)
+                elif event.button() == Qt.RightButton:
+                    self.send_to_table(0, 0, 0)
+                self.label_kpt = False
+
             self.update_frame()
 
-        if self.ui.select_checkbox.isChecked():
-            pos = event.pos()
-            scene_pos = self.ui.video_frame_view.mapToScene(pos)
-            x, y = scene_pos.x(), scene_pos.y()
-            if event.button() == Qt.LeftButton:
-                self.person_id_selector(x, y)
-            if not self.is_play:
-                self.ui.play_btn.click()
-            
-    def smooth_kpt(self,person_ids:list):
+    def smooth_kpt(self, person_ids:list):
         for person_id in person_ids:
             pre_frame_num = 0
-            person_kpt = self.person_df.loc[(self.person_df['person_id'] == person_id)]['keypoints']
-            if len(person_kpt) > 0 and self.start_frame_num == 0 :
-                self.start_frame_num = self.ui.frame_slider.value()
-            # if self.start_frame_num != 0:
             curr_frame = self.ui.frame_slider.value()
             if curr_frame != 0:
                 pre_frame_num = curr_frame - 1
@@ -462,8 +455,7 @@ class PoseVideoTabControl(QWidget):
                     if pre_kptx != 0 and pre_kpty != 0 and curr_kptx != 0 and curr_kpty !=0:
                         curr_kptx = self.smooth_filter(curr_kptx, pre_kptx)
                         curr_kpty = self.smooth_filter(curr_kpty, pre_kpty)
-                    smoothed_kpts.append([curr_kptx, curr_kpty, curr_conf, curr_label])  # 设置可信度为默认值
-                # 更新 DataFrame 中的数据
+                    smoothed_kpts.append([curr_kptx, curr_kpty, curr_conf, curr_label])
                 self.person_df.at[curr_person_data.index[0], 'keypoints'] = smoothed_kpts
 
     def keyPressEvent(self, event):
@@ -479,7 +471,6 @@ class PoseVideoTabControl(QWidget):
             return
         before_correct_id = self.ui.before_correct_id.value()
         after_correct_id = self.ui.after_correct_id.value()
-        print(self.person_df['person_id'].unique())
         if (before_correct_id not in self.person_df['person_id'].unique()) or (after_correct_id not in self.person_df['person_id'].unique()):
             return
 
@@ -490,31 +481,53 @@ class PoseVideoTabControl(QWidget):
                 self.person_df.loc[condition_1, 'person_id'] = after_correct_id
         self.update_frame()
 
-    def person_id_selector(self, x, y):
-        curr_person_df, _= self.obtain_curr_data()
+    def person_id_selector(self, x:float, y:float):
+        curr_person_df = self.obtain_data(frame_num = self.ui.frame_slider.value())
+        if curr_person_df.empty:
+            return    
+        selected_id = None
+        max_area = -1
+        for _, row in curr_person_df.iterrows():
+            person_id = row['person_id']
+            x1, y1, x2, y2 = map(int, row['bbox'])
+            if x != 0 and y != 0:
+                if not (x1 <= x <= x2 and y1 <= y <= y2):
+                    continue
+            area = (x2 - x1) * (y2 - y1)
+            if area > max_area:
+                max_area = area
+                selected_id = person_id
+
+        self.select_person_id = selected_id
+        self.update_frame()
+        print(self.select_person_id)
+
+    def kpt_id_selector(self, x:float, y:float):
+        def calculate_distance(point1, point2):
+            return np.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
+        
+        curr_person_df = self.obtain_data(self.ui.frame_slider.value())
         if curr_person_df.empty:
             return
         
         selected_id = None
-        max_area = -1
+        min_distance = float('inf')
 
-        for _, row in curr_person_df.iterrows():
-            person_id = row['person_id']
-            bbox = row['bbox']
-            x1, y1, x2, y2 = map(int, bbox)
+        for person_kpts in curr_person_df['keypoints']:
+            kpts_coords = person_kpts[:, :2].astype(int)
+            distances = np.sqrt((kpts_coords[:, 0] - x)**2 + (kpts_coords[:, 1] - y)**2)
+            
+            min_idx = np.argmin(distances)
+            if distances[min_idx] < min_distance:
+                min_distance = distances[min_idx]
+                selected_id = min_idx
 
-            if x1 <= x <= x2 and y1 <= y <= y2:
-                w = x2 - x1
-                h = y2 - y1
-                area = w * h
+        self.select_kpt_id = selected_id
 
-                if area > max_area:
-                    max_area = area
-                    selected_id = person_id
-
-        self.select_person_id = selected_id
-        print(self.select_person_id)
-
+    def set_angle_info_pos(self, person_kpt):
+        person_kpt = person_kpt.iloc[0]
+        x, y, _, _ = person_kpt[19]
+        self.angle_info_pos = (int(x), int(y))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -152,11 +152,17 @@
         <layout class="QGridLayout" name="gridLayout_2">
          <item row="0" column="0">
           <widget class="QCheckBox" name="show_skeleton_checkBox">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
            <property name="text">
             <string>人體骨架</string>
            </property>
-           <property name="checked">
+           <property name="checkable">
             <bool>true</bool>
+           </property>
+           <property name="checked">
+            <bool>false</bool>
            </property>
           </widget>
          </item>
