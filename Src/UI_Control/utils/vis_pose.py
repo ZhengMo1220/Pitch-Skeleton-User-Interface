@@ -90,7 +90,7 @@ def joints_dict():
     }
     return joints
 
-def draw_points(image, points, person_idx, color_palette='tab20', palette_samples=16, confidence_threshold=0.5):
+def draw_points(image, points, person_idx, color_palette='gist_rainbow', palette_samples=10, confidence_threshold=0.3):
     """
     Draws `points` on `image`.
 
@@ -129,7 +129,7 @@ def draw_points(image, points, person_idx, color_palette='tab20', palette_sample
 
     return image
 
-def draw_skeleton(image, points, skeleton, color_palette='Set2', palette_samples=8, person_index=0,
+def draw_skeleton(image, points, skeleton, color_palette='Set2', palette_samples='jet', person_index=0,
                   confidence_threshold=0.5):
     """
     Draws a `skeleton` on `image`.
@@ -183,8 +183,8 @@ def draw_skeleton(image, points, skeleton, color_palette='Set2', palette_samples
             )
     return image
 
-def draw_points_and_skeleton(image, person_df, skeleton, points_color_palette='tab20', points_palette_samples=16,
-                             skeleton_color_palette='Set2', skeleton_palette_samples=8, confidence_threshold=0.5):
+def draw_points_and_skeleton(image, person_df, skeleton, points_color_palette='gist_rainbow', points_palette_samples=10,
+                             skeleton_color_palette='Set2', skeleton_palette_samples='jet', confidence_threshold=0.3):
     """
     Draws `points` and `skeleton` on `image`.
 
@@ -215,11 +215,8 @@ def draw_points_and_skeleton(image, person_df, skeleton, points_color_palette='t
     """
     person_data = df_to_points(person_df)
     for person_id, points in person_data.items(): 
-        image = draw_skeleton(image, points, skeleton, color_palette=skeleton_color_palette,
-                            palette_samples=skeleton_palette_samples, person_index=person_id,
-                            confidence_threshold=confidence_threshold)
-        image = draw_points(image, points,person_idx=person_id, color_palette=points_color_palette, palette_samples=points_palette_samples,
-                            confidence_threshold=confidence_threshold)
+        image = draw_skeleton(image, points, skeleton,person_index=person_id)
+        image = draw_points(image, points,person_idx=person_id)
     return image
 
 def df_to_points(person_df):
@@ -232,40 +229,3 @@ def df_to_points(person_df):
 
 def swap_values(kpts):
     return [[item[1], item[0], item[2]] for item in kpts]
-
-def draw_tracking_skeleton(image, person_kpt, skeleton, points_color_palette='tab20', points_palette_samples=16,
-                             skeleton_color_palette='Set2', skeleton_palette_samples=8, confidence_threshold=0.5):
-    """
-    Draws `points` and `skeleton` on `image`.
-
-    Args:
-        image: image in opencv format
-        points: list of points to be drawn.
-            Shape: (nof_points, 3)
-            Format: each point should contain (y, x, confidence)
-        skeleton: list of joints to be drawn
-            Shape: (nof_joints, 2)
-            Format: each joint should contain (point_a, point_b) where `point_a` and `point_b` are an index in `points`
-        points_color_palette: name of a matplotlib color palette
-            Default: 'tab20'
-        points_palette_samples: number of different colors sampled from the `color_palette`
-            Default: 16
-        skeleton_color_palette: name of a matplotlib color palette
-            Default: 'Set2'
-        skeleton_palette_samples: number of different colors sampled from the `color_palette`
-            Default: 8
-        person_index: index of the person in `image`
-            Default: 0
-        confidence_threshold: only points with a confidence higher than this threshold will be drawn. Range: [0, 1]
-            Default: 0.5
-
-    Returns:
-        A new image with overlaid joints
-
-    """
-    image = draw_skeleton(image, person_kpt, skeleton, color_palette=skeleton_color_palette,
-                        palette_samples=skeleton_palette_samples, person_index=0,
-                        confidence_threshold=confidence_threshold)
-    image = draw_points(image, person_kpt,person_idx=0, color_palette=points_color_palette, palette_samples=points_palette_samples,
-                        confidence_threshold=confidence_threshold)
-    return image

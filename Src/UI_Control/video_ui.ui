@@ -301,7 +301,7 @@
             <string>人體骨架</string>
            </property>
            <property name="checked">
-            <bool>true</bool>
+            <bool>false</bool>
            </property>
           </widget>
          </item>

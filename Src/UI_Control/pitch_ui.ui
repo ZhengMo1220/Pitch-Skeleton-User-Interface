@@ -203,17 +203,17 @@
            </item>
           </layout>
          </item>
-         <item row="4" column="0">
-          <widget class="QCheckBox" name="camera_checkbox">
-           <property name="text">
-            <string>開啟相機</string>
-           </property>
-          </widget>
-         </item>
          <item row="4" column="1">
           <widget class="QCheckBox" name="record_checkbox">
            <property name="text">
             <string>開始錄影</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QCheckBox" name="camera_checkbox">
+           <property name="text">
+            <string>開啟相機</string>
            </property>
           </widget>
          </item>
@@ -244,6 +244,13 @@
            </item>
           </layout>
          </item>
+         <item row="4" column="2">
+          <widget class="QCheckBox" name="start_pitch_checkbox">
+           <property name="text">
+            <string>開始投球</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </widget>
       </item>
@@ -259,7 +266,7 @@
             <string>人體骨架</string>
            </property>
            <property name="checked">
-            <bool>true</bool>
+            <bool>false</bool>
            </property>
           </widget>
          </item>

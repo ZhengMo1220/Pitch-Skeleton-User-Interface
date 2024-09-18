@@ -53,9 +53,7 @@ def save_video(video_name, video_images, person_df, select_id=None):
 
     json_path = os.path.join(output_folder, f"{video_name}.json")
     save_person_df = person_df.copy()
-    # if select_id is not None:
-    #     save_person_df = filter_person_df(save_person_df, select_id)
-    
+
     save_person_df.to_json(json_path, orient='records')
 
     video_size = (video_images[0].shape[1], video_images[0].shape[0])
