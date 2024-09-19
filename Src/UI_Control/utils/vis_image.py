@@ -39,28 +39,30 @@ class ImageDrawer():
         self.region = [(100, 250), (450, 600)]
     
     def draw_info(self, img:np.ndarray, frame_num:int=None, kpt_buffer:list = None):
+        if img is None:
+            return
+        image = img.copy()
         curr_person_df = self.pose_estimater.get_person_df_data(frame_num = frame_num, is_select=True)
-
         if self.show_region:
-            img = self.draw_region(img)
+            image = self.draw_region(image)
 
         if self.show_grid :
-            img = self.draw_grid(img)
+            image = self.draw_grid(image)
         
         if self.show_bbox:
-            img = self.draw_bbox(img, curr_person_df)
+            image = self.draw_bbox(image, curr_person_df)
         
         if self.show_skeleton:
-            img = self.draw_points_and_skeleton(img, curr_person_df, self.pose_estimater.joints['haple']['skeleton_links'], 
+            image = self.draw_points_and_skeleton(image, curr_person_df, self.pose_estimater.joints['haple']['skeleton_links'], 
                                                 points_palette_samples=10)
         
         if self.show_traj:
-            img = self.draw_traj(img, kpt_buffer)
+            image = self.draw_traj(image, kpt_buffer)
 
         if self.show_angle_info:
-            img = self.draw_angle_info(img,frame_num)
+            image = self.draw_angle_info(image, frame_num)
         
-        return img
+        return image
 
     def draw_cross(self, image, x, y, length=5, color=(0, 0, 255), thickness=2):
         cv2.line(image, (x, y - length), (x, y + length), color, thickness)

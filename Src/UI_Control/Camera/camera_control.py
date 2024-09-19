@@ -6,7 +6,7 @@ import pandas as pd
 from enum import Enum
 from PyQt5.QtWidgets import QGraphicsScene
 from utils.vis_image import ImageDrawer
-from utils.cv_thread import VideoCaptureThread, VideoWriter, VideoToImagesThread
+from utils.cv_thread import VideoCaptureThread, VideoWriterThread, VideoToImagesThread
 from PyQt5.QtWidgets import *
 
 class Camera:
@@ -16,7 +16,7 @@ class Camera:
         self.frame_count = 0
         self.fps_control = 1
         self.frame_buffer = queue.Queue()
-        self.is_recording = False
+        self.video_path = None
         self.video_writer = None
         self.video_thread = None
 
@@ -56,27 +56,28 @@ class Camera:
         self.frame_count += 1
         if self.is_opened and self.frame_count % self.fps_control ==0:
             self.frame_buffer.put(frame)
+            # print(self.frame_buffer.qsize())
 
-        if self.video_writer is not None:
-            self.video_writer.write(frame)
+        if self.video_writer is not None and self.video_writer.is_writing:
+            self.video_writer.write_frame(frame)
 
-    def start_recording(self, filename:str):
+    def start_recording(self, filename: str):
         # 開始錄製影片
         if self.video_thread is None:
             return
-            
         frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
-        self.video_writer = VideoWriter(filename, frame_width, frame_height, fps=fps)
-        self.is_recording = True
+        self.video_path = filename
+
+        self.video_writer = VideoWriterThread(filename, frame_width, frame_height, fps=fps)
+        self.video_writer.start_writing()
 
     def stop_recording(self):
         # 停止錄製影片
         if self.video_writer is not None:
-            self.is_recording = False
-            self.video_writer.release()
-            self.video_writer = None
+            self.video_writer.stop_writing()  # 停止寫入
+            self.video_writer.release()  # 釋放執行緒
 
     def set_camera_idx(self, new_idx: int):
         self.camera_idx = new_idx
@@ -106,11 +107,12 @@ class VideoLoader:
         self.video_name = None
         self.is_loading = False
     
-    def load_video(self):
+    def load_video(self, video_path:str = None):
         options = QFileDialog.Options()
-        video_path, _ = QFileDialog.getOpenFileName(None, "Select Video File", "", "Video Files (*.mp4 *.avi);;All Files (*)", options=options)
-        if not video_path:
-            return
+        if video_path is None:
+            video_path, _ = QFileDialog.getOpenFileName(None, "Select Video File", "", "Video Files (*.mp4 *.avi);;All Files (*)", options=options)
+            if not video_path:
+                return
         self.video_path = video_path
         self.video_name = os.path.splitext(os.path.basename(self.video_path))[0]
         self.folder_path = os.path.dirname(video_path)
@@ -132,8 +134,8 @@ class VideoLoader:
         self.is_loading = False
         thread = None
     
-    def get_video_image(self, frame_num:int):
-        return self.video_frames[frame_num]
+    def get_video_image(self, frame_num:int) -> np.ndarray: 
+        return self.video_frames[frame_num].copy()
     
     def save_video(self):
         output_folder = os.path.join("../../Db/Record", self.video_name)
@@ -173,7 +175,7 @@ class JsonLoader:
     def __init__(self, folder_path:str = None, file_name:str = None):
         self.folder_path = folder_path
         self.file_name = file_name
-    def load(self):
+    def load(self) -> pd.DataFrame:
         json_path = os.path.join(self.folder_path, f"{self.file_name}.json")
         print(json_path)
         if not os.path.exists(json_path):

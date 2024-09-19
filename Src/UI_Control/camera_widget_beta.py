@@ -109,7 +109,7 @@ class PoseCameraTabControl(QWidget):
     def analyze_frame(self):
         """Analyze and process each frame from the camera."""
         if not self.camera.frame_buffer.empty():
-            frame = self.camera.frame_buffer.get()
+            frame = self.camera.frame_buffer.get().copy()
             _, self.person_df, fps = self.pose_estimater.detect_kpt(frame)
             self.ui.fps_info_label.setText(f"{fps:02d}")
             self.update_frame(frame)

@@ -152,11 +152,9 @@ class PoseVideoTabControl(QWidget):
             QMessageBox.warning(self, "影片讀取中", "請稍等!")
             return
         self.is_play = not self.is_play
+        self.ui.play_btn.setText("||" if self.is_play else "▶︎")
         if self.is_play:
-            self.ui.play_btn.setText("||")
             self.play_frame(self.ui.frame_slider.value())
-        else:
-            self.ui.play_btn.setText("▶︎")
 
     def update_person_df(self, x, y, label):
         person_id = self.pose_estimater.person_id
@@ -171,8 +169,7 @@ class PoseVideoTabControl(QWidget):
         image = self.video_loader.get_video_image(frame_num)
         _, self.person_df, fps= self.pose_estimater.detect_kpt(image,frame_num)
         self.ui.fps_info_label.setText(f"{fps:02d}")
-        person_id = self.pose_estimater.person_id
-        if person_id is not None:
+        if self.pose_estimater.person_id is not None:
             self.pose_analyzer.add_analyze_info(frame_num)
             self.graph_plotter.update_graph(frame_num)
         self.import_data_to_table(frame_num)

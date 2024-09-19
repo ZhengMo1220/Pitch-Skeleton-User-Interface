@@ -67,48 +67,42 @@ class VideoCaptureThread(QThread):
         self.cap.release()
 
 class VideoWriterThread(QThread):
-    def __init__(self, output_file, frame_queue, parent=None):
-        super().__init__(parent)
-        self.output_file = output_file
-        self.frame_queue = frame_queue
-        self.running = False
-        self.out = None
+    # 使用 signal 傳遞狀態更新
+    writeFinished = pyqtSignal()
 
-    def start_writing(self, frame_width, frame_height, fps):
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        self.out = cv2.VideoWriter(self.output_file, fourcc, fps, (frame_width, frame_height))
-        self.running = True
-        if not self.isRunning():
-            self.start()
-        print(f"Started writing video to {self.output_file} at {fps} FPS with resolution {frame_width}x{frame_height}")
-
-    def stop_writing(self):
-        self.running = False
-        self.wait()
-        print("Stopped writing video.")
+    def __init__(self, filepath, frame_width, frame_height, fps=60, codec='mp4v'):
+        super().__init__()
+        self.filepath = filepath
+        self.frame_width = frame_width
+        self.frame_height = frame_height
+        self.fps = fps
+        self.codec = codec
+        self.is_writing = False
 
     def run(self):
-        try:
-            while self.running or not self.frame_queue.empty():
-                if not self.frame_queue.empty():
-                    frame = self.frame_queue.get()
-                    self.out.write(frame)
-        except Exception as e:
-            print(f"Error occurred in VideoWriterThread: {e}")
-        finally:
-            self.out.release()
-            print("Released video writer resources.")
+        # 在 run 方法中進行視頻寫入
+        fourcc = cv2.VideoWriter_fourcc(*self.codec)
+        self.writer = cv2.VideoWriter(self.filepath, fourcc, self.fps, (self.frame_width, self.frame_height))
+        
+        # 持續寫入直到 is_writing 被設置為 False
+        while self.is_writing:
+            if hasattr(self, 'frame') and self.frame is not None:
+                self.writer.write(self.frame)
 
-class VideoWriter:
-    def __init__(self, filepath, frame_width, frame_height, fps=60, codec='mp4v'):
-        fourcc = cv2.VideoWriter_fourcc(*codec)
-        self.writer = cv2.VideoWriter(filepath, fourcc, fps, (frame_width, frame_height))
+        # 錄製結束後釋放資源
+        self.writer.release()
+        self.writeFinished.emit()
 
-    def write(self, frame):
-        if self.writer is not None:
-            self.writer.write(frame)
+    def start_writing(self):
+        self.is_writing = True
+        self.start()
+
+    def stop_writing(self):
+        self.is_writing = False
+
+    def write_frame(self, frame):
+        self.frame = frame
 
     def release(self):
-        if self.writer is not None:
-            self.writer.release()
-            self.writer = None
+        self.stop_writing()
+        self.wait()  # 等待執行緒安全結束
