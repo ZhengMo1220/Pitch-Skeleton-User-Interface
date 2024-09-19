@@ -15,7 +15,7 @@
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout_2">
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,0,0">
+    <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,3,1,0">
      <item>
       <widget class="QLabel" name="image_resolution_label">
        <property name="maximumSize">
@@ -44,6 +44,9 @@
         </size>
        </property>
       </widget>
+     </item>
+     <item>
+      <widget class="QGraphicsView" name="curve_view"/>
      </item>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_4">
@@ -384,9 +387,9 @@
        </widget>
       </item>
      </layout>
-     <zorder>camer_setting_groupbox</zorder>
      <zorder>kpt_adjust_groupbox</zorder>
      <zorder>display_groupbox</zorder>
+     <zorder>camer_setting_groupbox</zorder>
     </widget>
    </item>
   </layout>
