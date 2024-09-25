@@ -5,6 +5,7 @@ from utils.timer import FPS_Timer
 import os
 import sys
 import numpy as np
+from utils.model import Model
 from mmengine.logging import print_log
 from scipy.signal import savgol_filter
 from mmpose.apis import inference_topdown
@@ -12,6 +13,10 @@ from mmpose.apis import init_model as init_pose_estimator
 from mmpose.evaluation.functional import nms
 from mmpose.structures import merge_data_samples
 from utils.timer import FPS_Timer
+
+import torch
+import torch.autograd.profiler as profiler
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(current_dir, "..", "tracker"))
 
@@ -22,8 +27,10 @@ except (ImportError, ModuleNotFoundError):
     has_mmdet = False
 
 class PoseEstimater:
-    def __init__(self, model=None):
+    def __init__(self, model: Model =None):
+        
         self.model = model
+        self.img_shape = (0,0,0)
         self.person_df = pd.DataFrame()
         self.pre_person_df = pd.DataFrame()
         self.person_id = None
@@ -150,9 +157,15 @@ class PoseEstimater:
     def detect_kpt(self, image:np.ndarray, frame_num:int = None):
         if not self.is_detect:
             return image, pd.DataFrame(), 0
+
         fps = 0
         if frame_num not in self.processed_frames:
             self.fps_timer.tic()
+            if image.shape != self.img_shape:
+                self.img_shape = image.shape
+                self.model.init_tracker()
+
+
             pred_instances, person_ids = self.process_one_image(self.model, image, select_id=self.person_id)
             average_time = self.fps_timer.toc()
             fps = int(1/max(average_time, 0.00001))
@@ -172,7 +185,7 @@ class PoseEstimater:
                     self.kpt_buffer.append(keypoint)
         return image, self.person_df, fps
 
-    def smooth_kpt(self, person_ids:list, frame_num=None):
+    def smooth_kpt(self, person_ids: list, frame_num=None):
         # 如果是即時處理，則初始化前一幀的數據，否則依賴 frame_slider 進行處理
         if frame_num is not None:
             curr_frame = frame_num
@@ -203,23 +216,24 @@ class PoseEstimater:
             if curr_person_data.empty or pre_person_data.empty:
                 continue  # 當前幀或前幀沒有該 person_id 的數據，跳過
             
-            pre_kpts = pre_person_data.iloc[0]['keypoints']
-            curr_kpts = curr_person_data.iloc[0]['keypoints']
+            pre_kpts = torch.tensor(pre_person_data.iloc[0]['keypoints'], device='cuda')
+            curr_kpts = torch.tensor(curr_person_data.iloc[0]['keypoints'], device='cuda')
             smoothed_kpts = []
-            
+
+            # 使用張量運算來進行平滑
             for pre_kpt, curr_kpt in zip(pre_kpts, curr_kpts):
                 pre_kptx, pre_kpty = pre_kpt[0], pre_kpt[1]
                 curr_kptx, curr_kpty, curr_conf, curr_label = curr_kpt[0], curr_kpt[1], curr_kpt[2], curr_kpt[3]
                 
-                if all([pre_kptx != 0, pre_kpty != 0, curr_kptx != 0, curr_kpty != 0]):
+                if all([pre_kptx.item() != 0, pre_kpty.item() != 0, curr_kptx.item() != 0, curr_kpty.item() != 0]):
                     curr_kptx = self.smooth_filter(curr_kptx, pre_kptx)
                     curr_kpty = self.smooth_filter(curr_kpty, pre_kpty)
                 
-                smoothed_kpts.append([curr_kptx, curr_kpty, curr_conf, curr_label])
+                smoothed_kpts.append([curr_kptx.cpu().item(), curr_kpty.cpu().item(), curr_conf.item(), curr_label.item()])
             
             # 更新當前幀的數據
             self.person_df.at[curr_person_data.index[0], 'keypoints'] = smoothed_kpts
-        
+
         # 如果是即時處理，則更新前幀數據
         if frame_num is None:
             self.pre_person_df = self.person_df.copy()
@@ -236,39 +250,34 @@ class PoseEstimater:
         Returns:
             Tuple: 預測的姿態實例和在線的追蹤ID。
         """
-
-        # 從模型中提取組件和參數
-        detect_args = model["Detector"]["args"]
-        detector = model["Detector"]["detector"]
-        test_pipeline = model["Detector"]["test_pipeline"]
-        pose_estimator = model["Pose Estimator"]["pose estimator"]
-        tracker = model["Tracker"]["tracker"]
-
+       
         # 進行物件偵測
-        result = inference_detector(detector, img, test_pipeline=test_pipeline)
+        
+        result = inference_detector(model.detector, img, test_pipeline= model.detector_test_pipeline)
+        
         pred_instances = result.pred_instances
-        det_result = pred_instances[pred_instances.scores > detect_args.score_thr].cpu().numpy()
-
+        det_result = pred_instances[pred_instances.scores > model.detect_args.score_thr].cpu().numpy()
+        
         # 篩選指定類別的邊界框
-        bboxes = det_result.bboxes[det_result.labels == detect_args.det_cat_id]
-        scores = det_result.scores[det_result.labels == detect_args.det_cat_id]
-        bboxes = bboxes[nms(np.hstack((bboxes, scores[:, None])), detect_args.nms_thr), :4]
-
+        bboxes = det_result.bboxes[det_result.labels == model.detect_args.det_cat_id]
+        scores = det_result.scores[det_result.labels == model.detect_args.det_cat_id]
+        bboxes = bboxes[nms(np.hstack((bboxes, scores[:, None])), model.detect_args.nms_thr), :4]
         # 將新偵測的邊界框更新到跟蹤器
-        online_targets = tracker.update(
+        online_targets = model.tracker.update(
             np.hstack((bboxes, np.full((bboxes.shape[0], 2), [0.9, 0]))), img.copy()
         )
-
+    
         # 過濾出有效的邊界框和追蹤ID
         online_bbox, online_ids = self.filter_valid_targets(online_targets, select_id)
 
         # 姿態估計
-        pose_results = inference_topdown(pose_estimator, img, np.array(online_bbox))
+        pose_results = inference_topdown(model.pose_estimator, img, np.array(online_bbox))
         data_samples = merge_data_samples(pose_results)
-
+        
+    
         return data_samples.get('pred_instances', None), online_ids
-
-    def filter_valid_targets(self, online_targets, select_id=None):
+    
+    def filter_valid_targets(self, online_targets, select_id: int = None):
         """
         過濾出有效的追蹤目標。
 
@@ -279,16 +288,40 @@ class PoseEstimater:
         Returns:
             Tuple: 有效的邊界框和追蹤ID。
         """
-        valid_bbox = []
-        valid_ids = []
+        if not online_targets:
+            return [], []
 
+        # 將所有在線目標的邊界框和ID提取為兩個列表
+        tlwhs = []
+        track_ids = []
+        
         for target in online_targets:
-            x1, y1, w, h = target.tlwh
-            if (w * h > 10) and (select_id is None or target.track_id == select_id):
-                valid_bbox.append([x1, y1, x1 + w, y1 + h])
-                valid_ids.append(target.track_id)
+            tlwhs.append(target.tlwh)
+            track_ids.append(target.track_id)
 
-        return valid_bbox, valid_ids
+        # 將數據轉為張量並放到 GPU 上
+        tlwhs = torch.tensor(tlwhs, device='cuda')  # shape: (n, 4)
+        track_ids = torch.tensor(track_ids, device='cuda')  # shape: (n,)
+
+        # 計算面積 w * h
+        areas = tlwhs[:, 2] * tlwhs[:, 3]  # w * h
+
+        # 過濾面積大於 10 的邊界框
+        valid_mask = areas > 10
+
+        # 如果指定了 select_id，則進一步過濾
+        if select_id is not None:
+            valid_mask &= (track_ids == select_id)
+
+        # 過濾有效的邊界框和追蹤ID
+        valid_tlwhs = tlwhs[valid_mask]
+        valid_track_ids = track_ids[valid_mask]
+
+        # 將 (x1, y1, w, h) 轉為 (x1, y1, x2, y2)
+        valid_bbox = torch.cat([valid_tlwhs[:, :2], valid_tlwhs[:, :2] + valid_tlwhs[:, 2:4]], dim=1)
+
+        # 返回結果
+        return valid_bbox.cpu().tolist(), valid_track_ids.cpu().tolist()
 
     def correct_person_id(self, before_correct_id:int, after_correct_id:int):
         if self.person_df.empty:
@@ -389,6 +422,10 @@ class PoseEstimater:
         
         self.person_df = person_df
         self.processed_frames = {frame_num for frame_num in self.person_df['frame_number'] if frame_num != 0}
+
+    def update_person_df(self, x:float, y:float,frame_num:int, correct_kpt_idx:int):
+        self.person_df.loc[(self.person_df['frame_number'] == frame_num) &
+                            (self.person_df['person_id'] == self.person_id), 'keypoints'].iloc[0][correct_kpt_idx] = [x, y, 0.9, 1]
 
     def reset(self):
         self.person_df = pd.DataFrame()

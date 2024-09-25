@@ -134,7 +134,7 @@ class VideoLoader:
         self.is_loading = False
         thread = None
     
-    def get_video_image(self, frame_num:int) -> np.ndarray: 
+    def get_video_image(self, frame_num:int) -> np.ndarray:
         return self.video_frames[frame_num].copy()
     
     def save_video(self):
@@ -175,10 +175,14 @@ class JsonLoader:
     def __init__(self, folder_path:str = None, file_name:str = None):
         self.folder_path = folder_path
         self.file_name = file_name
+        self.is_loading = False
+
     def load(self) -> pd.DataFrame:
+        self.is_loading = True
         json_path = os.path.join(self.folder_path, f"{self.file_name}.json")
         print(json_path)
         if not os.path.exists(json_path):
             return pd.DataFrame()
         person_df = pd.read_json(json_path)
+        self.is_loading = False
         return person_df

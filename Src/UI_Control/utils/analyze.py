@@ -15,7 +15,6 @@ class PoseAnalyzer:
         if self.pose_estimater.get_person_id() is None:
             return pd.DataFrame()
         
-
         person_kpt = self.pose_estimater.get_person_df_data(frame_num= frame_num, is_select= True,is_kpt=True)
         
         if person_kpt is None:
@@ -52,10 +51,10 @@ class PoseAnalyzer:
             info[angle_name] = [self._calculate_angle(A, B, C), [np.array(A), np.array(B), np.array(C)]]
         return info
 
-    def get_frame_angle_data(self, frame_num: int = None, angle_name: str = None):
+    def get_frame_angle_data(self, frame_num: int = None, angle_name: str = None) :
+        # print(self.analyze_df)
         if self.analyze_df.empty:
             return pd.DataFrame(), []
-
         condition = pd.Series([True] * len(self.analyze_df))
 
         # 根據 frame_num 過濾數據

@@ -16,15 +16,15 @@ class GraphPlotter:
 
     def _init_graph(self, frame_range: int) -> pg.PlotWidget:
         """Set up the plot widget with labels, axis, and initial configuration."""
-        title = f'<span style="color: blue; font-size: 15px">{self.angle_name}角度 (度)</span>'
+        title = f'<span style="color: blue; font-size: 30px">{self.angle_name}角度 (度)</span>'
         self.graph.setTitle(f'{title}')
 
         # Setting up fonts and styles
         font = QFont()
-        font.setPixelSize(18)
-        self.graph.addLegend(offset=(150, 5), labelTextSize="18pt")
-        self.graph.setLabel('left', '<span style="font-size: 18px">角度 (度)</span>', color="blue")
-        self.graph.setLabel('bottom', '<span style="font-size: 18px">幀 (fps: 120)</span>')
+        font.setPixelSize(30)
+        self.graph.addLegend(offset=(150, 5), labelTextSize="30pt")
+        self.graph.setLabel('left', '<span style="font-size: 30px">角度 (度)</span>', color="blue")
+        self.graph.setLabel('bottom', '<span style="font-size: 30px">幀 (fps: 120)</span>')
         self.graph.getAxis("bottom").setStyle(tickFont=font)
         self.graph.getAxis("left").setStyle(tickFont=font)
         self.graph.setXRange(0, frame_range - 1)
@@ -45,7 +45,7 @@ class GraphPlotter:
         _, angle_info = self.pose_analyzer.get_frame_angle_data(frame_num, self.angle_name)
         try:
             angle_value = int(angle_info[0])
-            title = f'<span style="color: blue; font-size: 15px">{self.angle_name}角度({int(angle_value):03}度)</span>'
+            title = f'<span style="color: blue; font-size: 30px">{self.angle_name}角度({int(angle_value):03}度)</span>'
         except TypeError:
             # print(f"角度數據格式錯誤: {angle_value}")
             return

@@ -15,7 +15,7 @@
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout">
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout_3">
+    <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,4,2,0">
      <item>
       <widget class="QLabel" name="video_resolution_label">
        <property name="maximumSize">
@@ -50,7 +50,7 @@
        <property name="maximumSize">
         <size>
          <width>16777215</width>
-         <height>200</height>
+         <height>16777215</height>
         </size>
        </property>
       </widget>

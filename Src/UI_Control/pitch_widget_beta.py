@@ -15,9 +15,10 @@ from utils.vis_graph import GraphPlotter
 from utils.vis_image import ImageDrawer
 from skeleton.detect_skeleton import PoseEstimater
 import pyqtgraph as pg
+from utils.model import Model
 
 class PosePitchTabControl(QWidget):
-    def __init__(self, model, parent=None):
+    def __init__(self, model:Model, parent=None):
         super().__init__(parent)
         self.ui = Ui_pitch_ui()
         self.ui.setupUi(self)
@@ -30,13 +31,13 @@ class PosePitchTabControl(QWidget):
     def init_var(self):
         self.camera = None
         self.timer = None
-
         self.record_timer = None
         self.view_scene = QGraphicsScene()
         self.person_selector = None
         self.kpt_selector = None
+
         #pyqtgraph setting
-        pg.setConfigOptions(foreground=QColor(113,148,116), antialias = True)
+        pg.setConfigOptions(foreground = QColor(113,148,116), antialias = True)
         pg.setConfigOption('background', 'w')
         pg.setConfigOption('foreground', 'k')
 
@@ -66,6 +67,7 @@ class PosePitchTabControl(QWidget):
         self.ui.select_keypoint_checkbox.stateChanged.connect(self.toggle_kpt_select)
         self.ui.show_bbox_checkbox.stateChanged.connect(self.toggle_show_bbox)
         self.ui.show_line_checkbox.stateChanged.connect(self.toggle_show_grid)
+        
         self.ui.start_pitch_checkbox.stateChanged.connect(self.toggle_pitching)
         self.ui.camera_id_input.valueChanged.connect(self.change_camera)
         self.ui.pitch_input.currentIndexChanged.connect(self.change_pitcher)
@@ -79,6 +81,7 @@ class PosePitchTabControl(QWidget):
             lambda: self.ui.frame_slider.setValue(self.ui.frame_slider.value() + 1)
         )
         self.ui.frame_slider.valueChanged.connect(self.analyze_frame)
+        self.ui.keypoint_table.cellActivated.connect(self.on_cell_clicked)
     
     def reset(self):
         self.pose_estimater.reset()
@@ -128,21 +131,22 @@ class PosePitchTabControl(QWidget):
             # 開啟攝影機並顯示解析度和幀率
             frame_width, frame_height, fps = self.camera.toggle_camera(True)
             self.ui.image_resolution_label.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
-
+            self.model.set_image_size((frame_width, frame_height,3))
             # 啟動定時器並更新 UI
             self.timer.start(1)
-            self.video_silder(False)
+            self.video_silder(visible=False)
 
         else:
             if self.camera is not None:
                 self.camera.toggle_camera(False)
             if self.timer is not None:
                 self.timer.stop()
+            self.update_frame()
             # 清理資源並更新 UI
             self.camera = None
             self.timer = None
             # self.update_frame()
-            self.video_silder(True)
+            self.video_silder(visible=True)
 
     def toggle_record(self, state):
         """Start or stop video recording."""
@@ -245,20 +249,19 @@ class PosePitchTabControl(QWidget):
     def analyze_frame(self):
         """Analyze and process each frame from the camera."""
         if self.camera is not None:
-            # print("camera")
             if not self.camera.frame_buffer.empty():
                 frame = self.camera.frame_buffer.get()
                 _, self.person_df, fps = self.pose_estimater.detect_kpt(frame)
                 self.ui.fps_info_label.setText(f"{fps:02d}")
                 self.update_frame(img=frame)
         else:
-            # print("video")
             frame_num = self.ui.frame_slider.value()
             self.ui.frame_num_label.setText(f'{frame_num}/{len(self.video_loader.video_frames) - 1}')
             image = self.video_loader.get_video_image(frame_num)
             _, self.person_df, fps= self.pose_estimater.detect_kpt(image,frame_num)
             self.ui.fps_info_label.setText(f"{fps:02d}")
             if self.pose_estimater.person_id is not None:
+                self.import_data_to_table(frame_num)
                 self.pose_analyzer.add_analyze_info(frame_num)
                 self.graph_plotter.update_graph(frame_num)
             self.update_frame(frame_num = frame_num)
@@ -268,12 +271,12 @@ class PosePitchTabControl(QWidget):
 
     def update_frame(self, img: np.ndarray = None, frame_num:int= None):
         """Update the displayed frame with additional analysis."""
-        show_image = self.image_drawer.draw_info(img = img, kpt_buffer = self.pose_estimater.kpt_buffer)
+        show_img = self.image_drawer.draw_info(img = img, kpt_buffer = self.pose_estimater.kpt_buffer)
         if frame_num is not None:
             img = self.video_loader.get_video_image(frame_num)
-            show_image = self.image_drawer.draw_info(img = img, frame_num=frame_num, kpt_buffer = self.pose_estimater.kpt_buffer)
+            show_img = self.image_drawer.draw_info(img = img, frame_num=frame_num, kpt_buffer = self.pose_estimater.kpt_buffer)
             
-        self.show_image(show_image, self.view_scene, self.ui.frame_view)
+        self.show_image(show_img, self.view_scene, self.ui.frame_view)
 
     def show_image(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
         """Display an image in the QGraphicsView."""
@@ -306,7 +309,14 @@ class PosePitchTabControl(QWidget):
             self.kpt_selector.select(x, y, search_person_df)
             self.pose_estimater.set_kpt_id(self.kpt_selector.selected_id)
 
-    def play_frame(self, start_num=0):
+        if self.label_kpt:
+            if event.button() == Qt.LeftButton:
+                self.send_to_table(x, y, 1)
+            elif event.button() == Qt.RightButton:
+                self.send_to_table(0, 0, 0)
+            self.label_kpt = False
+
+    def play_frame(self, start_num:int =0):
         for i in range(start_num, self.video_loader.total_frames):
             if not self.is_play:
                 break
@@ -340,7 +350,7 @@ class PosePitchTabControl(QWidget):
         for element in elements:
             element.setVisible(visible)
 
-    def show_graph(self, scene, graphicview):
+    def show_graph(self, scene:QGraphicsScene, graphicview: QGraphicsView):
         graph = self.graph_plotter.graph
         graph.resize(graphicview.width(),graphicview.height())
         scene.addWidget(graph)
@@ -354,6 +364,75 @@ class PosePitchTabControl(QWidget):
             self.ui.frame_slider.setValue(self.ui.frame_slider.value() - 1)
         else:
             super().keyPressEvent(event)
+
+    def clear_table_view(self):
+        self.ui.keypoint_table.clear()
+        self.ui.keypoint_table.setColumnCount(4)
+        title = ["關節點", "X", "Y", "有無更改"]
+        self.ui.keypoint_table.setHorizontalHeaderLabels(title)
+        header = self.ui.keypoint_table.horizontalHeader()
+        for i in range(4):
+            header.setDefaultAlignment(Qt.AlignLeft)
+
+    def import_data_to_table(self, frame_num:int):
+        self.clear_table_view()
+        person_id = self.pose_estimater.person_id
+        if person_id is None:
+            return
+        person_data = self.pose_estimater.get_person_df_data(frame_num=frame_num, is_select=True)
+        if person_data.empty:
+            self.clear_table_view()
+            self.ui.select_checkbox.click()
+            return
+        
+        num_keypoints = len(self.pose_estimater.joints["haple"]["keypoints"])
+        if self.ui.keypoint_table.rowCount() < num_keypoints:
+            self.ui.keypoint_table.setRowCount(num_keypoints)
+
+        for kpt_idx, kpt in enumerate(person_data['keypoints'].iloc[0]): 
+            kptx, kpty, kpt_label = kpt[0], kpt[1], kpt[3]
+            kpt_name = self.pose_estimater.joints["haple"]["keypoints"][kpt_idx]
+            kpt_name_item = QTableWidgetItem(str(kpt_name))
+            kptx_item = QTableWidgetItem(str(np.round(kptx,1)))
+            kpty_item = QTableWidgetItem(str(np.round(kpty,1)))
+            if kpt_label :
+                kpt_label_item = QTableWidgetItem("Y")
+            else:
+                kpt_label_item = QTableWidgetItem("N")
+            kpt_name_item.setTextAlignment(Qt.AlignRight)
+            kptx_item.setTextAlignment(Qt.AlignRight)
+            kpty_item.setTextAlignment(Qt.AlignRight)
+            kpt_label_item.setTextAlignment(Qt.AlignRight)
+            self.ui.keypoint_table.setItem(kpt_idx, 0, kpt_name_item)
+            self.ui.keypoint_table.setItem(kpt_idx, 1, kptx_item)
+            self.ui.keypoint_table.setItem(kpt_idx, 2, kpty_item)
+            self.ui.keypoint_table.setItem(kpt_idx, 3, kpt_label_item)
+
+    def on_cell_clicked(self, row, column):
+        self.correct_kpt_idx = row
+        self.label_kpt = True
+    
+    def send_to_table(self, kptx:float, kpty:float, kpt_label:int):
+        kptx_item = QTableWidgetItem(str(kptx))
+        kpty_item = QTableWidgetItem(str(kpty))
+        if kpt_label :
+            kpt_label_item = QTableWidgetItem("Y")
+        else:
+            kpt_label_item = QTableWidgetItem("N")
+        kptx_item.setTextAlignment(Qt.AlignRight)
+        kpty_item.setTextAlignment(Qt.AlignRight)
+        kpt_label_item.setTextAlignment(Qt.AlignRight)
+        self.ui.keypoint_table.setItem(self.correct_kpt_idx, 1, kptx_item)
+        self.ui.keypoint_table.setItem(self.correct_kpt_idx, 2, kpty_item)
+        self.ui.keypoint_table.setItem(self.correct_kpt_idx, 3, kpt_label_item)
+        self.update_person_df(kptx, kpty, kpt_label)
+
+    def update_person_df(self, x, y, label):
+        person_id = self.pose_estimater.person_id
+        frame_num = self.ui.frame_slider.value()
+        self.person_df.loc[(self.person_df['frame_number'] == frame_num) &
+                            (self.person_df['person_id'] == person_id), 'keypoints'].iloc[0][self.correct_kpt_idx] = [x, y, 0.9, label]
+        self.update_frame(frame_num=frame_num)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
