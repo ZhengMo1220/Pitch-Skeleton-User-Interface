@@ -120,18 +120,17 @@ class ImageDrawer():
     def draw_angle_info(self, img: np.ndarray, frame_num: int) -> np.ndarray:
         # 从 pose_analyzer 获取角度数据
         _, angle_info = self.pose_analyzer.get_frame_angle_data(frame_num, self.angle_name)
-        
         # 提取角度值，并将其转换为整数
         angle_value = int(angle_info[0])
         
         # 提取坐标并将其转换为整数元组
         p = tuple(map(int, angle_info[1][1]))
         # 使用 cv2.line 绘制线条
-        cv2.line(img, p, (self.angle_info_pos[0] + 20, self.angle_info_pos[1] + 180), (0, 0, 0), 1)
+        cv2.line(img, p, (self.angle_info_pos[0] + 20, self.angle_info_pos[1] + 320), (0, 0, 0), 2)
         
         # 使用 cv2.putText 绘制角度值
-        img = cv2.putText(img, str(angle_value), (self.angle_info_pos[0] - 20, self.angle_info_pos[1] + 200), 
-                        cv2.FONT_HERSHEY_COMPLEX, 1.5, (0, 255, 0), 2)
+        img = cv2.putText(img, str(angle_value), (self.angle_info_pos[0] - 50, self.angle_info_pos[1] + 420), 
+                        cv2.FONT_HERSHEY_COMPLEX, 3.5, (0, 255, 0), 3)
         
         return img
 
@@ -220,7 +219,7 @@ class ImageDrawer():
             pt1_unlabel = False if pt1[0] != 0 and pt1[1] != 0 else True
             pt2_unlabel = False if pt2[0] != 0 and pt2[1] != 0 else True
             skeleton_color = tuple(colors[person_index % len(colors)])
-            skeleton_color = (0,255,0)
+            skeleton_color = (0, 165, 255)
             if joint in right_skeleton:
                 skeleton_color = (240, 176, 0)
             elif joint in left_skeleton:

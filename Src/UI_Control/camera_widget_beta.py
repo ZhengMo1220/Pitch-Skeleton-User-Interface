@@ -11,9 +11,10 @@ from Camera.camera_control import Camera
 from utils.selector import Person_selector, Kpt_selector
 from utils.vis_image import ImageDrawer
 from skeleton.detect_skeleton import PoseEstimater
+from utils.model import Model
 
 class PoseCameraTabControl(QWidget):
-    def __init__(self, model, parent=None):
+    def __init__(self, model:Model, parent=None):
         super().__init__(parent)
         self.ui = Ui_camera_ui()
         self.ui.setupUi(self)
@@ -52,6 +53,7 @@ class PoseCameraTabControl(QWidget):
         """Toggle the camera on/off based on checkbox state."""
         if state == 2:
             frame_width, frame_height, fps = self.camera.toggle_camera(True)
+            self.model.set_image_size((frame_width, frame_height))
             self.ui.image_resolution_label.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
             self.timer.start(1)
         else:
@@ -71,6 +73,7 @@ class PoseCameraTabControl(QWidget):
         output_dir = f'../../Db/Record/C{self.ui.camera_id_input.value()}_Fps120_{current_time}'
         os.makedirs(output_dir, exist_ok=True)
         video_filename = os.path.join(output_dir, f'C{self.ui.camera_id_input.value()}_Fps120_{current_time}.mp4')
+        self.ui.show_skeleton_checkBox.setChecked(False)
         self.camera.start_recording(video_filename)
 
     def toggle_select(self, state):
@@ -116,8 +119,8 @@ class PoseCameraTabControl(QWidget):
 
     def update_frame(self, image: np.ndarray):
         """Update the displayed frame with additional analysis."""
-        self.image_drawer.draw_info(img = image, kpt_buffer = self.pose_estimater.kpt_buffer)
-        self.show_image(image, self.camera_scene, self.ui.camer_frame_view)
+        drawed_img = self.image_drawer.draw_info(img = image, kpt_buffer = self.pose_estimater.kpt_buffer)
+        self.show_image(drawed_img, self.camera_scene, self.ui.camer_frame_view)
 
     def show_image(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
         """Display an image in the QGraphicsView."""
