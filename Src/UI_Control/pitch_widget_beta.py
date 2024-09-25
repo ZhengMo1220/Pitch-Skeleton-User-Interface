@@ -7,8 +7,8 @@ import os
 from pitch_ui import Ui_pitch_ui
 from datetime import datetime
 from utils.timer import Timer
-from Camera.camera_control import Camera, VideoLoader
-from utils.selector import Person_selector, Kpt_selector
+from cv_utils.cv_control import Camera, VideoLoader
+from utils.selector import PersonSelector, KptSelector
 from utils.analyze import PoseAnalyzer
 import cv2
 from utils.vis_graph import GraphPlotter
@@ -172,7 +172,7 @@ class PosePitchTabControl(QWidget):
     def toggle_select(self, state):
         """Select a person based on checkbox state."""
         if state == 2:
-            self.person_selector = Person_selector()
+            self.person_selector = PersonSelector()
             self.person_selector.select(search_person_df = self.pose_estimater.pre_person_df)
             if self.camera is None:
                 self.person_selector.select(search_person_df=self.pose_estimater.get_person_df_data(frame_num=self.ui.frame_slider.value()))
@@ -210,11 +210,11 @@ class PosePitchTabControl(QWidget):
         """Toggle keypoint selection and trajectory visualization."""
         is_checked = state == 2
         if state == 2:
-            self.kpt_selector = Kpt_selector()
+            self.kpt_selector = KptSelector()
             self.pose_estimater.set_person_id(self.person_selector.selected_id)
         else:
             self.kpt_selector = None
-        self.pose_estimater.set_kpt_id(9 if is_checked else None)
+        self.pose_estimater.set_kpt_id(10 if is_checked else None)
         self.image_drawer.set_show_traj(is_checked)
 
     def toggle_show_skeleton(self, state):
@@ -297,7 +297,7 @@ class PosePitchTabControl(QWidget):
         
         scene_pos = self.ui.frame_view.mapToScene(event.pos())
         x, y = scene_pos.x(), scene_pos.y()
-        search_person_df = self.pose_estimater.get_pre_person_df()
+        search_person_df = self.pose_estimater.pre_person_df
         if self.camera is None:
             search_person_df = self.pose_estimater.get_person_df_data(frame_num = self.ui.frame_slider.value())
 

@@ -1,14 +1,12 @@
-import typing
 import cv2
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, Qt, QThread
-from .util import video_to_frame
 import numpy as np
 import sys
 import cv2
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
-from .timer import Timer
+from utils.timer import Timer
 
 
 class VideoToImagesThread(QThread):
@@ -17,9 +15,29 @@ class VideoToImagesThread(QThread):
     def __init__(self,video_path):
         super(VideoToImagesThread, self).__init__()
         self.video_path=video_path
+
+    def video_to_frame(self, input_video_path):
+        video_images = []
+        vidcap = cv2.VideoCapture(input_video_path)
+        fps = vidcap.get(cv2.CAP_PROP_FPS)
+        success, image = vidcap.read()
+        frame_counter = 0
+        count = 0
+        while success:
+            # # load in even number frame only
+            # if not frame_counter & 1:
+            video_images.append(image)
+            count += 1
+            success, image = vidcap.read()
+            # frame_counter += 1
+        vidcap.release()
+        fps = int(fps) >> 1
+        # set image count labels
+        return video_images, fps, count
+
     def run(self):
         # capture from web cam
-        video_images, fps, count= video_to_frame(self.video_path)
+        video_images, fps, count= self.video_to_frame(self.video_path)
         _run_flag=False
         self.emit_signal.emit(video_images, fps, count)
     def stop(self):

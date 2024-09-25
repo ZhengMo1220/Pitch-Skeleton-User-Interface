@@ -1,7 +1,7 @@
 import time
 
 
-class FPS_Timer(object):
+class FPSTimer:
     """A simple timer."""
     def __init__(self):
         self.total_time = 0.

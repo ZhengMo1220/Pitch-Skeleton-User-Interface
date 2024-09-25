@@ -5,14 +5,14 @@ from skeleton.detect_skeleton import PoseEstimater
 class PoseAnalyzer:
     def __init__(self, pose_estimater:PoseEstimater):
         self.pose_estimater = pose_estimater
-        self.angle_dict = self.pose_estimater.get_joint_dict()['haple']['angle_dict']
+        self.angle_dict = self.pose_estimater.joints['haple']['angle_dict']
         self.analyze_info = []
         self.analyze_df = pd.DataFrame()
         self.processed_frames = set()
 
     def add_analyze_info(self, frame_num: int):
         """Analyze information for each frame up to the current frame."""
-        if self.pose_estimater.get_person_id() is None:
+        if self.pose_estimater.person_id is None:
             return pd.DataFrame()
         
         person_kpt = self.pose_estimater.get_person_df_data(frame_num= frame_num, is_select= True,is_kpt=True)

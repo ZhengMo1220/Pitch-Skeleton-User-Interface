@@ -6,7 +6,7 @@ import pandas as pd
 from enum import Enum
 from PyQt5.QtWidgets import QGraphicsScene
 from utils.vis_image import ImageDrawer
-from utils.cv_thread import VideoCaptureThread, VideoWriterThread, VideoToImagesThread
+from cv_utils.cv_thread import VideoCaptureThread, VideoWriterThread, VideoToImagesThread
 from PyQt5.QtWidgets import *
 
 class Camera:
@@ -175,14 +175,15 @@ class JsonLoader:
     def __init__(self, folder_path:str = None, file_name:str = None):
         self.folder_path = folder_path
         self.file_name = file_name
-        self.is_loading = False
+        self.person_df = pd.DataFrame()
 
     def load(self) -> pd.DataFrame:
-        self.is_loading = True
+        if self.folder_path == None or self.file_name == None:
+            return
         json_path = os.path.join(self.folder_path, f"{self.file_name}.json")
         print(json_path)
+
         if not os.path.exists(json_path):
-            return pd.DataFrame()
-        person_df = pd.read_json(json_path)
-        self.is_loading = False
-        return person_df
+            return
+        
+        self.person_df = pd.read_json(json_path)

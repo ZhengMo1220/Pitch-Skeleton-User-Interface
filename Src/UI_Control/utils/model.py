@@ -1,5 +1,4 @@
 from argparse import ArgumentParser
-from utils.set_parser import set_detect_parser, set_pose_parser, set_tracker_parser
 from mmcv.transforms import Compose
 from mmengine.logging import print_log
 import sys
@@ -21,9 +20,9 @@ except (ImportError, ModuleNotFoundError):
 
 class Model(object):
     def __init__(self):
-        self.detect_args = set_detect_parser()
-        self.pose_args = set_pose_parser()
-        self.tracker_args = set_tracker_parser()
+        self.detect_args = self.set_detect_parser()
+        self.pose_args = self.set_pose_parser()
+        self.tracker_args = self.set_tracker_parser()
         self.detector = init_detector(
         self.detect_args.det_config, self.detect_args.det_checkpoint, device=self.detect_args.device)
         self.detector.cfg.test_dataloader.dataset.pipeline[
