@@ -12,4 +12,4 @@ def test_torch_meshgrid():
         warnings.simplefilter('error')
         x = torch.tensor([1, 2, 3])
         y = torch.tensor([4, 5, 6])
-        grid_x, grid_y = torch_meshgrid(x, y)
+        grid_x, grid_y = torch.meshgrid(x, y, indexing='ij')
