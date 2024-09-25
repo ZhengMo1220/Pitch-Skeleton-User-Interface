@@ -4,7 +4,7 @@ from .analyze import PoseAnalyzer
 import numpy as np
 import pandas as pd
 
-class GraphPlotter:
+class GraphPlotter():
     def __init__(self, pose_analyzer: PoseAnalyzer, angle_name: str = "右手肘"):
         """Initialize GraphPlotter with frame range and keypoint name."""
         pg.setConfigOptions(foreground=QColor(113,148,116), antialias = True)

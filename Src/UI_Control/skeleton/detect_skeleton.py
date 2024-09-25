@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from utils.one_euro_filter import OneEuroFilter
-from utils.timer import FPS_Timer
 import os
 import sys
 import numpy as np
@@ -12,7 +11,7 @@ from mmpose.apis import inference_topdown
 from mmpose.apis import init_model as init_pose_estimator
 from mmpose.evaluation.functional import nms
 from mmpose.structures import merge_data_samples
-from utils.timer import FPS_Timer
+from utils.timer import FPSTimer
 
 import torch
 import torch.autograd.profiler as profiler
@@ -38,7 +37,7 @@ class PoseEstimater:
         self.fps = None
         self.person_data = []
         self.processed_frames = set()
-        self.fps_timer = FPS_Timer()
+        self.fps_timer = FPSTimer()
         self.smooth_filter = OneEuroFilter()
         self.is_detect = False
         self.kpt_buffer = []
@@ -294,10 +293,14 @@ class PoseEstimater:
         # 將所有在線目標的邊界框和ID提取為兩個列表
         tlwhs = []
         track_ids = []
-        
+
         for target in online_targets:
             tlwhs.append(target.tlwh)
             track_ids.append(target.track_id)
+
+        # 將列表轉換為 NumPy array
+        tlwhs = np.array(tlwhs)
+        track_ids = np.array(track_ids)
 
         # 將數據轉為張量並放到 GPU 上
         tlwhs = torch.tensor(tlwhs, device='cuda')  # shape: (n, 4)
@@ -346,9 +349,6 @@ class PoseEstimater:
     def set_detect(self, status:bool):
         self.is_detect = status
 
-    def get_pre_person_df(self):
-        return self.pre_person_df
-
     def update_kpt_buffer(self, frame_num:int, window_length=17, polyorder=2):
         filtered_df = self.person_df[
             (self.person_df['person_id'] == self.person_id) & 
@@ -386,12 +386,6 @@ class PoseEstimater:
             smoothed_points = kpt_buffer
 
         return smoothed_points
-        
-    def get_joint_dict(self):
-        return self.joints
-
-    def get_kpt_buffer(self):
-        return self.kpt_buffer
     
     def get_person_df_data(self, frame_num=None, is_select=False, is_kpt=False):
         if self.person_df.empty:
@@ -413,9 +407,6 @@ class PoseEstimater:
 
         return data
     
-    def get_person_id(self):
-        return self.person_id
-
     def set_processed_data(self, person_df:pd.DataFrame):
         if person_df.empty:
             return
@@ -435,7 +426,7 @@ class PoseEstimater:
         self.fps = None
         self.person_data = []
         self.processed_frames = set()
-        self.fps_timer = FPS_Timer()
+        self.fps_timer = FPSTimer()
         self.smooth_filter = OneEuroFilter()
         self.is_detect = False
         self.kpt_buffer = []

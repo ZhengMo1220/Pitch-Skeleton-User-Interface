@@ -8,7 +8,7 @@ import os
 from pitch_ui import Ui_pitch_ui
 import pandas as pd
 import queue
-from utils.cv_thread import VideoCaptureThread, VideoWriter
+from UI_Control.cv_control.cv_thread import VideoCaptureThread, VideoWriter
 from datetime import datetime
 from utils.timer import FPS_Timer, Timer
 from utils.vis_image import draw_grid, draw_bbox, draw_traj, draw_region

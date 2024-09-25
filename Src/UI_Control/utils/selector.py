@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-class Person_selector:
+class PersonSelector:
     def __init__(self):
         self.selected_id = None
 
@@ -36,7 +36,7 @@ class Person_selector:
     def reset(self):
         self.selected_id = None
         
-class Kpt_selector:
+class KptSelector:
     def __init__(self):
         self.selected_id = None
 
