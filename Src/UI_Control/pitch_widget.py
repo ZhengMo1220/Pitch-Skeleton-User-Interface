@@ -14,7 +14,7 @@ from utils.timer import FPS_Timer, Timer
 from utils.vis_image import draw_grid, draw_bbox, draw_traj, draw_region
 from utils.vis_pose import draw_points_and_skeleton, joints_dict
 from utils.store import save_video
-from topdown_demo_with_mmdet import process_one_image
+from topdown_demo_with_mmdet import processImage
 import sys
 from utils.one_euro_filter import OneEuroFilter
 
@@ -36,7 +36,7 @@ class PosePitchTabControl(QWidget):
         self.ui.record_checkbox.clicked.connect(self.toggle_record)
         self.ui.select_checkbox.clicked.connect(self.toggle_select)
         self.ui.select_keypoint_checkbox.clicked.connect(self.toggle_select_kpt)
-        self.ui.frame_slider.valueChanged.connect(self.video_analyze_frame)
+        self.ui.frame_slider.valueChanged.connect(self.video_analyzeFrame)
         self.ui.play_btn.clicked.connect(self.play_btn_clicked)
         self.ui.back_key_btn.clicked.connect(
             lambda: self.ui.frame_slider.setValue(self.ui.frame_slider.value() - 1)
@@ -141,7 +141,7 @@ class PosePitchTabControl(QWidget):
             except queue.Full:
                 print("Frame buffer is full. Dropping frame.")
 
-            self.real_time_analyze_frame()
+            self.real_time_analyzeFrame()
 
         #確認有沒有在錄影
         if self.video_writer is not None:
@@ -183,7 +183,7 @@ class PosePitchTabControl(QWidget):
         GraphicsView.setAlignment(Qt.AlignLeft)
         GraphicsView.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
 
-    def merge_person_data(self, pred_instances, person_ids: list, frame_num: int = None):
+    def mergePersonData(self, pred_instances, person_ids: list, frame_num: int = None):
         person_bboxes = pred_instances['bboxes']
         if frame_num is None:
             self.person_data = []
@@ -211,17 +211,17 @@ class PosePitchTabControl(QWidget):
 
         return pd.DataFrame(self.person_data)
 
-    def real_time_analyze_frame(self):
+    def real_time_analyzeFrame(self):
         if not self.frame_buffer.empty():
             frame = self.frame_buffer.get()
             img = frame.copy()
             if self.ui.show_skeleton_checkbox.isChecked():
-                self.detect_kpt(img)
+                self.detectKpt(img)
                 self.start_pitch()
 
             self.update_frame(img)
 
-    def video_analyze_frame(self):
+    def video_analyzeFrame(self):
         frame_num = self.ui.frame_slider.value()
 
         if len(self.record_buffer) == 0:
@@ -238,7 +238,7 @@ class PosePitchTabControl(QWidget):
             save_video(self.video_name, self.record_buffer, self.person_df, select_id=self.select_person_id)
 
         if frame_num not in self.processed_frames:
-            self.detect_kpt(image, frame_num= frame_num)
+            self.detectKpt(image, frame_num= frame_num)
         
         # if self.select_person_id:
         #     self.import_data_to_table(self.select_person_id, frame_num)
@@ -267,7 +267,7 @@ class PosePitchTabControl(QWidget):
 
         self.show_image(image, self.camera_scene, self.ui.frame_view)
 
-    def smooth_kpt(self, person_ids: list):
+    def smoothKpt(self, person_ids: list):
         if self.pre_person_df.empty :
             self.pre_person_df = self.person_df.copy()
 
@@ -455,18 +455,18 @@ class PosePitchTabControl(QWidget):
         self.ui.frame_num_label.setText(f'0/{len(video)-1}')
         image = video[0].copy()
         if self.ui.show_skeleton_checkbox.isChecked():
-            self.detect_kpt(image, frame_num = 0)
+            self.detectKpt(image, frame_num = 0)
         self.update_frame(image)
         self.ui.image_resolution_label.setText( "(0,0) -" + f" {video[0].shape[1]} x {video[0].shape[0]}")
         
-    def detect_kpt(self, image:np.ndarray, frame_num:int = None):
+    def detectKpt(self, image:np.ndarray, frame_num:int = None):
         self.fps_timer.tic()
-        pred_instances, person_ids = process_one_image(self.model, image, select_id=self.select_person_id)
+        pred_instances, person_ids = processImage(self.model, image, select_id=self.select_person_id)
         average_time = self.fps_timer.toc()
         fps = int(1/max(average_time, 0.00001))
         self.ui.fps_info_label.setText(f"{fps:02}")
-        self.person_df = self.merge_person_data(pred_instances, person_ids, frame_num)
-        self.smooth_kpt(person_ids)
+        self.person_df = self.mergePersonData(pred_instances, person_ids, frame_num)
+        self.smoothKpt(person_ids)
         
         if frame_num is not None:
             self.processed_frames.add(frame_num)
@@ -478,7 +478,7 @@ class PosePitchTabControl(QWidget):
         self.is_play = not self.is_play
         if self.is_play:
             self.ui.play_btn.setText("||")
-            self.play_frame(self.ui.frame_slider.value())
+            self.playFrame(self.ui.frame_slider.value())
         else:
             self.ui.play_btn.setText("▶︎")
 
@@ -490,7 +490,7 @@ class PosePitchTabControl(QWidget):
         else:
             super().keyPressEvent(event)
 
-    def play_frame(self, start_num = 0):
+    def playFrame(self, start_num = 0):
         for i in range(start_num, len(self.record_buffer)):
             self.ui.frame_slider.setValue(i)
             if not self.is_play:

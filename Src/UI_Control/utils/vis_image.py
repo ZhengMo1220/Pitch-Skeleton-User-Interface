@@ -42,7 +42,7 @@ class ImageDrawer():
         if img is None:
             return
         image = img.copy()
-        curr_person_df = self.pose_estimater.get_person_df_data(frame_num = frame_num, is_select=True)
+        curr_person_df = self.pose_estimater.getPersonDf(frame_num = frame_num, is_select=True)
         if self.show_region:
             image = self.draw_region(image)
 
@@ -282,27 +282,27 @@ class ImageDrawer():
     def swap_values(self, kpts):
         return [[item[1], item[0], item[2]] for item in kpts]
 
-    def set_show_bbox(self, status:bool):
+    def setShowBbox(self, status:bool):
         self.show_bbox = status
     
-    def set_show_skeleton(self, status:bool):
+    def setShowSkeleton(self, status:bool):
         self.show_skeleton = status
     
-    def set_show_grid(self, status:bool):
+    def setShowGrid(self, status:bool):
         self.show_grid = status
         
     def set_show_region(self, status:bool):
         self.show_region = status
 
-    def set_show_traj(self, status:bool):
+    def setShowTraj(self, status:bool):
         self.show_traj = status
 
-    def set_show_angle_info(self, status:bool):
+    def setShowAngleInfo(self, status:bool):
         self.show_angle_info = status
-        self.set_angle_info_pos()
+        self.setAngleInfoPos()
 
-    def set_angle_info_pos(self):
-        person_df = self.pose_estimater.get_person_df_data(is_select=True)
+    def setAngleInfoPos(self):
+        person_df = self.pose_estimater.getPersonDf(is_select=True)
         if person_df is None:
             return
         self.angle_info_pos = person_df.iloc[0]['keypoints'][19]
@@ -311,7 +311,7 @@ class ImageDrawer():
     def reset(self):
         self.show_grid = False
         self.show_bbox = False
-        self.show_skeleton = True
+        self.show_skeleton = False
         self.show_traj = False
         self.show_angle_info = False
         self.angle_info_pos = (0,0)

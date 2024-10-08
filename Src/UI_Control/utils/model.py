@@ -20,9 +20,9 @@ except (ImportError, ModuleNotFoundError):
 
 class Model(object):
     def __init__(self):
-        self.detect_args = self.set_detect_parser()
-        self.pose_args = self.set_pose_parser()
-        self.tracker_args = self.set_tracker_parser()
+        self.detect_args = self.setDetectParser()
+        self.pose_args = self.setPoseParser()
+        self.tracker_args = self.setTrackerParser()
         self.detector = init_detector(
         self.detect_args.det_config, self.detect_args.det_checkpoint, device=self.detect_args.device)
         self.detector.cfg.test_dataloader.dataset.pipeline[
@@ -36,9 +36,9 @@ class Model(object):
         self.tracker = BoTSORT(self.tracker_args, frame_rate=30.0)
         self.image_size = (0,0,0)
 
-    def set_detect_parser(self) -> ArgumentParser:
+    def setDetectParser(self) -> ArgumentParser:
         parser = ArgumentParser()
-        parser.add_argument('--det-config', default='../mmyolo_main/configs/yolov8/yolov8_x_syncbn_fast_8xb16-500e_coco.py', help='Config file for detection')
+        parser.add_argument('--det-config', default='../mmyolo_main/configs/yolov8/yolov8_x_mask-refine_syncbn_fast_8xb16-500e_coco.py', help='Config file for detection')
         parser.add_argument('--det-checkpoint', default='../../Db/pretrain/yolov8_x_syncbn_fast_8xb16-500e_coco_20230218_023338-5674673c.pth', help='Checkpoint file for detection')
         parser.add_argument(
         '--device', default='cuda:0', help='Device used for inference')
@@ -87,10 +87,10 @@ class Model(object):
         args = parser.parse_args()
         return args
 
-    def set_pose_parser(self) -> ArgumentParser:
+    def setPoseParser(self) -> ArgumentParser:
         parser = ArgumentParser()
         parser.add_argument('--pose-config', default='../mmpose_main/configs/body_2d_keypoint/topdown_heatmap/haple/ViTPose_base_simple_halpe_256x192.py', help='Config file for pose')
-        parser.add_argument('--pose-checkpoint', default='../../Db/pretrain/vitpose_Sk26.pth', help='Checkpoint file for pose')
+        parser.add_argument('--pose-checkpoint', default='../../Db/pretrain/epoch_200.pth', help='Checkpoint file for pose')
         parser.add_argument(
             '--device', default='cuda:0', help='Device used for inference')
         parser.add_argument(
@@ -117,7 +117,7 @@ class Model(object):
         args = parser.parse_args()
         return args
 
-    def set_tracker_parser(self) -> ArgumentParser:
+    def setTrackerParser(self) -> ArgumentParser:
         parser = ArgumentParser()
         # tracking args
         parser.add_argument("--track_high_thresh", type=float, default=0.3, help="tracking confidence threshold")
@@ -159,6 +159,6 @@ class Model(object):
         self.tracker = None
         self.tracker = BoTSORT(self.tracker_args, frame_rate=30.0)
 
-    def set_image_size(self, image_size:tuple):
+    def setImageSize(self, image_size:tuple):
         self.reset_tracker()
         self.image_size = image_size

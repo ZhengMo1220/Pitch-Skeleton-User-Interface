@@ -15,7 +15,7 @@ class PoseAnalyzer:
         if self.pose_estimater.person_id is None:
             return pd.DataFrame()
         
-        person_kpt = self.pose_estimater.get_person_df_data(frame_num= frame_num, is_select= True,is_kpt=True)
+        person_kpt = self.pose_estimater.getPersonDf(frame_num= frame_num, is_select= True,is_kpt=True)
         
         if person_kpt is None:
             return

@@ -126,7 +126,7 @@ class PoseEstimater:
             },
         }
 
-    def merge_person_data(self, pred_instances, person_ids: list, frame_num: int = None):
+    def mergePersonData(self, pred_instances, person_ids: list, frame_num: int = None):
         person_bboxes = pred_instances['bboxes']
         if frame_num is None:
             self.person_data = []
@@ -145,7 +145,6 @@ class PoseEstimater:
                 'bbox': bbox,
                 'keypoints': new_kpts
             }
-
             if frame_num is not None:
                 person_info['frame_number'] = frame_num
 
@@ -153,38 +152,46 @@ class PoseEstimater:
 
         return pd.DataFrame(self.person_data)
   
-    def detect_kpt(self, image:np.ndarray, frame_num:int = None):
+    def detectKpt(self, image:np.ndarray, frame_num:int = None, is_video:bool = False, is_processed:bool=False):
         if not self.is_detect:
             return image, pd.DataFrame(), 0
 
         fps = 0
-        if frame_num not in self.processed_frames:
-            self.fps_timer.tic()
-            if image.shape != self.img_shape:
-                self.img_shape = image.shape
-                self.model.init_tracker()
-
-
-            pred_instances, person_ids = self.process_one_image(self.model, image, select_id=self.person_id)
-            average_time = self.fps_timer.toc()
-            fps = int(1/max(average_time, 0.00001))
-            self.person_df = self.merge_person_data(pred_instances, person_ids, frame_num)
-            self.smooth_kpt(person_ids, frame_num)
-        
-        if frame_num is not None:
-            self.processed_frames.add(frame_num)
-
-        if self.kpt_id is not None:
-            if frame_num is not None:
-                self.kpt_buffer = self.update_kpt_buffer(frame_num)
-            else:
-                person_data = self.get_person_df_data(is_select=True, is_kpt=True)
+        # self.fps_timer.tic()
+        # if not is_processed:
+        if is_video: 
+            #影片處理方式
+            if frame_num not in self.processed_frames:
+                pred_instances, person_ids = self.processImage(self.model, image, select_id=self.person_id)
+                self.person_df = self.mergePersonData(pred_instances, person_ids, frame_num)
+                self.smoothKpt(person_ids, frame_num)
+                self.processed_frames.add(frame_num)
+            if self.kpt_id is not None:
+                self.kpt_buffer = self.updateKptBuffer(frame_num)
+        else:
+            #real time 處理方式
+            pred_instances, person_ids = self.processImage(self.model, image, select_id=self.person_id)
+            self.person_df = self.mergePersonData(pred_instances, person_ids)
+            self.smoothKpt(person_ids, frame_num)
+            self.pre_person_df = self.person_df.copy()
+            if self.kpt_id:
+                person_data = self.getPersonDf(is_select=True, is_kpt=True)
                 if person_data is not None:
                     keypoint = person_data[self.kpt_id][:2]  # 確保取出的是有效的 [x, y] 數據
                     self.kpt_buffer.append(keypoint)
+
+        # if self.kpt_id and is_processed:
+        #     person_data = self.getPersonDf(is_select=True, is_kpt=True)
+        #     if person_data is not None:
+        #         keypoint = person_data[self.kpt_id][:2]  # 確保取出的是有效的 [x, y] 數據
+        #         self.kpt_buffer.append(keypoint)
+
+        average_time = self.fps_timer.toc()
+        fps = int(1/max(average_time, 0.00001))
+
         return image, self.person_df, fps
 
-    def smooth_kpt(self, person_ids: list, frame_num=None):
+    def smoothKpt(self, person_ids: list, frame_num=None):
         # 如果是即時處理，則初始化前一幀的數據，否則依賴 frame_slider 進行處理
         if frame_num is not None:
             curr_frame = frame_num
@@ -232,12 +239,8 @@ class PoseEstimater:
             
             # 更新當前幀的數據
             self.person_df.at[curr_person_data.index[0], 'keypoints'] = smoothed_kpts
-
-        # 如果是即時處理，則更新前幀數據
-        if frame_num is None:
-            self.pre_person_df = self.person_df.copy()
-
-    def process_one_image(self, model, img, select_id=None):
+           
+    def processImage(self, model, img, select_id=None):
         """
         處理單張圖像，進行物件偵測、跟蹤和姿態估計。
 
@@ -267,7 +270,7 @@ class PoseEstimater:
         )
     
         # 過濾出有效的邊界框和追蹤ID
-        online_bbox, online_ids = self.filter_valid_targets(online_targets, select_id)
+        online_bbox, online_ids = self.filterValidTargets(online_targets, select_id)
 
         # 姿態估計
         pose_results = inference_topdown(model.pose_estimator, img, np.array(online_bbox))
@@ -276,7 +279,7 @@ class PoseEstimater:
     
         return data_samples.get('pred_instances', None), online_ids
     
-    def filter_valid_targets(self, online_targets, select_id: int = None):
+    def filterValidTargets(self, online_targets, select_id: int = None):
         """
         過濾出有效的追蹤目標。
 
@@ -338,18 +341,18 @@ class PoseEstimater:
                 condition_1 = (self.person_df['frame_number'] == i) & (self.person_df['person_id'] == before_correct_id)
                 self.person_df.loc[condition_1, 'person_id'] = after_correct_id
 
-    def set_person_id(self, person_id):
+    def setPersonId(self, person_id):
         self.person_id = person_id
         print(self.person_id)
 
-    def set_kpt_id(self, kpt_id):
+    def setKptId(self, kpt_id):
         self.kpt_id = kpt_id
         print(self.kpt_id)
 
-    def set_detect(self, status:bool):
+    def setDetect(self, status:bool):
         self.is_detect = status
 
-    def update_kpt_buffer(self, frame_num:int, window_length=17, polyorder=2):
+    def updateKptBuffer(self, frame_num:int, window_length=17, polyorder=2):
         filtered_df = self.person_df[
             (self.person_df['person_id'] == self.person_id) & 
             (self.person_df['frame_number'] < frame_num)
@@ -387,7 +390,7 @@ class PoseEstimater:
 
         return smoothed_points
     
-    def get_person_df_data(self, frame_num=None, is_select=False, is_kpt=False):
+    def getPersonDf(self, frame_num=None, is_select=False, is_kpt=False):
         if self.person_df.empty:
             return pd.DataFrame()
         condition = pd.Series([True] * len(self.person_df))  # 初始條件設為全為 True
@@ -397,7 +400,7 @@ class PoseEstimater:
         if is_select and self.person_id is not None:
             condition &= (self.person_df['person_id'] == self.person_id)
  
-        data = self.person_df.loc[condition]
+        data = self.person_df.loc[condition].copy()
         
         if data.empty:
             return None
@@ -407,16 +410,18 @@ class PoseEstimater:
 
         return data
     
-    def set_processed_data(self, person_df:pd.DataFrame):
+    def setProcessedData(self, person_df:pd.DataFrame):
         if person_df.empty:
             return
-        
         self.person_df = person_df
-        self.processed_frames = {frame_num for frame_num in self.person_df['frame_number'] if frame_num != 0}
+        self.processed_frames = {frame_num for frame_num in self.person_df['frame_number']}
 
     def update_person_df(self, x:float, y:float,frame_num:int, correct_kpt_idx:int):
         self.person_df.loc[(self.person_df['frame_number'] == frame_num) &
                             (self.person_df['person_id'] == self.person_id), 'keypoints'].iloc[0][correct_kpt_idx] = [x, y, 0.9, 1]
+
+    def clearKptBuffer(self):
+        self.kpt_buffer = []
 
     def reset(self):
         self.person_df = pd.DataFrame()
