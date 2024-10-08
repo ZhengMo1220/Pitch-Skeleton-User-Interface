@@ -128,7 +128,7 @@ class PoseCameraTabControl(QWidget):
 
     def update_frame(self, frame: np.ndarray):
         """Update the displayed frame with additional analysis."""
-        drawed_img = self.image_drawer.draw_info(img = frame, kpt_buffer = self.pose_estimater.kpt_buffer)
+        drawed_img = self.image_drawer.drawInfo(img = frame, kpt_buffer = self.pose_estimater.kpt_buffer)
         self.show_image(drawed_img, self.camera_scene, self.ui.FrameView)
 
     def show_image(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):

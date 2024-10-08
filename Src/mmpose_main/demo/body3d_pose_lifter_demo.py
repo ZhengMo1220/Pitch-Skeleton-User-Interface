@@ -352,7 +352,7 @@ def process_one_image(args, detector, frame, frame_idx, pose_estimator,
             dataset_2d=pose_det_dataset_name,
             dataset_3d=pose_lift_dataset_name,
             show=args.show,
-            draw_bbox=True,
+            drawBbox=True,
             kpt_thr=args.kpt_thr,
             num_instances=args.num_instances,
             wait_time=args.show_interval)

@@ -25,7 +25,7 @@ class PoseVideoTabControl(QWidget):
         self.ui = Ui_video_widget()
         self.ui.setupUi(self)
         self.model = model
-        self.setup_components()
+        self.setupComponents()
         self.init_var()
         self.bind_ui()
         
@@ -43,9 +43,9 @@ class PoseVideoTabControl(QWidget):
             lambda: self.ui.frameSlider.setValue(self.ui.frameSlider.value() + 1)
         )
         self.ui.frameSlider.valueChanged.connect(self.analyzeFrame)
-        self.ui.KptTable.cellActivated.connect(self.on_cell_clicked)
+        self.ui.KptTable.cellActivated.connect(self.onCellClicked)
         self.ui.FrameView.mousePressEvent = self.mousePressEvent
-        self.ui.IdCorrectBtn.clicked.connect(self.correct_id)
+        self.ui.IdCorrectBtn.clicked.connect(self.correctId)
         self.ui.startCodeBtn.clicked.connect(self.toggle_detect)
         self.ui.selectCheckBox.stateChanged.connect(self.toggle_select)
         self.ui.showSkeletonCheckBox.stateChanged.connect(self.toggleShowSkeleton)
@@ -75,9 +75,9 @@ class PoseVideoTabControl(QWidget):
 
         if self.label_kpt:
             if event.button() == Qt.LeftButton:
-                self.send_to_table(x, y, 1)
+                self.sendtoTable(x, y, 1)
             elif event.button() == Qt.RightButton:
-                self.send_to_table(0, 0, 0)
+                self.sendtoTable(0, 0, 0)
             self.label_kpt = False
 
             self.update_frame(self.ui.frameSlider.value())
@@ -90,7 +90,7 @@ class PoseVideoTabControl(QWidget):
         else:
             super().keyPressEvent(event)
 
-    def setup_components(self): 
+    def setupComponents(self): 
         self.person_selector = PersonSelector()
         self.kpt_selector = KptSelector()
         self.pose_estimater = PoseEstimater(self.model)
@@ -220,17 +220,17 @@ class PoseVideoTabControl(QWidget):
         _, _, fps= self.pose_estimater.detectKpt(frame, frame_num)
         self.ui.FPSInfoLabel.setText(f"{fps:02d}")
         # if self.pose_estimater.person_id is not None:
-            # self.pose_analyzer.add_analyze_info(frame_num)
-            # self.graph_plotter.update_graph(frame_num)
-        # self.import_data_to_table(frame_num)
+            # self.pose_analyzer.addAnalyzeInfo(frame_num)
+            # self.graph_plotter.updateGraph(frame_num)
+        # self.importDatatoTable(frame_num)
         self.update_frame(frame_num)
         if frame_num == self.video_loader.total_frames - 1:
             self.ui.playBtn.click()
-            # self.video_loader.save_video()
+            # self.video_loader.saveVideo()
                 
     def update_frame(self, frame_num:int):
         image = self.video_loader.getVideoImage(frame_num)
-        drawed_img = self.image_drawer.draw_info(image, frame_num, self.pose_estimater.kpt_buffer)
+        drawed_img = self.image_drawer.drawInfo(image, frame_num, self.pose_estimater.kpt_buffer)
         self.show_image(drawed_img, self.video_scene, self.ui.FrameView)
     
     def toggle_detect(self):
@@ -278,7 +278,7 @@ class PoseVideoTabControl(QWidget):
         else:
             self.image_drawer.setShowAngleInfo(False)
 
-    def clear_table_view(self):
+    def clearTableView(self):
         self.ui.KptTable.clear()
         self.ui.KptTable.setColumnCount(4)
         title = ["關節點", "X", "Y", "有無更改"]
@@ -287,14 +287,14 @@ class PoseVideoTabControl(QWidget):
         for i in range(4):
             header.setDefaultAlignment(Qt.AlignLeft)
 
-    def import_data_to_table(self, frame_num:int):
-        self.clear_table_view()
+    def importDatatoTable(self, frame_num:int):
+        self.clearTableView()
         person_id = self.pose_estimater.person_id
         if person_id is None:
             return
         person_data = self.pose_estimater.getPersonDf(frame_num=frame_num, is_select=True)
         if person_data.empty:
-            self.clear_table_view()
+            self.clearTableView()
             self.ui.selectCheckBox.setChecked(False)
             return
         
@@ -321,11 +321,11 @@ class PoseVideoTabControl(QWidget):
             self.ui.KptTable.setItem(kpt_idx, 2, kpty_item)
             self.ui.KptTable.setItem(kpt_idx, 3, kpt_label_item)
 
-    def on_cell_clicked(self, row, column):
+    def onCellClicked(self, row, column):
         self.correct_kpt_idx = row
         self.label_kpt = True
      
-    def send_to_table(self, kptx:float, kpty:float, kpt_label:int):
+    def sendtoTable(self, kptx:float, kpty:float, kpt_label:int):
         kptx_item = QTableWidgetItem(str(kptx))
         kpty_item = QTableWidgetItem(str(kpty))
         if kpt_label :
@@ -342,10 +342,10 @@ class PoseVideoTabControl(QWidget):
         self.pose_estimater.update_person_df(kptx, kpty, self.ui.frameSlider.value(), self.correct_kpt_idx)
         self.update_frame(frame_num=self.ui.frameSlider.value())
  
-    def correct_id(self):
-        before_correct_id = self.ui.beforeCorrectId.value()
-        after_correct_id = self.ui.afterCorrectId.value()
-        self.pose_estimater.correct_person_id(before_correct_id, after_correct_id)
+    def correctId(self):
+        before_correctId = self.ui.beforeCorrectId.value()
+        after_correctId = self.ui.afterCorrectId.value()
+        self.pose_estimater.correct_person_id(before_correctId, after_correctId)
         self.update_frame(self.ui.frameSlider.value())
 
 

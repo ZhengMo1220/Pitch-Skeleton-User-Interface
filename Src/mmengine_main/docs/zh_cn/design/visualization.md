@@ -26,8 +26,8 @@
 
 **(1) 绘制相关接口**
 
-- [draw_bboxes](mmengine.visualization.Visualizer.draw_bboxes) 绘制单个或多个边界框
-- [draw_points](mmengine.visualization.Visualizer.draw_points) 绘制单个或多个点
+- [drawBboxes](mmengine.visualization.Visualizer.drawBboxes) 绘制单个或多个边界框
+- [drawPoints](mmengine.visualization.Visualizer.drawPoints) 绘制单个或多个点
 - [draw_texts](mmengine.visualization.Visualizer.draw_texts) 绘制单个或多个文本框
 - [draw_lines](mmengine.visualization.Visualizer.draw_lines) 绘制单个或多个线段
 - [draw_circles](mmengine.visualization.Visualizer.draw_circles) 绘制单个或多个圆

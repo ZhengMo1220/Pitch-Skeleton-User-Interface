@@ -38,41 +38,41 @@ class ImageDrawer():
         self.angle_info_pos = (0,0)
         self.region = [(100, 250), (450, 600)]
     
-    def draw_info(self, img:np.ndarray, frame_num:int=None, kpt_buffer:list = None):
+    def drawInfo(self, img:np.ndarray, frame_num:int=None, kpt_buffer:list = None):
         if img is None:
             return
         image = img.copy()
         curr_person_df = self.pose_estimater.getPersonDf(frame_num = frame_num, is_select=True)
         if self.show_region:
-            image = self.draw_region(image)
+            image = self.drawRegion(image)
 
         if self.show_grid :
-            image = self.draw_grid(image)
+            image = self.drawGrid(image)
         
         if self.show_bbox:
-            image = self.draw_bbox(image, curr_person_df)
+            image = self.drawBbox(image, curr_person_df)
         
         if self.show_skeleton:
-            image = self.draw_points_and_skeleton(image, curr_person_df, self.pose_estimater.joints['haple']['skeleton_links'], 
+            image = self.drawPointsandSkeleton(image, curr_person_df, self.pose_estimater.joints['haple']['skeleton_links'], 
                                                 points_palette_samples=10)
         
         if self.show_traj:
-            image = self.draw_traj(image, kpt_buffer)
+            image = self.drawTraj(image, kpt_buffer)
 
         if self.show_angle_info:
-            image = self.draw_angle_info(image, frame_num)
+            image = self.drawAngleInfo(image, frame_num)
         
         return image
 
-    def draw_cross(self, image, x, y, length=5, color=(0, 0, 255), thickness=2):
+    def drawCross(self, image, x, y, length=5, color=(0, 0, 255), thickness=2):
         cv2.line(image, (x, y - length), (x, y + length), color, thickness)
         cv2.line(image, (x - length, y), (x + length, y), color, thickness)
 
-    def draw_grid(self, image:np.ndarray):
+    def drawGrid(self, image:np.ndarray):
         #return image:np.ndarray
         
         height, width = image.shape[:2]
-        self.draw_cross(image,int(width/2),int(height/2),length=20,color=(0,0,255),thickness = 3)
+        self.drawCross(image,int(width/2),int(height/2),length=20,color=(0,0,255),thickness = 3)
         # 計算垂直線的位置
         vertical_interval = width // 5
         vertical_lines = [vertical_interval * i for i in range(1, 5)]
@@ -91,7 +91,7 @@ class ImageDrawer():
 
         return image
 
-    def draw_bbox(self, image:np.ndarray, person_df:pd.DataFrame):
+    def drawBbox(self, image:np.ndarray, person_df:pd.DataFrame):
         if person_df.empty:
             return image
         person_ids = person_df['person_id']
@@ -104,7 +104,7 @@ class ImageDrawer():
             image = cv2.putText(image, str(id), (x1, y1-10), cv2.FONT_HERSHEY_COMPLEX, 1.5, color, 2)
         return image
 
-    def draw_traj(self, img: np.ndarray, kpt_buffer: list):
+    def drawTraj(self, img: np.ndarray, kpt_buffer: list):
         if not kpt_buffer or len(kpt_buffer) < 2:
             return img
 
@@ -117,9 +117,11 @@ class ImageDrawer():
 
         return img
 
-    def draw_angle_info(self, img: np.ndarray, frame_num: int) -> np.ndarray:
+    def drawAngleInfo(self, img: np.ndarray, frame_num: int) -> np.ndarray:
         # 从 pose_analyzer 获取角度数据
         _, angle_info = self.pose_analyzer.get_frame_angle_data(frame_num, self.angle_name)
+        if (len(angle_info) == 0):
+            return img
         # 提取角度值，并将其转换为整数
         angle_value = int(angle_info[0])
         
@@ -134,11 +136,11 @@ class ImageDrawer():
         
         return img
 
-    def draw_region(self, img:np.ndarray):
+    def drawRegion(self, img:np.ndarray):
         cv2.rectangle(img, self.region[0], self.region[1], (0, 255, 0), -1)
         return img
 
-    def draw_points(self, image, points, person_idx, color_palette='gist_rainbow', palette_samples=10, confidence_threshold=0.3):
+    def drawPoints(self, image, points, person_idx, color_palette='gist_rainbow', palette_samples=10, confidence_threshold=0.3):
         """
         Draws `points` on `image`.
 
@@ -177,7 +179,7 @@ class ImageDrawer():
 
         return image
 
-    def draw_skeleton(self, image, points, skeleton, color_palette='Set2', palette_samples='jet', person_index=0,
+    def drawSkeleton(self, image, points, skeleton, color_palette='Set2', palette_samples='jet', person_index=0,
                     confidence_threshold=0.5):
         """
         Draws a `skeleton` on `image`.
@@ -231,7 +233,7 @@ class ImageDrawer():
                 )
         return image
 
-    def draw_points_and_skeleton(self, image, person_df, skeleton, points_color_palette='gist_rainbow', points_palette_samples=10,
+    def drawPointsandSkeleton(self, image, person_df, skeleton, points_color_palette='gist_rainbow', points_palette_samples=10,
                                 skeleton_color_palette='Set2', skeleton_palette_samples='jet', confidence_threshold=0.3):
         """
         Draws `points` and `skeleton` on `image`.
@@ -267,8 +269,8 @@ class ImageDrawer():
             return image
         person_data = self.df_to_points(person_df)
         for person_id, points in person_data.items(): 
-            image = self.draw_skeleton(image, points, skeleton,person_index=person_id)
-            image = self.draw_points(image, points,person_idx=person_id)
+            image = self.drawSkeleton(image, points, skeleton,person_index=person_id)
+            image = self.drawPoints(image, points,person_idx=person_id)
         return image
 
     def df_to_points(self, person_df):
@@ -276,10 +278,10 @@ class ImageDrawer():
         person_ids = person_df['person_id']
         person_kpts = person_df['keypoints']
         for id, kpts in zip(person_ids, person_kpts):
-            person_data[id] = np.array(self.swap_values(kpts))
+            person_data[id] = np.array(self.swapValues(kpts))
         return person_data
 
-    def swap_values(self, kpts):
+    def swapValues(self, kpts):
         return [[item[1], item[0], item[2]] for item in kpts]
 
     def setShowBbox(self, status:bool):
@@ -291,7 +293,7 @@ class ImageDrawer():
     def setShowGrid(self, status:bool):
         self.show_grid = status
         
-    def set_show_region(self, status:bool):
+    def setShowRegion(self, status:bool):
         self.show_region = status
 
     def setShowTraj(self, status:bool):

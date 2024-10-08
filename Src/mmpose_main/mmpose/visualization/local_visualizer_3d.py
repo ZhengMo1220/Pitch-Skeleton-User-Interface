@@ -495,7 +495,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                        draw_gt: bool = True,
                        draw_pred: bool = True,
                        draw_2d: bool = True,
-                       draw_bbox: bool = False,
+                       drawBbox: bool = False,
                        show_kpt_idx: bool = False,
                        skeleton_style: str = 'mmpose',
                        dataset_2d: str = 'coco',
@@ -535,7 +535,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                 Defaults to ``True``
             draw_2d (bool): Whether to draw 2d detection results. Defaults to
                 ``True``
-            draw_bbox (bool): Whether to draw bounding boxes. Default to
+            drawBbox (bool): Whether to draw bounding boxes. Default to
                 ``False``
             show_kpt_idx (bool): Whether to show the index of keypoints.
                 Defaults to ``False``
@@ -584,7 +584,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                     kpt_thr=kpt_thr,
                     show_kpt_idx=show_kpt_idx,
                     skeleton_style=skeleton_style)
-                if draw_bbox:
+                if drawBbox:
                     det_img_data = self._draw_instances_bbox(
                         det_img_data, det_data_sample.pred_instances)
         if scores_2d is not None and convert_keypoint:

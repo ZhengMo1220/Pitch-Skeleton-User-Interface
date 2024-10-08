@@ -31,9 +31,9 @@ image = mmcv.imread('docs/en/_static/image/cat_and_dog.png',
                     channel_order='rgb')
 visualizer = Visualizer(image=image)
 # single bbox formatted as [xyxy]
-visualizer.draw_bboxes(torch.tensor([72, 13, 179, 147]))
+visualizer.drawBboxes(torch.tensor([72, 13, 179, 147]))
 # draw multiple bboxes
-visualizer.draw_bboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
+visualizer.drawBboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
 visualizer.show()
 ```
 
@@ -55,10 +55,10 @@ You can also customize things like color and width using the parameters in each 
 
 ```python
 visualizer.set_image(image=image)
-visualizer.draw_bboxes(torch.tensor([72, 13, 179, 147]),
+visualizer.drawBboxes(torch.tensor([72, 13, 179, 147]),
                        edge_colors='r',
                        line_widths=3)
-visualizer.draw_bboxes(torch.tensor([[33, 120, 209, 220]]),line_styles='--')
+visualizer.drawBboxes(torch.tensor([[33, 120, 209, 220]]),line_styles='--')
 visualizer.show()
 ```
 
@@ -72,7 +72,7 @@ These APIs can be called multiple times to get an overlay result.
 
 ```python
 visualizer.set_image(image=image)
-visualizer.draw_bboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
+visualizer.drawBboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
 visualizer.draw_texts("cat and dog",
                       torch.tensor([10, 20])).draw_circles(torch.tensor([40, 50]),
                       torch.tensor([20]))
@@ -217,7 +217,7 @@ Suppose you want to save to your local device.
 visualizer = Visualizer(image=image,
                         vis_backends=[dict(type='LocalVisBackend')],
                         save_dir='temp_dir')
-visualizer.draw_bboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
+visualizer.drawBboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
 visualizer.draw_texts("cat and dog", torch.tensor([10, 20]))
 visualizer.draw_circles(torch.tensor([40, 50]), torch.tensor([20]))
 
@@ -296,7 +296,7 @@ visualizer = Visualizer(image=image,
                                       dict(type='LocalVisBackend')],
                         save_dir='temp_dir')
 # temp_dir/vis_data/events.out.tfevents.xxx files will be generated
-visualizer.draw_bboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
+visualizer.drawBboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
 visualizer.draw_texts("cat and dog", torch.tensor([10, 20]))
 visualizer.draw_circles(torch.tensor([40, 50]), torch.tensor([20]))
 

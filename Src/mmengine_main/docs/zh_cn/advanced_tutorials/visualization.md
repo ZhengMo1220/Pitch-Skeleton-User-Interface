@@ -29,9 +29,9 @@ image = mmcv.imread('docs/en/_static/image/cat_and_dog.png',
                     channel_order='rgb')
 visualizer = Visualizer(image=image)
 # 绘制单个检测框, xyxy 格式
-visualizer.draw_bboxes(torch.tensor([72, 13, 179, 147]))
+visualizer.drawBboxes(torch.tensor([72, 13, 179, 147]))
 # 绘制多个检测框
-visualizer.draw_bboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
+visualizer.drawBboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
 visualizer.show()
 ```
 
@@ -53,10 +53,10 @@ visualizer.show()
 
 ```python
 visualizer.set_image(image=image)
-visualizer.draw_bboxes(torch.tensor([72, 13, 179, 147]),
+visualizer.drawBboxes(torch.tensor([72, 13, 179, 147]),
                        edge_colors='r',
                        line_widths=3)
-visualizer.draw_bboxes(torch.tensor([[33, 120, 209, 220]]),line_styles='--')
+visualizer.drawBboxes(torch.tensor([[33, 120, 209, 220]]),line_styles='--')
 visualizer.show()
 ```
 
@@ -70,7 +70,7 @@ visualizer.show()
 
 ```python
 visualizer.set_image(image=image)
-visualizer.draw_bboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
+visualizer.drawBboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
 visualizer.draw_texts("cat and dog",
                       torch.tensor([10, 20])).draw_circles(torch.tensor([40, 50]),
                       torch.tensor([20]))
@@ -214,7 +214,7 @@ visualizer.show(drawn_img)
 visualizer = Visualizer(image=image,
                         vis_backends=[dict(type='LocalVisBackend')],
                         save_dir='temp_dir')
-visualizer.draw_bboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
+visualizer.drawBboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
 visualizer.draw_texts("cat and dog", torch.tensor([10, 20]))
 visualizer.draw_circles(torch.tensor([40, 50]), torch.tensor([20]))
 
@@ -293,7 +293,7 @@ visualizer = Visualizer(image=image,
                                       dict(type='LocalVisBackend')],
                         save_dir='temp_dir')
 # 会生成 temp_dir/vis_data/events.out.tfevents.xxx 文件
-visualizer.draw_bboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
+visualizer.drawBboxes(torch.tensor([[33, 120, 209, 220], [72, 13, 179, 147]]))
 visualizer.draw_texts("cat and dog", torch.tensor([10, 20]))
 visualizer.draw_circles(torch.tensor([40, 50]), torch.tensor([20]))
 

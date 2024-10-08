@@ -264,7 +264,7 @@ The inferencer is designed for both visualization and saving predictions. The ta
 | `radius`                  | Sets the visualization keypoint radius.                                                                                                                           | ✔️  | ✔️  |
 | `thickness`               | Determines the link thickness for visualization.                                                                                                                  | ✔️  | ✔️  |
 | `kpt_thr`                 | Sets the keypoint score threshold. Keypoints with scores exceeding this threshold will be displayed.                                                              | ✔️  | ✔️  |
-| `draw_bbox`               | Decides whether to display the bounding boxes of instances.                                                                                                       | ✔️  | ✔️  |
+| `drawBbox`               | Decides whether to display the bounding boxes of instances.                                                                                                       | ✔️  | ✔️  |
 | `draw_heatmap`            | Decides if the predicted heatmaps should be drawn.                                                                                                                | ✔️  | ❌  |
 | `black_background`        | Decides whether the estimated poses should be displayed on a black background.                                                                                    | ✔️  | ❌  |
 | `skeleton_style`          | Sets the skeleton style. Options include 'mmpose' (default) and 'openpose'.                                                                                       | ✔️  | ❌  |

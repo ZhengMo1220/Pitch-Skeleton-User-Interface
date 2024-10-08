@@ -64,7 +64,7 @@ class MMPoseInferencer(BaseMMPoseInferencer):
         'merge_results', 'disable_rebase_keypoint', 'pose_based_nms'
     }
     visualize_kwargs: set = {
-        'return_vis', 'show', 'wait_time', 'draw_bbox', 'radius', 'thickness',
+        'return_vis', 'show', 'wait_time', 'drawBbox', 'radius', 'thickness',
         'kpt_thr', 'vis_out_dir', 'skeleton_style', 'draw_heatmap',
         'black_background', 'num_instances'
     }

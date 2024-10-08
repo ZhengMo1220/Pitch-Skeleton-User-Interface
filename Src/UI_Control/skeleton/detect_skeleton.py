@@ -329,17 +329,17 @@ class PoseEstimater:
         # 返回結果
         return valid_bbox.cpu().tolist(), valid_track_ids.cpu().tolist()
 
-    def correct_person_id(self, before_correct_id:int, after_correct_id:int):
+    def correct_person_id(self, before_correctId:int, after_correctId:int):
         if self.person_df.empty:
             return
     
-        if (before_correct_id not in self.person_df['person_id'].unique()) or (after_correct_id not in self.person_df['person_id'].unique()):
+        if (before_correctId not in self.person_df['person_id'].unique()) or (after_correctId not in self.person_df['person_id'].unique()):
             return
 
-        if (before_correct_id in self.person_df['person_id'].unique()) and (after_correct_id in self.person_df['person_id'].unique()):
+        if (before_correctId in self.person_df['person_id'].unique()) and (after_correctId in self.person_df['person_id'].unique()):
             for i in range(0, max(self.processed_frames)):
-                condition_1 = (self.person_df['frame_number'] == i) & (self.person_df['person_id'] == before_correct_id)
-                self.person_df.loc[condition_1, 'person_id'] = after_correct_id
+                condition_1 = (self.person_df['frame_number'] == i) & (self.person_df['person_id'] == before_correctId)
+                self.person_df.loc[condition_1, 'person_id'] = after_correctId
 
     def setPersonId(self, person_id):
         self.person_id = person_id

@@ -563,10 +563,10 @@ class UniversalVisualizer(Visualizer):
         self.set_image(image)
         # Avoid the line-width limit in the base classes.
         self._default_font_size = 1e3
-        self.draw_bboxes(
+        self.drawBboxes(
             pred_bboxes, line_widths=line_width, edge_colors=bbox_color)
         if gt_bboxes is not None:
-            self.draw_bboxes(
+            self.drawBboxes(
                 gt_bboxes, line_widths=line_width, edge_colors='blue')
 
         img_scale = get_adaptive_scale(image.shape[:2])

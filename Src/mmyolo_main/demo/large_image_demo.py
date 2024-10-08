@@ -219,12 +219,12 @@ def main():
             palette = np.random.randint(0, 256, size=(len(debug_grids), 3))
             palette = [tuple(c) for c in palette]
             line_styles = random.choices(['-', '-.', ':'], k=len(debug_grids))
-            visualizer.draw_bboxes(
+            visualizer.drawBboxes(
                 debug_grids,
                 edge_colors=palette,
                 alpha=1,
                 line_styles=line_styles)
-            visualizer.draw_bboxes(
+            visualizer.drawBboxes(
                 debug_grids, face_colors=palette, alpha=0.15)
 
             visualizer.draw_texts(
