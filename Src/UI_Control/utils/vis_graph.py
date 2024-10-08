@@ -56,7 +56,7 @@ class GraphPlotter():
         kpt_times, kpt_angles = self.pose_analyzer.get_frame_angle_data(angle_name=self.angle_name)
         self.graph.plot(kpt_times, kpt_angles, pen='b')
 
-    def _get_update_graph(self):
+    def getUpdateGraph(self):
         return self.graph
     
     def set_angle_name(self, angle_name):

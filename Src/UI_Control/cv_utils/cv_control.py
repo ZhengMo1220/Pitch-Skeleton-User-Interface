@@ -107,7 +107,7 @@ class VideoLoader:
         self.video_name = None
         self.is_loading = False
     
-    def load_video(self, video_path:str = None):
+    def loadVideo(self, video_path:str = None):
         options = QFileDialog.Options()
         if video_path is None:
             video_path, _ = QFileDialog.getOpenFileName(None, "Select Video File", "", "Video Files (*.mp4 *.avi);;All Files (*)", options=options)
@@ -134,7 +134,7 @@ class VideoLoader:
         self.is_loading = False
         thread = None
     
-    def get_video_image(self, frame_num:int) -> np.ndarray:
+    def getVideoImage(self, frame_num:int) -> np.ndarray:
         return self.video_frames[frame_num].copy()
     
     def save_video(self):
@@ -143,7 +143,7 @@ class VideoLoader:
 
         json_path = os.path.join(output_folder, f"{self.video_name}.json")
 
-        save_person_df = self.image_drawer.pose_estimater.get_person_df_data()
+        save_person_df = self.image_drawer.pose_estimater.person_df
         save_person_df.to_json(json_path, orient='records')
 
         save_location = os.path.join(output_folder, f"{self.video_name}_Sk26.mp4")
