@@ -252,7 +252,7 @@ result = next(result_generator)
 | `radius`                  | 设置可视化关键点的半径。                                                                                                   | ✔️  | ✔️  |
 | `thickness`               | 确定可视化链接的厚度。                                                                                                     | ✔️  | ✔️  |
 | `kpt_thr`                 | 设置关键点分数阈值。分数超过此阈值的关键点将被显示。                                                                       | ✔️  | ✔️  |
-| `draw_bbox`               | 决定是否显示实例的边界框。                                                                                                 | ✔️  | ✔️  |
+| `drawBbox`               | 决定是否显示实例的边界框。                                                                                                 | ✔️  | ✔️  |
 | `draw_heatmap`            | 决定是否绘制预测的热图。                                                                                                   | ✔️  | ❌  |
 | `black_background`        | 决定是否在黑色背景上显示预估的姿势。                                                                                       | ✔️  | ❌  |
 | `skeleton_style`          | 设置骨架样式。可选项包括 'mmpose'（默认）和 'openpose'。                                                                   | ✔️  | ❌  |

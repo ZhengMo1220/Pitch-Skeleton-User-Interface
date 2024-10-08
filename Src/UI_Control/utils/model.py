@@ -90,7 +90,7 @@ class Model(object):
     def setPoseParser(self) -> ArgumentParser:
         parser = ArgumentParser()
         parser.add_argument('--pose-config', default='../mmpose_main/configs/body_2d_keypoint/topdown_heatmap/haple/ViTPose_base_simple_halpe_256x192.py', help='Config file for pose')
-        parser.add_argument('--pose-checkpoint', default='../../Db/pretrain/epoch_200.pth', help='Checkpoint file for pose')
+        parser.add_argument('--pose-checkpoint', default='../../Db/pretrain/epoch_210.pth', help='Checkpoint file for pose')
         parser.add_argument(
             '--device', default='cuda:0', help='Device used for inference')
         parser.add_argument(

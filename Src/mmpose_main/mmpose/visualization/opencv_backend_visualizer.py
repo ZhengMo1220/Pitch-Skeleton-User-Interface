@@ -262,7 +262,7 @@ class OpencvBackendVisualizer(Visualizer):
             raise ValueError(f'got unsupported backend {self.backend}')
 
     @master_only
-    def draw_bboxes(self,
+    def drawBboxes(self,
                     bboxes: Union[np.ndarray, torch.Tensor],
                     edge_colors: Union[str, tuple, List[str],
                                        List[tuple]] = 'g',
@@ -298,7 +298,7 @@ class OpencvBackendVisualizer(Visualizer):
                 Defaults to 0.8.
         """
         if self.backend == 'matplotlib':
-            super().draw_bboxes(
+            super().drawBboxes(
                 bboxes=bboxes,
                 edge_colors=edge_colors,
                 line_widths=line_widths,

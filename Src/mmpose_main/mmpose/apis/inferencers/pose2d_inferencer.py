@@ -61,7 +61,7 @@ class Pose2DInferencer(BaseMMPoseInferencer):
         'return_vis',
         'show',
         'wait_time',
-        'draw_bbox',
+        'drawBbox',
         'radius',
         'thickness',
         'kpt_thr',

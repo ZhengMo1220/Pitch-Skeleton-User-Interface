@@ -35,9 +35,9 @@ class Visualizer(ManagerMixin):
 
     - Basic drawing methods
 
-      - draw_bboxes: draw single or multiple bounding boxes
+      - drawBboxes: draw single or multiple bounding boxes
       - draw_texts: draw single or multiple text boxes
-      - draw_points: draw single or multiple points
+      - drawPoints: draw single or multiple points
       - draw_lines: draw single or multiple line segments
       - draw_circles: draw single or multiple circles
       - draw_polygons: draw single or multiple polygons
@@ -92,8 +92,8 @@ class Visualizer(ManagerMixin):
 
         >>> # Basic drawing methods
         >>> vis = Visualizer(image=image)
-        >>> vis.draw_bboxes(np.array([0, 0, 1, 1]), edge_colors='g')
-        >>> vis.draw_bboxes(bbox=np.array([[1, 1, 2, 2], [2, 2, 3, 3]]),
+        >>> vis.drawBboxes(np.array([0, 0, 1, 1]), edge_colors='g')
+        >>> vis.drawBboxes(bbox=np.array([[1, 1, 2, 2], [2, 2, 3, 3]]),
         >>>                    edge_colors=['g', 'r'])
         >>> vis.draw_lines(x_datas=np.array([1, 3]),
         >>>                y_datas=np.array([1, 3]),
@@ -124,7 +124,7 @@ class Visualizer(ManagerMixin):
         >>>                            topk=-1)
 
         >>> # chain calls
-        >>> vis.draw_bboxes().draw_texts().draw_circle().draw_binary_masks()
+        >>> vis.drawBboxes().draw_texts().draw_circle().draw_binary_masks()
 
         >>> # Backend related methods
         >>> vis = Visualizer(vis_backends=[dict(type='LocalVisBackend')],
@@ -383,7 +383,7 @@ class Visualizer(ManagerMixin):
         return flag
 
     @master_only
-    def draw_points(self,
+    def drawPoints(self,
                     positions: Union[np.ndarray, torch.Tensor],
                     colors: Union[str, tuple, List[str], List[tuple]] = 'g',
                     marker: Optional[str] = None,
@@ -709,7 +709,7 @@ class Visualizer(ManagerMixin):
         return self
 
     @master_only
-    def draw_bboxes(
+    def drawBboxes(
         self,
         bboxes: Union[np.ndarray, torch.Tensor],
         edge_colors: Union[str, tuple, List[str], List[tuple]] = 'g',

@@ -11,9 +11,9 @@ import queue
 from UI_Control.cv_control.cv_thread import VideoCaptureThread, VideoWriter
 from datetime import datetime
 from utils.timer import FPS_Timer, Timer
-from utils.vis_image import draw_grid, draw_bbox, draw_traj, draw_region
-from utils.vis_pose import draw_points_and_skeleton, joints_dict
-from utils.store import save_video
+from utils.vis_image import drawGrid, drawBbox, drawTraj, drawRegion
+from utils.vis_pose import drawPointsandSkeleton, joints_dict
+from utils.store import saveVideo
 from topdown_demo_with_mmdet import processImage
 import sys
 from utils.one_euro_filter import OneEuroFilter
@@ -234,14 +234,14 @@ class PosePitchTabControl(QWidget):
         if frame_num == len(self.record_buffer) - 1:
         #     print(self.person_df)
             self.ui.play_btn.click()
-            # save_video(self.video_name, self.record_buffer, self.person_df, select_id=self.select_person_id)
-            save_video(self.video_name, self.record_buffer, self.person_df, select_id=self.select_person_id)
+            # saveVideo(self.video_name, self.record_buffer, self.person_df, select_id=self.select_person_id)
+            saveVideo(self.video_name, self.record_buffer, self.person_df, select_id=self.select_person_id)
 
         if frame_num not in self.processed_frames:
             self.detectKpt(image, frame_num= frame_num)
         
         # if self.select_person_id:
-        #     self.import_data_to_table(self.select_person_id, frame_num)
+        #     self.importDatatoTable(self.select_person_id, frame_num)
         curr_person_df = self.obtain_data(frame_num = frame_num, person_id = self.select_person_id)
         self.update_frame(image, curr_person_df)
 
@@ -250,20 +250,20 @@ class PosePitchTabControl(QWidget):
             curr_person_df = self.person_df
         
         if not self.ui.record_checkbox.isChecked() and self.ui.camera_checkbox.isChecked():
-            image = draw_region(image)
+            image = drawRegion(image)
 
         if not self.person_df.empty:
             if self.ui.show_skeleton_checkbox.isChecked():
-                image = draw_points_and_skeleton(image, curr_person_df, joints_dict()['haple']['skeleton_links'],
+                image = drawPointsandSkeleton(image, curr_person_df, joints_dict()['haple']['skeleton_links'],
                                                 points_color_palette='gist_rainbow', skeleton_palette_samples='jet',
                                                 points_palette_samples=10, confidence_threshold=0.3)
             if self.ui.show_bbox_checkbox.isChecked():
-                image = draw_bbox(curr_person_df, image)
+                image = drawBbox(curr_person_df, image)
             # if self.ui.select_keypoint_checkbox.isChecked():
-            #     image = draw_traj(self.select_kpt_buffer,image)
+            #     image = drawTraj(self.select_kpt_buffer,image)
 
         if self.ui.show_line_checkbox.isChecked():
-            image = draw_grid(image)
+            image = drawGrid(image)
 
         self.show_image(image, self.camera_scene, self.ui.frame_view)
 

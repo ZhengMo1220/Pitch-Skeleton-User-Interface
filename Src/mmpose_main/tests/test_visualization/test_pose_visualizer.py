@@ -75,7 +75,7 @@ class TestPoseLocalVisualizer(TestCase):
             'image',
             image,
             data_sample=pred_pose_data_sample,
-            draw_bbox=True,
+            drawBbox=True,
             out_file=out_file)
         self._assert_image_and_shape(out_file, (h, w * 2, 3))
 

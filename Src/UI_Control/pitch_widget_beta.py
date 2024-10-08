@@ -81,7 +81,7 @@ class PosePitchTabControl(QWidget):
             lambda: self.ui.frame_slider.setValue(self.ui.frame_slider.value() + 1)
         )
         self.ui.frame_slider.valueChanged.connect(self.analyzeFrame)
-        self.ui.keypoint_table.cellActivated.connect(self.on_cell_clicked)
+        self.ui.keypoint_table.cellActivated.connect(self.onCellClicked)
     
     def reset(self):
         self.pose_estimater.reset()
@@ -261,20 +261,20 @@ class PosePitchTabControl(QWidget):
             _, self.person_df, fps= self.pose_estimater.detectKpt(image,frame_num)
             self.ui.fps_info_label.setText(f"{fps:02d}")
             if self.pose_estimater.person_id is not None:
-                self.import_data_to_table(frame_num)
-                self.pose_analyzer.add_analyze_info(frame_num)
-                self.graph_plotter.update_graph(frame_num)
+                self.importDatatoTable(frame_num)
+                self.pose_analyzer.addAnalyzeInfo(frame_num)
+                self.graph_plotter.updateGraph(frame_num)
             self.update_frame(frame_num = frame_num)
             if frame_num == self.video_loader.total_frames - 1:
                 self.ui.play_btn.click()
-                self.video_loader.save_video()
+                self.video_loader.saveVideo()
 
     def update_frame(self, img: np.ndarray = None, frame_num:int= None):
         """Update the displayed frame with additional analysis."""
-        show_img = self.image_drawer.draw_info(img = img, kpt_buffer = self.pose_estimater.kpt_buffer)
+        show_img = self.image_drawer.drawInfo(img = img, kpt_buffer = self.pose_estimater.kpt_buffer)
         if frame_num is not None:
             img = self.video_loader.getVideoImage(frame_num)
-            show_img = self.image_drawer.draw_info(img = img, frame_num=frame_num, kpt_buffer = self.pose_estimater.kpt_buffer)
+            show_img = self.image_drawer.drawInfo(img = img, frame_num=frame_num, kpt_buffer = self.pose_estimater.kpt_buffer)
             
         self.show_image(show_img, self.view_scene, self.ui.frame_view)
 
@@ -311,9 +311,9 @@ class PosePitchTabControl(QWidget):
 
         if self.label_kpt:
             if event.button() == Qt.LeftButton:
-                self.send_to_table(x, y, 1)
+                self.sendtoTable(x, y, 1)
             elif event.button() == Qt.RightButton:
-                self.send_to_table(0, 0, 0)
+                self.sendtoTable(0, 0, 0)
             self.label_kpt = False
 
     def playFrame(self, start_num:int =0):
@@ -365,7 +365,7 @@ class PosePitchTabControl(QWidget):
         else:
             super().keyPressEvent(event)
 
-    def clear_table_view(self):
+    def clearTableView(self):
         self.ui.keypoint_table.clear()
         self.ui.keypoint_table.setColumnCount(4)
         title = ["關節點", "X", "Y", "有無更改"]
@@ -374,14 +374,14 @@ class PosePitchTabControl(QWidget):
         for i in range(4):
             header.setDefaultAlignment(Qt.AlignLeft)
 
-    def import_data_to_table(self, frame_num:int):
-        self.clear_table_view()
+    def importDatatoTable(self, frame_num:int):
+        self.clearTableView()
         person_id = self.pose_estimater.person_id
         if person_id is None:
             return
         person_data = self.pose_estimater.getPersonDf(frame_num=frame_num, is_select=True)
         if person_data.empty:
-            self.clear_table_view()
+            self.clearTableView()
             self.ui.select_checkbox.click()
             return
         
@@ -408,11 +408,11 @@ class PosePitchTabControl(QWidget):
             self.ui.keypoint_table.setItem(kpt_idx, 2, kpty_item)
             self.ui.keypoint_table.setItem(kpt_idx, 3, kpt_label_item)
 
-    def on_cell_clicked(self, row, column):
+    def onCellClicked(self, row, column):
         self.correct_kpt_idx = row
         self.label_kpt = True
     
-    def send_to_table(self, kptx:float, kpty:float, kpt_label:int):
+    def sendtoTable(self, kptx:float, kpty:float, kpt_label:int):
         kptx_item = QTableWidgetItem(str(kptx))
         kpty_item = QTableWidgetItem(str(kpty))
         if kpt_label :

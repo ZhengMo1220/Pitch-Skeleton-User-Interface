@@ -153,7 +153,7 @@ def main():
             img,
             data_sample,
             draw_pred=False,
-            draw_bbox=(args.mode == 'original'),
+            drawBbox=(args.mode == 'original'),
             draw_heatmap=True,
             show=not args.not_show,
             wait_time=args.show_interval,

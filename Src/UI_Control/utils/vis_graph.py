@@ -36,7 +36,7 @@ class GraphPlotter():
         self.graph.getPlotItem().getAxis('left').setPen(color=QColor("blue"))
         self.graph.getPlotItem().getAxis('left').setTextPen(color=QColor("blue"))
 
-    def update_graph(self, frame_num: int):
+    def updateGraph(self, frame_num: int):
         """Update the graph with the latest angle data for the specified frame."""
       
         self.graph.clear()
@@ -50,16 +50,18 @@ class GraphPlotter():
             # print(f"角度數據格式錯誤: {angle_value}")
             return
         self.graph.setTitle(f'{title}')
-
-
         # Plot angle data for all frames
         kpt_times, kpt_angles = self.pose_analyzer.get_frame_angle_data(angle_name=self.angle_name)
         self.graph.plot(kpt_times, kpt_angles, pen='b')
 
-    def getUpdateGraph(self):
-        return self.graph
+
+        # Create a scatter plot for the point
+        scatter = pg.ScatterPlotItem([frame_num], [angle_value], size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 0, 0, 255))
+        
+        # Add the scatter plot to the graph
+        self.graph.addItem(scatter)
     
-    def set_angle_name(self, angle_name):
+    def setAngleName(self, angle_name):
         self.angle_name = angle_name
     
     def reset(self):

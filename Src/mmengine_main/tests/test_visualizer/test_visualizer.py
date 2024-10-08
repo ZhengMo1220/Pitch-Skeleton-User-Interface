@@ -140,34 +140,34 @@ class TestVisualizer(TestCase):
         visualizer = Visualizer(image=self.image)
         visualizer.get_image()
 
-    def test_draw_bboxes(self):
+    def test_drawBboxes(self):
         visualizer = Visualizer(image=self.image)
 
         # only support 4 or nx4 tensor and numpy
-        visualizer.draw_bboxes(torch.tensor([1, 1, 2, 2]))
+        visualizer.drawBboxes(torch.tensor([1, 1, 2, 2]))
         # valid bbox
-        visualizer.draw_bboxes(torch.tensor([1, 1, 1, 2]))
+        visualizer.drawBboxes(torch.tensor([1, 1, 1, 2]))
         bboxes = torch.tensor([[1, 1, 2, 2], [1, 2, 2, 2.5]])
-        visualizer.draw_bboxes(
+        visualizer.drawBboxes(
             bboxes, alpha=0.5, edge_colors=(255, 0, 0), line_styles='-')
         bboxes = bboxes.numpy()
-        visualizer.draw_bboxes(bboxes)
+        visualizer.drawBboxes(bboxes)
 
         # test invalid bbox
         with pytest.raises(AssertionError):
             # x1 > x2
-            visualizer.draw_bboxes(torch.tensor([5, 1, 2, 2]))
+            visualizer.drawBboxes(torch.tensor([5, 1, 2, 2]))
 
         # test out of bounds
         with pytest.warns(
                 UserWarning,
                 match='Warning: The bbox is out of bounds,'
                 ' the drawn bbox may not be in the image'):
-            visualizer.draw_bboxes(torch.tensor([1, 1, 20, 2]))
+            visualizer.drawBboxes(torch.tensor([1, 1, 20, 2]))
 
         # test incorrect bbox format
         with pytest.raises(TypeError):
-            visualizer.draw_bboxes([1, 1, 2, 2])
+            visualizer.drawBboxes([1, 1, 2, 2])
 
     def test_close(self):
         visualizer = Visualizer(
@@ -181,18 +181,18 @@ class TestVisualizer(TestCase):
         for name in ['mock1', 'mock2']:
             assert visualizer.get_backend(name)._close is True
 
-    def test_draw_points(self):
+    def test_drawPoints(self):
         visualizer = Visualizer(image=self.image)
 
         with pytest.raises(TypeError):
-            visualizer.draw_points(positions=[1, 2])
+            visualizer.drawPoints(positions=[1, 2])
         with pytest.raises(AssertionError):
-            visualizer.draw_points(positions=np.array([1, 2, 3], dtype=object))
+            visualizer.drawPoints(positions=np.array([1, 2, 3], dtype=object))
         # test color
-        visualizer.draw_points(
+        visualizer.drawPoints(
             positions=torch.tensor([[1, 1], [3, 3]]),
             colors=['g', (255, 255, 0)])
-        visualizer.draw_points(
+        visualizer.drawPoints(
             positions=torch.tensor([[1, 1], [3, 3]]),
             colors=['g', (255, 255, 0)],
             marker='.',
@@ -500,7 +500,7 @@ class TestVisualizer(TestCase):
     def test_chain_call(self):
         visualizer = Visualizer(image=self.image)
         binary_mask = np.random.randint(0, 2, size=(10, 10)).astype(bool)
-        visualizer.draw_bboxes(torch.tensor([1, 1, 2, 2])). \
+        visualizer.drawBboxes(torch.tensor([1, 1, 2, 2])). \
             draw_texts('test', torch.tensor([5, 5])). \
             draw_lines(x_datas=torch.tensor([1, 5]),
                        y_datas=torch.tensor([2, 6])). \

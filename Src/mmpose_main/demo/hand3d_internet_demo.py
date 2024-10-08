@@ -138,7 +138,7 @@ def process_one_image(args, img, model, visualizer=None, show_interval=0):
             data_sample=data_samples,
             det_data_sample=data_samples_2d,
             draw_gt=False,
-            draw_bbox=True,
+            drawBbox=True,
             kpt_thr=args.kpt_thr,
             convert_keypoint=False,
             axis_azimuth=-115,

@@ -197,7 +197,7 @@ class PoseLocalVisualizer(OpencvBackendVisualizer):
 
         if 'bboxes' in instances:
             bboxes = instances.bboxes
-            self.draw_bboxes(
+            self.drawBboxes(
                 bboxes,
                 edge_colors=self.bbox_color,
                 alpha=self.alpha,
@@ -575,7 +575,7 @@ class PoseLocalVisualizer(OpencvBackendVisualizer):
                        draw_gt: bool = True,
                        draw_pred: bool = True,
                        draw_heatmap: bool = False,
-                       draw_bbox: bool = False,
+                       drawBbox: bool = False,
                        show_kpt_idx: bool = False,
                        skeleton_style: str = 'mmpose',
                        show: bool = False,
@@ -603,7 +603,7 @@ class PoseLocalVisualizer(OpencvBackendVisualizer):
                 ``True``
             draw_pred (bool): Whether to draw Prediction PoseDataSample.
                 Defaults to ``True``
-            draw_bbox (bool): Whether to draw bounding boxes. Default to
+            drawBbox (bool): Whether to draw bounding boxes. Default to
                 ``False``
             draw_heatmap (bool): Whether to draw heatmaps. Defaults to
                 ``False``
@@ -632,7 +632,7 @@ class PoseLocalVisualizer(OpencvBackendVisualizer):
                 gt_img_data = self._draw_instances_kpts(
                     gt_img_data, data_sample.gt_instances, kpt_thr,
                     show_kpt_idx, skeleton_style)
-                if draw_bbox:
+                if drawBbox:
                     gt_img_data = self._draw_instances_bbox(
                         gt_img_data, data_sample.gt_instances)
 
@@ -653,7 +653,7 @@ class PoseLocalVisualizer(OpencvBackendVisualizer):
                 pred_img_data = self._draw_instances_kpts(
                     pred_img_data, data_sample.pred_instances, kpt_thr,
                     show_kpt_idx, skeleton_style)
-                if draw_bbox:
+                if drawBbox:
                     pred_img_data = self._draw_instances_bbox(
                         pred_img_data, data_sample.pred_instances)
 

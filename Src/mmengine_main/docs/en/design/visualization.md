@@ -26,8 +26,8 @@ The external interface of `Visualizer` can be divided into three categories.
 
 1. Drawing APIs
 
-- [draw_bboxes](mmengine.visualization.Visualizer.draw_bboxes) draws a single or multiple bounding boxes
-- [draw_points](mmengine.visualization.Visualizer.draw_points) draws a single or multiple points
+- [drawBboxes](mmengine.visualization.Visualizer.drawBboxes) draws a single or multiple bounding boxes
+- [drawPoints](mmengine.visualization.Visualizer.drawPoints) draws a single or multiple points
 - [draw_texts](mmengine.visualization.Visualizer.draw_texts) draws a single or multiple text boxes
 - [draw_lines](mmengine.visualization.Visualizer.draw_lines) draws a single or multiple line segments
 - [draw_circles](mmengine.visualization.Visualizer.draw_circles) draws a single or multiple circles

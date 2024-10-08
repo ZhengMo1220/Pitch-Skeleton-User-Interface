@@ -70,7 +70,7 @@ class Pose3DInferencer(BaseMMPoseInferencer):
         'return_vis',
         'show',
         'wait_time',
-        'draw_bbox',
+        'drawBbox',
         'radius',
         'thickness',
         'num_instances',
@@ -357,7 +357,7 @@ class Pose3DInferencer(BaseMMPoseInferencer):
                   preds: List[PoseDataSample],
                   return_vis: bool = False,
                   show: bool = False,
-                  draw_bbox: bool = False,
+                  drawBbox: bool = False,
                   wait_time: float = 0,
                   radius: int = 3,
                   thickness: int = 1,
@@ -376,7 +376,7 @@ class Pose3DInferencer(BaseMMPoseInferencer):
             show (bool): Whether to display the image in a popup window.
                 Defaults to False.
             wait_time (float): The interval of show (ms). Defaults to 0
-            draw_bbox (bool): Whether to draw the bounding boxes.
+            drawBbox (bool): Whether to draw the bounding boxes.
                 Defaults to False
             radius (int): Keypoint radius for visualization. Defaults to 3
             thickness (int): Link thickness for visualization. Defaults to 1
@@ -432,7 +432,7 @@ class Pose3DInferencer(BaseMMPoseInferencer):
                 data_sample=pred,
                 det_data_sample=self._buffer['pose2d_results'],
                 draw_gt=False,
-                draw_bbox=draw_bbox,
+                drawBbox=drawBbox,
                 show=show,
                 wait_time=wait_time,
                 dataset_2d=self.pose2d_model.model.

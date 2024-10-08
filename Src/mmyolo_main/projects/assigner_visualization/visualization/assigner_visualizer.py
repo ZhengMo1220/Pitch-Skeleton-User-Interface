@@ -28,7 +28,7 @@ class YOLOAssignerVisualizer(DetLocalVisualizer):
         # need priors_size from config
         self.priors_size = None
 
-    def draw_grid(self,
+    def drawGrid(self,
                   stride: int = 8,
                   line_styles: Union[str, List[str]] = ':',
                   colors: Union[str, tuple, List[str],
@@ -118,7 +118,7 @@ class YOLOAssignerVisualizer(DetLocalVisualizer):
         text_palette = get_palette(self.text_color, max_label + 1)
         text_colors = [text_palette[label] for label in labels]
 
-        self.draw_bboxes(
+        self.drawBboxes(
             bboxes,
             edge_colors=edge_colors,
             alpha=self.alpha,
@@ -231,7 +231,7 @@ class YOLOAssignerVisualizer(DetLocalVisualizer):
                 device=device)
 
         colors = [palette[i] for i in class_inds]
-        self.draw_bboxes(
+        self.drawBboxes(
             xyxy,
             edge_colors=colors,
             alpha=self.alpha,
@@ -267,7 +267,7 @@ class YOLOAssignerVisualizer(DetLocalVisualizer):
 
                 # draw grid
                 stride = assign_results_prior['stride']
-                self.draw_grid(stride)
+                self.drawGrid(stride)
 
                 # draw prior on matched gt
                 grid_x_inds = assign_results_prior['grid_x_inds']

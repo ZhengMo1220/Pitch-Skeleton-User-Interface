@@ -137,13 +137,14 @@ class VideoLoader:
     def getVideoImage(self, frame_num:int) -> np.ndarray:
         return self.video_frames[frame_num].copy()
     
-    def save_video(self):
+    def saveVideo(self):
         output_folder = os.path.join("../../Db/Record", self.video_name)
         os.makedirs(output_folder, exist_ok=True)
 
         json_path = os.path.join(output_folder, f"{self.video_name}.json")
 
         save_person_df = self.image_drawer.pose_estimater.person_df
+
         save_person_df.to_json(json_path, orient='records')
 
         save_location = os.path.join(output_folder, f"{self.video_name}_Sk26.mp4")
@@ -155,7 +156,7 @@ class VideoLoader:
             return
 
         for frame_num, frame in enumerate(self.video_frames):
-            image = self.image_drawer.draw_info(img = frame, frame_num = frame_num)
+            image = self.image_drawer.drawInfo(img = frame, frame_num = frame_num)
             video_writer.write(image)
 
         video_writer.release()
