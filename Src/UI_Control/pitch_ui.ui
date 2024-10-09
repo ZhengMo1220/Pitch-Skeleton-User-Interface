@@ -17,7 +17,7 @@
    <item>
     <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,3,1,0">
      <item>
-      <widget class="QLabel" name="image_resolution_label">
+      <widget class="QLabel" name="ResolutionLabel">
        <property name="maximumSize">
         <size>
          <width>16777215</width>
@@ -36,7 +36,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QGraphicsView" name="frame_view">
+      <widget class="QGraphicsView" name="FrameView">
        <property name="minimumSize">
         <size>
          <width>480</width>
@@ -46,12 +46,12 @@
       </widget>
      </item>
      <item>
-      <widget class="QGraphicsView" name="curve_view"/>
+      <widget class="QGraphicsView" name="CurveView"/>
      </item>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_4">
        <item>
-        <widget class="QPushButton" name="back_key_btn">
+        <widget class="QPushButton" name="backKeyBtn">
          <property name="minimumSize">
           <size>
            <width>50</width>
@@ -70,7 +70,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="play_btn">
+        <widget class="QPushButton" name="playBtn">
          <property name="minimumSize">
           <size>
            <width>50</width>
@@ -105,7 +105,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="forward_key_btn">
+        <widget class="QPushButton" name="forwardKeyBtn">
          <property name="minimumSize">
           <size>
            <width>50</width>
@@ -124,7 +124,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QSlider" name="frame_slider">
+        <widget class="QSlider" name="frameSlider">
          <property name="minimumSize">
           <size>
            <width>300</width>
@@ -137,7 +137,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLabel" name="frame_num_label">
+        <widget class="QLabel" name="frameNumLabel">
          <property name="minimumSize">
           <size>
            <width>20</width>
@@ -177,7 +177,7 @@
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_7">
       <item>
-       <widget class="QGroupBox" name="camer_setting_groupbox">
+       <widget class="QGroupBox" name="camerSettingGroupBox">
         <property name="title">
          <string>相機設定</string>
         </property>
@@ -185,14 +185,14 @@
          <item row="0" column="0">
           <layout class="QHBoxLayout" name="horizontalLayout">
            <item>
-            <widget class="QLabel" name="camera_id_label">
+            <widget class="QLabel" name="cameraIdLabel">
              <property name="text">
               <string>相機ID:</string>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QSpinBox" name="camera_id_input">
+            <widget class="QSpinBox" name="cameraIdInput">
              <property name="minimumSize">
               <size>
                <width>0</width>
@@ -207,14 +207,14 @@
           </layout>
          </item>
          <item row="4" column="1">
-          <widget class="QCheckBox" name="record_checkbox">
+          <widget class="QCheckBox" name="recordCheckBox">
            <property name="text">
             <string>開始錄影</string>
            </property>
           </widget>
          </item>
          <item row="4" column="0">
-          <widget class="QCheckBox" name="camera_checkbox">
+          <widget class="QCheckBox" name="cameraCheckBox">
            <property name="text">
             <string>開啟相機</string>
            </property>
@@ -223,14 +223,14 @@
          <item row="1" column="0">
           <layout class="QHBoxLayout" name="horizontalLayout_3">
            <item>
-            <widget class="QLabel" name="fps_label">
+            <widget class="QLabel" name="FPSLabel">
              <property name="text">
               <string>FPS:</string>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QLabel" name="fps_info_label">
+            <widget class="QLabel" name="FPSInfoLabel">
              <property name="minimumSize">
               <size>
                <width>130</width>
@@ -248,7 +248,7 @@
           </layout>
          </item>
          <item row="4" column="2">
-          <widget class="QCheckBox" name="start_pitch_checkbox">
+          <widget class="QCheckBox" name="startPitchCheckBox">
            <property name="text">
             <string>開始投球</string>
            </property>
@@ -258,13 +258,13 @@
        </widget>
       </item>
       <item>
-       <widget class="QGroupBox" name="display_groupbox">
+       <widget class="QGroupBox" name="displayGroupBox">
         <property name="title">
          <string>顯示資訊</string>
         </property>
         <layout class="QGridLayout" name="gridLayout_2">
          <item row="1" column="0">
-          <widget class="QCheckBox" name="show_skeleton_checkbox">
+          <widget class="QCheckBox" name="showSkeletonCheckBox">
            <property name="text">
             <string>人體骨架</string>
            </property>
@@ -274,7 +274,7 @@
           </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QCheckBox" name="show_bbox_checkbox">
+          <widget class="QCheckBox" name="showBboxCheckBox">
            <property name="text">
             <string>人物框</string>
            </property>
@@ -287,21 +287,21 @@
           </widget>
          </item>
          <item row="3" column="0">
-          <widget class="QCheckBox" name="select_keypoint_checkbox">
+          <widget class="QCheckBox" name="selectKptCheckBox">
            <property name="text">
             <string>選擇關節點</string>
            </property>
           </widget>
          </item>
          <item row="3" column="1">
-          <widget class="QCheckBox" name="show_kpt_angle_checkbox">
+          <widget class="QCheckBox" name="showAngleCheckBox">
            <property name="text">
             <string>顯示角度</string>
            </property>
           </widget>
          </item>
          <item row="2" column="1">
-          <widget class="QCheckBox" name="select_checkbox">
+          <widget class="QCheckBox" name="selectCheckBox">
            <property name="text">
             <string>選擇人</string>
            </property>
@@ -311,21 +311,21 @@
           </widget>
          </item>
          <item row="2" column="0">
-          <widget class="QCheckBox" name="show_line_checkbox">
+          <widget class="QCheckBox" name="showLineCheckBox">
            <property name="text">
             <string>輔助線</string>
            </property>
           </widget>
          </item>
          <item row="0" column="0">
-          <widget class="QLabel" name="pitch_label">
+          <widget class="QLabel" name="pitchLabel">
            <property name="text">
             <string>投手:</string>
            </property>
           </widget>
          </item>
          <item row="0" column="1">
-          <widget class="QComboBox" name="pitch_input">
+          <widget class="QComboBox" name="pitchInput">
            <item>
             <property name="text">
              <string>右投</string>
@@ -342,13 +342,13 @@
        </widget>
       </item>
       <item>
-       <widget class="QGroupBox" name="kpt_adjust_groupbox">
+       <widget class="QGroupBox" name="kptAdjustGroupbox">
         <property name="title">
          <string>手動關節點修正</string>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_6">
          <item>
-          <widget class="QTableWidget" name="keypoint_table">
+          <widget class="QTableWidget" name="KptTable">
            <property name="minimumSize">
             <size>
              <width>400</width>
@@ -387,9 +387,9 @@
        </widget>
       </item>
      </layout>
-     <zorder>kpt_adjust_groupbox</zorder>
-     <zorder>display_groupbox</zorder>
-     <zorder>camer_setting_groupbox</zorder>
+     <zorder>kptAdjustGroupbox</zorder>
+     <zorder>displayGroupBox</zorder>
+     <zorder>camerSettingGroupBox</zorder>
     </widget>
    </item>
   </layout>

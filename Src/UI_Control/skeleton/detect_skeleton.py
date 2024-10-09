@@ -34,6 +34,7 @@ class PoseEstimater:
         self.pre_person_df = pd.DataFrame()
         self.person_id = None
         self.kpt_id = None
+        self.pitch_hand_id = 10
         self.fps = None
         self.person_data = []
         self.processed_frames = set()
@@ -348,6 +349,9 @@ class PoseEstimater:
     def setKptId(self, kpt_id):
         self.kpt_id = kpt_id
         print(self.kpt_id)
+    
+    def setPitchHandId(self,kpt_id):
+        self.pitch_hand_id = kpt_id
 
     def setDetect(self, status:bool):
         self.is_detect = status
@@ -409,6 +413,21 @@ class PoseEstimater:
             data = data['keypoints'].iloc[0]
 
         return data
+    
+    def getPrePersonDf(self):
+        if self.pre_person_df.empty:
+            return pd.DataFrame()
+        condition = pd.Series([True] * len(self.pre_person_df))  # 初始條件設為全為 True
+
+        condition &= (self.pre_person_df['person_id'] == self.person_id)
+ 
+        data = self.pre_person_df.loc[condition].copy()
+        
+        if data.empty:
+            return None
+
+        data = data['keypoints'].iloc[0][self.pitch_hand_id]
+        return (data[0], data[1])
     
     def setProcessedData(self, person_df:pd.DataFrame):
         if person_df.empty:

@@ -19,11 +19,11 @@ class PoseCameraTabControl(QWidget):
         self.ui = Ui_camera_ui()
         self.ui.setupUi(self)
         self.model = model
-        self.init_var()
+        self.initVar()
         self.init_pose_estimater()
-        self.bind_ui()
+        self.bindUI()
 
-    def init_var(self):
+    def initVar(self):
         """Initialize variables and timer."""
         self.camera = Camera()
         self.timer = QTimer()
@@ -37,46 +37,46 @@ class PoseCameraTabControl(QWidget):
         self.pose_estimater = PoseEstimater(self.model)
         self.image_drawer = ImageDrawer(self.pose_estimater)
 
-    def bind_ui(self):
+    def bindUI(self):
         """Bind UI elements to their corresponding functions."""
-        self.ui.cameraCheckBox.stateChanged.connect(self.toggle_camera)
-        self.ui.recordCheckBox.stateChanged.connect(self.toggle_record)
+        self.ui.cameraCheckBox.stateChanged.connect(self.toggleCamera)
+        self.ui.recordCheckBox.stateChanged.connect(self.toggleRecord)
         self.ui.selectCheckBox.stateChanged.connect(self.toggleSelect)
         self.ui.showSkeletonCheckBox.stateChanged.connect(self.toggleShowSkeleton)
         self.ui.selectKptCheckBox.stateChanged.connect(self.toggleKptSelect)
         self.ui.showBboxCheckBox.stateChanged.connect(self.toggleShowBbox)
-        self.ui.showLineCheckBox.stateChanged.connect(self.toggle_show_grid)
-        self.ui.CameraIdInput.valueChanged.connect(self.change_camera)
+        self.ui.showLineCheckBox.stateChanged.connect(self.toggleShowGrid)
+        self.ui.CameraIdInput.valueChanged.connect(self.changeCamera)
 
-    def toggle_camera(self, state):
+    def toggleCamera(self, state:int):
         """Toggle the camera on/off based on checkbox state."""
         if state == 2:
-            frame_width, frame_height, fps = self.camera.toggle_camera(True)
+            frame_width, frame_height, fps = self.camera.toggleCamera(True)
             self.model.setImageSize((frame_width, frame_height))
             self.ui.ResolutionLabel.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
             self.timer.start(1)
         else:
-            self.camera.toggle_camera(False)
+            self.camera.toggleCamera(False)
             self.timer.stop()
 
-    def toggle_record(self, state):
+    def toggleRecord(self, state:int):
         """Start or stop video recording."""
         if state == 2:
-            self.start_recording()
+            self.startRecording()
             self.ui.showSkeletonCheckBox.setChecked(False)
         else:
             self.camera.stop_recording()
 
-    def start_recording(self):
+    def startRecording(self):
         """Start recording the video."""
         current_time = datetime.now().strftime("%Y%m%d_%H%M")
         output_dir = f'../../Db/Record/C{self.ui.CameraIdInput.value()}_Fps120_{current_time}'
         os.makedirs(output_dir, exist_ok=True)
         video_filename = os.path.join(output_dir, f'C{self.ui.CameraIdInput.value()}_Fps120_{current_time}.mp4')
         self.ui.showSkeletonCheckBox.setChecked(False)
-        self.camera.start_recording(video_filename)
+        self.camera.startRecording(video_filename)
 
-    def toggleSelect(self, state):
+    def toggleSelect(self, state:int):
         """Select a person based on checkbox state."""
         if not self.ui.showSkeletonCheckBox.isChecked():
             self.ui.selectCheckBox.setCheckState(0)
@@ -88,7 +88,7 @@ class PoseCameraTabControl(QWidget):
         else:
             self.pose_estimater.setPersonId(None)
 
-    def toggleKptSelect(self, state):
+    def toggleKptSelect(self, state:int):
         """Toggle keypoint selection and trajectory visualization."""
         if not self.ui.selectCheckBox.isChecked():
             self.ui.selectKptCheckBox.setCheckState(0)
@@ -99,24 +99,24 @@ class PoseCameraTabControl(QWidget):
         self.pose_estimater.clearKptBuffer()
         self.image_drawer.setShowTraj(is_checked)
 
-    def toggleShowSkeleton(self, state):
+    def toggleShowSkeleton(self, state:int):
         """Toggle skeleton detection and FPS control."""
         is_checked = state == 2
         self.pose_estimater.setDetect(is_checked)
         self.image_drawer.setShowSkeleton(is_checked)
-        self.camera.set_fps_control(15 if is_checked else 1)
+        self.camera.setFPSControl(15 if is_checked else 1)
 
-    def toggleShowBbox(self, state):
+    def toggleShowBbox(self, state:int):
         """Toggle bounding box visibility."""
         self.image_drawer.setShowBbox(state == 2)
 
-    def toggle_show_grid(self, state):
+    def toggleShowGrid(self, state:int):
         """Toggle gridline visibility."""
         self.image_drawer.setShowGrid(state == 2)
 
-    def change_camera(self):
+    def changeCamera(self):
         """Change the camera based on input value."""
-        self.camera.set_camera_idx(self.ui.CameraIdInput.value())
+        self.camera.setCameraId(self.ui.CameraIdInput.value())
 
     def analyzeFrame(self):
         """Analyze and process each frame from the camera."""
@@ -129,9 +129,9 @@ class PoseCameraTabControl(QWidget):
     def update_frame(self, frame: np.ndarray):
         """Update the displayed frame with additional analysis."""
         drawed_img = self.image_drawer.drawInfo(img = frame, kpt_buffer = self.pose_estimater.kpt_buffer)
-        self.show_image(drawed_img, self.camera_scene, self.ui.FrameView)
+        self.showImage(drawed_img, self.camera_scene, self.ui.FrameView)
 
-    def show_image(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
+    def showImage(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
         """Display an image in the QGraphicsView."""
         scene.clear()
         h, w = image.shape[:2]

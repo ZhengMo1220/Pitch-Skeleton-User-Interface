@@ -51,8 +51,7 @@ class PoseAnalyzer:
             info[angle_name] = [self._calculate_angle(A, B, C), [np.array(A), np.array(B), np.array(C)]]
         return info
 
-    def get_frame_angle_data(self, frame_num: int = None, angle_name: str = None) :
-        # print(self.analyze_df)
+    def get_frame_angle_data(self, frame_num: int = None, angle_name: str = None):
         if self.analyze_df.empty:
             return pd.DataFrame(), []
         condition = pd.Series([True] * len(self.analyze_df))
@@ -84,3 +83,26 @@ class PoseAnalyzer:
         self.analyze_info = []
         self.analyze_df = pd.DataFrame()
         self.processed_frames = set()
+
+class JointAreaChecker:
+    def __init__(self, image_size:tuple):
+        self.image_width = image_size[0]
+        self.image_height = image_size[1]
+
+        # 設置1/5區域的邊界
+        self.region_width = image_size[0]
+        self.region_height = image_size[1] // 5
+
+        # 區域左上角的坐標
+        self.region_top_left = (0, 0)
+        self.region_bottom_right = (self.region_width, self.region_height)
+
+    def is_joint_in_area(self, joint_position:tuple)->bool:
+        """檢查關節點是否在定義的區域內"""
+        if joint_position is None:
+            return False
+        x, y = joint_position
+        
+        in_area = (self.region_top_left[0] <= x <= self.region_bottom_right[0] and
+                   self.region_top_left[1] <= y <= self.region_bottom_right[1])
+        return in_area

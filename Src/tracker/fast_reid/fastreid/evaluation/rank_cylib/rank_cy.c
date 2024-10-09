@@ -21795,11 +21795,11 @@ static CYTHON_SMALL_CODE int __Pyx_InitGlobals(void) {
 }
 
 static CYTHON_SMALL_CODE int __Pyx_modinit_global_init_code(void); /*proto*/
-static CYTHON_SMALL_CODE int __Pyx_modinit_variable_export_code(void); /*proto*/
+static CYTHON_SMALL_CODE int __Pyx_modinitVariable_export_code(void); /*proto*/
 static CYTHON_SMALL_CODE int __Pyx_modinit_function_export_code(void); /*proto*/
 static CYTHON_SMALL_CODE int __Pyx_modinit_type_init_code(void); /*proto*/
 static CYTHON_SMALL_CODE int __Pyx_modinit_type_import_code(void); /*proto*/
-static CYTHON_SMALL_CODE int __Pyx_modinit_variable_import_code(void); /*proto*/
+static CYTHON_SMALL_CODE int __Pyx_modinitVariable_import_code(void); /*proto*/
 static CYTHON_SMALL_CODE int __Pyx_modinit_function_import_code(void); /*proto*/
 
 static int __Pyx_modinit_global_init_code(void) {
@@ -21815,9 +21815,9 @@ static int __Pyx_modinit_global_init_code(void) {
   return 0;
 }
 
-static int __Pyx_modinit_variable_export_code(void) {
+static int __Pyx_modinitVariable_export_code(void) {
   __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("__Pyx_modinit_variable_export_code", 0);
+  __Pyx_RefNannySetupContext("__Pyx_modinitVariable_export_code", 0);
   /*--- Variable export code ---*/
   __Pyx_RefNannyFinishContext();
   return 0;
@@ -21956,9 +21956,9 @@ static int __Pyx_modinit_type_import_code(void) {
   return -1;
 }
 
-static int __Pyx_modinit_variable_import_code(void) {
+static int __Pyx_modinitVariable_import_code(void) {
   __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("__Pyx_modinit_variable_import_code", 0);
+  __Pyx_RefNannySetupContext("__Pyx_modinitVariable_import_code", 0);
   /*--- Variable import code ---*/
   __Pyx_RefNannyFinishContext();
   return 0;
@@ -22163,11 +22163,11 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_InitCachedConstants() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   /*--- Global type/function init code ---*/
   (void)__Pyx_modinit_global_init_code();
-  (void)__Pyx_modinit_variable_export_code();
+  (void)__Pyx_modinitVariable_export_code();
   (void)__Pyx_modinit_function_export_code();
   if (unlikely(__Pyx_modinit_type_init_code() < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
   if (unlikely(__Pyx_modinit_type_import_code() < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
-  (void)__Pyx_modinit_variable_import_code();
+  (void)__Pyx_modinitVariable_import_code();
   (void)__Pyx_modinit_function_import_code();
   /*--- Execution code ---*/
   #if defined(__Pyx_Generator_USED) || defined(__Pyx_Coroutine_USED)

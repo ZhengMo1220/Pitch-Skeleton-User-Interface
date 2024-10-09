@@ -15,6 +15,7 @@ class Camera:
         self.is_opened = False
         self.frame_count = 0
         self.fps_control = 1
+        self.frame_size = None
         self.frame_buffer = queue.Queue()
         self.video_path = None
         self.video_writer = None
@@ -39,16 +40,18 @@ class Camera:
             self.video_writer.release()
             self.video_writer = None
 
-    def toggle_camera(self, is_checked:bool):
+    def toggleCamera(self, is_checked:bool):
         # 根據checkbox狀態切換相機
         if is_checked:
             self.open_camera()
             frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
+            self.frame_size = (frame_width, frame_height)
             return (frame_width, frame_height, fps)
         else:
             self.close_camera()
+            self.frame_size = None
             return (0, 0, 0)
 
     def buffer_frame(self, frame:np.ndarray):
@@ -61,7 +64,7 @@ class Camera:
         if self.video_writer is not None and self.video_writer.is_writing:
             self.video_writer.write_frame(frame)
 
-    def start_recording(self, filename: str):
+    def startRecording(self, filename: str):
         # 開始錄製影片
         if self.video_thread is None:
             return
@@ -79,10 +82,10 @@ class Camera:
             self.video_writer.stop_writing()  # 停止寫入
             self.video_writer.release()  # 釋放執行緒
 
-    def set_camera_idx(self, new_idx: int):
+    def setCameraId(self, new_idx: int):
         self.camera_idx = new_idx
 
-    def set_fps_control(self, fps:int):
+    def setFPSControl(self, fps:int):
         self.fps_control = fps
 
 class DataType(Enum):

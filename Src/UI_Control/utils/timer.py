@@ -47,7 +47,14 @@ class Timer:
         if (diff_time) < self.duration:
             return False
         return True
-        
+    
+    def get_remaining_time(self):
+        """返回剩餘的倒數時間"""
+        if self.start_time is None:
+            return self.duration
+        elapsed_time = time.time() - self.start_time
+        remaining_time = self.duration - elapsed_time
+        return max(0, int(remaining_time)) 
     
     def reset(self):
         self.start_time = None

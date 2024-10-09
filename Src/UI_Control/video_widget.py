@@ -26,10 +26,25 @@ class PoseVideoTabControl(QWidget):
         self.ui.setupUi(self)
         self.model = model
         self.setupComponents()
-        self.init_var()
-        self.bind_ui()
+        self.initVar()
+        self.bindUI()
         
-    def bind_ui(self):
+    def initVar(self):
+        self.is_play = False
+        self.is_video = False
+        self.video_scene = QGraphicsScene()
+        self.curve_scene = QGraphicsScene()
+        self.video_scene.clear()
+        self.curve_scene.clear()
+        self.correct_kpt_idx = 0
+        self.label_kpt = False
+        self.is_processed = False
+        pg.setConfigOptions(foreground=QColor(113,148,116), antialias = True)
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 'k')
+
+
+    def bindUI(self):
         self.ui.loadOriginalVideoBtn.clicked.connect(
             lambda: self.loadVideo(is_processed=False))
         self.ui.loadProcessedVideoBtn.clicked.connect(
@@ -79,8 +94,8 @@ class PoseVideoTabControl(QWidget):
             elif event.button() == Qt.RightButton:
                 self.sendtoTable(0, 0, 0)
             self.label_kpt = False
-
-        self.updateFrame(self.ui.frameSlider.value())
+        if self.video_loader.video_name is not None:
+            self.updateFrame(self.ui.frameSlider.value())
 
     def keyPressEvent(self, event):
         if event.key() == ord('D') or event.key() == ord('d'):
@@ -99,19 +114,6 @@ class PoseVideoTabControl(QWidget):
         self.graph_plotter = GraphPlotter(self.pose_analyzer)
         self.image_drawer = ImageDrawer(self.pose_estimater, self.pose_analyzer)
         self.video_loader = VideoLoader(self.image_drawer)
-
-    def init_var(self):
-        self.is_play = False
-        self.video_scene = QGraphicsScene()
-        self.curve_scene = QGraphicsScene()
-        self.video_scene.clear()
-        self.curve_scene.clear()
-        self.correct_kpt_idx = 0
-        self.label_kpt = False
-        self.is_processed = False
-        pg.setConfigOptions(foreground=QColor(113,148,116), antialias = True)
-        pg.setConfigOption('background', 'w')
-        pg.setConfigOption('foreground', 'k')
 
     def reset(self):
         self.person_selector.reset()
@@ -197,7 +199,7 @@ class PoseVideoTabControl(QWidget):
         graphicview.setScene(scene)
         graphicview.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
    
-    def playFrame(self, start_num=0):
+    def playFrame(self, start_num:int=0):
         for i in range(start_num, self.video_loader.total_frames):
             if not self.is_play:
                 break
@@ -272,12 +274,9 @@ class PoseVideoTabControl(QWidget):
         self.updateFrame(self.ui.frameSlider.value())
 
     def toggleShowSkeleton(self, state:int):
-        if state == 2:  
-            self.pose_estimater.setDetect(True)
-            self.image_drawer.setShowSkeleton(True)
-        else:
-            self.pose_estimater.setDetect(False)
-            self.image_drawer.setShowSkeleton(False)
+        is_checked = state == 2
+        self.pose_estimater.setDetect(is_checked)
+        self.image_drawer.setShowSkeleton(is_checked)
         self.updateFrame(self.ui.frameSlider.value())
 
     def toggleShowBbox(self, state:int):
@@ -339,7 +338,7 @@ class PoseVideoTabControl(QWidget):
             self.ui.KptTable.setItem(kpt_idx, 2, kpty_item)
             self.ui.KptTable.setItem(kpt_idx, 3, kpt_label_item)
 
-    def onCellClicked(self, row, column):
+    def onCellClicked(self, row:int, column:int):
         self.correct_kpt_idx = row
         self.label_kpt = True
      

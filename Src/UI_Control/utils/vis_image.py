@@ -7,7 +7,10 @@ from .analyze import PoseAnalyzer
 from skeleton.detect_skeleton import PoseEstimater
 import os
 from scipy.signal import savgol_filter
+from utils.timer import Timer
 import sys
+import time
+
 try:
     colors = np.round(
         np.array(plt.get_cmap('gist_rainbow').colors) * 255
@@ -33,18 +36,26 @@ class ImageDrawer():
         self.show_bbox = False
         self.show_skeleton = False
         self.show_traj = False
-        self.show_region = False
+        self.show_countdown = False
         self.show_angle_info = False
         self.angle_info_pos = (0,0)
         self.region = [(100, 250), (450, 600)]
+
+        self.timer = None
     
-    def drawInfo(self, img:np.ndarray, frame_num:int=None, kpt_buffer:list = None):
+    def drawInfo(self, img:np.ndarray, frame_num:int=None, kpt_buffer:list = None, countdown_time:int = None):
         if img is None:
             return
         image = img.copy()
         curr_person_df = self.pose_estimater.getPersonDf(frame_num = frame_num, is_select=True)
-        if self.show_region:
-            image = self.drawRegion(image)
+        if curr_person_df is None:
+            return image
+        
+        if countdown_time is not None:
+            self.show_countdown = True
+
+        if self.show_countdown:
+            image = self.drawCountdown(image, countdown_time)
 
         if self.show_grid :
             image = self.drawGrid(image)
@@ -136,9 +147,27 @@ class ImageDrawer():
         
         return img
 
-    def drawRegion(self, img:np.ndarray):
-        cv2.rectangle(img, self.region[0], self.region[1], (0, 255, 0), -1)
+    def drawCountdown(self, img:np.ndarray,countdown_time:int):
+        height, width, _ = img.shape
+        text = str(countdown_time) 
+        
+        # 設置文字的大小、顏色與位置
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 4
+        color = (0, 0, 255)  # 紅色
+        thickness = 8
+
+        # 計算文字的邊界框來居中顯示
+        text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+        text_x = (width - text_size[0]) // 2
+        text_y = (height + text_size[1]) // 2
+        # 在透明圖層上繪製文字
+        cv2.putText(img, text, (text_x,text_y), font, font_scale, color, thickness, cv2.LINE_AA)
+        if countdown_time == 0:
+            self.show_countdown = False
+
         return img
+
 
     def drawPoints(self, image, points, person_idx, color_palette='gist_rainbow', palette_samples=10, confidence_threshold=0.3):
         """
@@ -267,13 +296,13 @@ class ImageDrawer():
             return image
         if person_df.empty:
             return image
-        person_data = self.df_to_points(person_df)
+        person_data = self.DftoPoints(person_df)
         for person_id, points in person_data.items(): 
             image = self.drawSkeleton(image, points, skeleton,person_index=person_id)
             image = self.drawPoints(image, points,person_idx=person_id)
         return image
 
-    def df_to_points(self, person_df):
+    def DftoPoints(self, person_df):
         person_data = {}
         person_ids = person_df['person_id']
         person_kpts = person_df['keypoints']
@@ -302,7 +331,10 @@ class ImageDrawer():
     def setShowAngleInfo(self, status:bool):
         self.show_angle_info = status
         self.setAngleInfoPos()
-
+    
+    def setShowCountdown(self,status:bool):
+        self.show_countdown = status
+        
     def setAngleInfoPos(self):
         person_df = self.pose_estimater.getPersonDf(is_select=True)
         if person_df is None:
