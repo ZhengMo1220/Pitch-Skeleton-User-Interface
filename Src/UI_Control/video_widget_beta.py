@@ -26,10 +26,10 @@ class PoseVideoTabControl(QWidget):
         self.ui.setupUi(self)
         self.model = model
         self.setupComponents()
-        self.init_var()
-        self.bind_ui()
+        self.initVar()
+        self.bindUI()
         
-    def bind_ui(self):
+    def bindUI(self):
         self.ui.loadOriginalVideoBtn.clicked.connect(
             lambda: self.loadVideo(is_processed=False))
         self.ui.loadProcessedVideoBtn.clicked.connect(
@@ -100,7 +100,7 @@ class PoseVideoTabControl(QWidget):
         self.image_drawer = ImageDrawer(self.pose_estimater, self.pose_analyzer)
         self.video_loader = VideoLoader(self.image_drawer)
 
-    def init_var(self):
+    def initVar(self):
         self.is_play = False
         self.video_scene = QGraphicsScene()
         self.curve_scene = QGraphicsScene()
@@ -126,7 +126,7 @@ class PoseVideoTabControl(QWidget):
             self.ui.showSkeletonCheckBox.setChecked(True)
 
     def reset(self):
-        self.init_var()
+        self.initVar()
         self.pose_estimater.reset()
         self.image_drawer.reset()
         self.person_selector.reset()
@@ -172,7 +172,7 @@ class PoseVideoTabControl(QWidget):
         self.model.setImageSize(self.video_loader.video_size)
         self.showGraph(self.curve_scene, self.ui.CurveView)
 
-    def show_image(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView): 
+    def showImage(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView): 
         scene.clear()
         image = image.copy()
         image = cv2.circle(image, (0, 0), 10, (0, 0, 255), -1)
@@ -231,7 +231,7 @@ class PoseVideoTabControl(QWidget):
     def update_frame(self, frame_num:int):
         image = self.video_loader.getVideoImage(frame_num)
         drawed_img = self.image_drawer.drawInfo(image, frame_num, self.pose_estimater.kpt_buffer)
-        self.show_image(drawed_img, self.video_scene, self.ui.FrameView)
+        self.showImage(drawed_img, self.video_scene, self.ui.FrameView)
     
     def toggle_detect(self):
         self.ui.showSkeletonCheckBox.setChecked(True)

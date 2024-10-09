@@ -1,180 +1,419 @@
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QColor, QImage, QPixmap
-from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QImage, QPixmap, QColor
+from PyQt5.QtCore import Qt, QTimer
 import numpy as np
 import sys
-import cv2
 import os
 from pitch_ui import Ui_pitch_ui
-import pandas as pd
-import queue
-from UI_Control.cv_control.cv_thread import VideoCaptureThread, VideoWriter
 from datetime import datetime
-from utils.timer import FPS_Timer, Timer
-from utils.vis_image import drawGrid, drawBbox, drawTraj, drawRegion
-from utils.vis_pose import drawPointsandSkeleton, joints_dict
-from utils.store import saveVideo
-from topdown_demo_with_mmdet import processImage
-import sys
-from utils.one_euro_filter import OneEuroFilter
-
+from utils.timer import Timer
+from cv_utils.cv_control import Camera, VideoLoader
+from utils.selector import PersonSelector, KptSelector
+from utils.analyze import PoseAnalyzer, JointAreaChecker
+import cv2
+from utils.vis_graph import GraphPlotter
+from utils.vis_image import ImageDrawer
+from skeleton.detect_skeleton import PoseEstimater
+import pyqtgraph as pg
+from utils.model import Model
 
 class PosePitchTabControl(QWidget):
-    def __init__(self, model,parent= None):
-        super(PosePitchTabControl, self).__init__(parent)
+    def __init__(self, model:Model, parent=None):
+        super().__init__(parent)
         self.ui = Ui_pitch_ui()
         self.ui.setupUi(self)
-        self.init_var()
-        self.bind_ui()
-        self.video_writer = None
-        self.model = model 
-        self.smooth_filter = OneEuroFilter()
-        self.fps_timer = FPS_Timer()
+        self.model = model
+        self.setupComponents()
+        self.initVar()
+        self.bindUI()
 
-    def bind_ui(self):
-        self.ui.camera_checkbox.clicked.connect(self.toggle_camera)
-        self.ui.record_checkbox.clicked.connect(self.toggle_record)
-        self.ui.select_checkbox.clicked.connect(self.toggle_select)
-        self.ui.select_keypoint_checkbox.clicked.connect(self.toggle_select_kpt)
-        self.ui.frame_slider.valueChanged.connect(self.video_analyzeFrame)
-        self.ui.play_btn.clicked.connect(self.play_btn_clicked)
-        self.ui.back_key_btn.clicked.connect(
-            lambda: self.ui.frame_slider.setValue(self.ui.frame_slider.value() - 1)
-        )
-        self.ui.forward_key_btn.clicked.connect(
-            lambda: self.ui.frame_slider.setValue(self.ui.frame_slider.value() + 1)
-        )
-
-    def init_var(self):
-        self.select_person_id = None
-        self.select_kpt_id = None
-        self.trigger_record_timer = Timer(1)
-        self.trigger_pitch_timer = Timer(1)
-        self.select_kpt_buffer = []
-        self.record_buffer = []
+    def initVar(self):
+        """Initialize variables and timer."""
+        self.view_scene = QGraphicsScene()
         self.is_play = False
-        self.processed_images=-1
-        self.region = [(100, 250), (450, 600)]
-        self.fps_control = 1
-        self.pre_person_df = pd.DataFrame()
-        self.camera_scene = QGraphicsScene()
-        self.person_df = pd.DataFrame()
-        self.person_data = []
-        self.frame_buffer = queue.Queue(maxsize=100)
-        
-        self.video_name = ""
-        self.frame_count = 0
-        self.kpts_dict = joints_dict()['haple']['keypoints']
+        self.video_scene = QGraphicsScene()
+        self.curve_scene = QGraphicsScene()
+        self.video_scene.clear()
+        self.curve_scene.clear()
+        self.correct_kpt_idx = 0
+        self.label_kpt = False
+        self.is_processed = False
+        self.is_pitching = False
+        self.is_video = True if self.camera is None else False
+        pg.setConfigOptions(foreground=QColor(113,148,116), antialias = True)
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 'k')
 
-    def toggle_camera(self):
-        if self.ui.camera_checkbox.isChecked():
-            self.open_camera()
-            frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
-            self.ui.image_resolution_label.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
+    def setupComponents(self): 
+        self.camera = None
+        self.timer = None
+        self.countdown_timer = None
+        self.record_checker = None
+        self.record_timer = None
+        self.pose_estimater = PoseEstimater(self.model)
+        self.kpt_dict = self.pose_estimater.joints["haple"]["keypoints"]
+        self.pose_analyzer = PoseAnalyzer(self.pose_estimater)
+        self.graph_plotter = GraphPlotter(self.pose_analyzer)
+        self.image_drawer = ImageDrawer(self.pose_estimater, self.pose_analyzer)
+        self.video_loader = VideoLoader(self.image_drawer)
+
+    def bindUI(self):
+        """Bind UI element to their corresponding functions."""
+        self.ui.cameraIdInput.valueChanged.connect(self.changeCamera)
+        self.ui.playBtn.clicked.connect(self.play_btn_clicked)
+        self.ui.backKeyBtn.clicked.connect(
+            lambda: self.ui.frameSlider.setValue(self.ui.frameSlider.value() - 1)
+        )
+        self.ui.forwardKeyBtn.clicked.connect(
+            lambda: self.ui.frameSlider.setValue(self.ui.frameSlider.value() + 1)
+        )
+        self.ui.frameSlider.valueChanged.connect(self.analyzeFrame)
+        self.ui.FrameView.mousePressEvent = self.mousePressEvent
+        self.ui.pitchInput.currentIndexChanged.connect(self.change_pitcher)
+        self.bindCheckBox()
+
+    def bindCheckBox(self):
+        """Bind UI CheckBox to their corresponding functions."""
+        self.ui.cameraCheckBox.stateChanged.connect(self.toggleCamera)
+        self.ui.recordCheckBox.stateChanged.connect(self.toggleRecord)
+        self.ui.selectCheckBox.stateChanged.connect(self.toggleSelect)
+        self.ui.showSkeletonCheckBox.stateChanged.connect(self.toggleShowSkeleton)
+        self.ui.selectKptCheckBox.stateChanged.connect(self.toggleKptSelect)
+        self.ui.showAngleCheckBox.stateChanged.connect(self.toggleShowAngleInfo)
+        self.ui.showBboxCheckBox.stateChanged.connect(self.toggleShowBbox)
+        self.ui.showLineCheckBox.stateChanged.connect(self.toggleShowGrid)  
+        self.ui.startPitchCheckBox.stateChanged.connect(self.togglePitching)
+
+    def play_btn_clicked(self):
+        if self.video_loader.video_name == "":
+            QMessageBox.warning(self, "無法播放影片", "請讀取影片!")
+            return
+        if self.video_loader.is_loading:
+            QMessageBox.warning(self, "影片讀取中", "請稍等!")
+            return
+        self.is_play = not self.is_play
+        self.ui.playBtn.setText("||" if self.is_play else "▶︎")
+        if self.is_play:
+            self.playFrame(self.ui.frameSlider.value())
+
+    def playFrame(self, start_num:int=0):
+        for i in range(start_num, self.video_loader.total_frames):
+            if not self.is_play:
+                break
+            self.ui.frameSlider.setValue(i)
+            if i == self.video_loader.total_frames - 1 and self.is_play:
+                self.play_btn_clicked()
+            cv2.waitKey(15)
+
+    def video_silder(self, visible:bool):
+        elements = [
+            self.ui.backKeyBtn,
+            self.ui.playBtn,
+            self.ui.forwardKeyBtn,
+            self.ui.frameSlider,
+            self.ui.frameNumLabel,
+            self.ui.CurveView
+        ]
+        
+        for element in elements:
+            element.setVisible(visible)
+
+    def change_pitcher(self):
+        """Change the pitcher based on input value. 9: "左腕", 10: "右腕","""
+        kpt_id = 10 if self.ui.pitchInput.currentIndex() == 0 else 9
+        self.pose_estimater.setKptId(kpt_id)
+        self.pose_estimater.setPitchHandId(kpt_id)
+
+    def toggleCamera(self, state:int):
+        """Toggle the camera on/off based on checkbox state."""
+        if state == 2:
+            if self.is_play:
+                self.ui.cameraCheckBox.setCheckState(0)
+                QMessageBox.warning(self, "無法開啟相機", "請先暫停播放影片")
+                return
+            self.ui.showAngleCheckBox.setCheckState(0)
+            self.ui.selectCheckBox.setCheckState(0)
+            self.ui.selectKptCheckBox.setCheckState(0)
+            self.camera = Camera()
+            self.timer = QTimer()
+            self.timer.timeout.connect(self.analyzeFrame)
+            self.is_video = False
+            frame_width, frame_height, fps = self.camera.toggleCamera(True)
+            self.model.setImageSize((frame_width, frame_height))
+            self.ui.ResolutionLabel.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
+            self.timer.start(1)
             self.video_silder(visible=False)
         else:
-            self.close_camera()
-            self.ui.image_resolution_label.setText(f"(0, 0) - ")
+            if self.camera is not None:
+                self.camera.toggleCamera(False)
+            if self.timer is not None:
+                self.timer.stop()
+            self.is_video = True
             self.video_silder(visible=True)
+            self.camera = None
+            self.timer = None
 
-    def toggle_record(self):
-        if not self.ui.camera_checkbox.isChecked():
-            print("Need to open camera first")
+    def togglePitching(self, state):
+        if state == 2:
+            if not self.ui.cameraCheckBox.isChecked():
+                self.ui.startPitchCheckBox.setCheckState(0)
+                QMessageBox.warning(self, "無法開始投球模式", "請先開啟相機")
+                return
+            if not self.ui.showSkeletonCheckBox.isChecked():
+                self.ui.startPitchCheckBox.setCheckState(0)
+                QMessageBox.warning(self, "無法開始投球模式", "請選擇顯示人體骨架!")
+                return
+            if not self.ui.selectCheckBox.isChecked():
+                self.ui.startPitchCheckBox.setCheckState(0)
+                QMessageBox.warning(self, "無法開始投球模式", "請選擇人!")
+                return
+            self.is_pitching = True
+            self.record_checker = JointAreaChecker(self.camera.frame_size)
+        else:
+            self.is_pitching = False
+
+    def toggleRecord(self, state:int):
+        """Start or stop video recording."""
+        if state == 2:
+            self.startRecording()
+            print("record!!")
+        else:
+            if self.camera is None:
+                return
+            print("stop record!!")
+            self.camera.stop_recording()
+
+    def startRecording(self):
+        """Start recording the video."""
+        if self.camera is None:
+            self.ui.recordCheckBox.setCheckState(0)
             return
-        if self.ui.record_checkbox.isChecked():
-            self.start_recording()
-        else:
-            self.stop_recording()
-
-    def toggle_select(self):
-        if not self.ui.select_checkbox.isChecked():
-            self.select_person_id = None
-            
-        else:
-            self.person_id_selector(0.0, 0.0)
-    
-    def toggle_select_kpt(self):
-        if not self.ui.select_keypoint_checkbox.isChecked():
-            self.select_kpt_id = None
-            self.select_kpt_buffer = []
-        else:
-            if self.ui.pitch_input.currentIndex() == 0:
-                self.select_kpt_id = 10
-            else:
-                self.select_kpt_id = 9
-
-    def toggle_analyze_video(self, video):
-        self.video_ui_set(video)
-        self.checkbox_controller(camera= False, record=False, show_skeleton=True, show_bbox=False)
-                                    #   select_person=True, select_kpt=True, show_kpt_angle= True)
-        self.processed_frames = set()
-        self.ui.play_btn.click()
-
-    def open_camera(self):
-        self.video_thread = VideoCaptureThread(camera_index=self.ui.camera_id_input.value())
-        self.video_thread.frame_ready.connect(self.buffer_frame)
-        self.video_thread.start_capture()
-
-    def close_camera(self):
-        self.video_thread.stop_capture()
-        self.camera_scene.clear()
-
-        if self.video_writer is not None:
-            self.video_writer.release()
-            self.video_writer = None
-
-    def buffer_frame(self, frame: np.ndarray):
-        self.frame_count += 1
-        if self.ui.show_skeleton_checkbox.isChecked():
-            if self.ui.record_checkbox.isChecked():
-                self.fps_control = 30
-            else:
-                self.fps_control = 15
-
-        if self.frame_count % self.fps_control == 0:
-            try:
-                if self.frame_buffer.full():
-                    self.frame_buffer.get_nowait()
-                self.frame_buffer.put_nowait(frame)
-            except queue.Full:
-                print("Frame buffer is full. Dropping frame.")
-
-            self.real_time_analyzeFrame()
-
-        #確認有沒有在錄影
-        if self.video_writer is not None:
-            self.video_writer.write(frame)
-            #存取投球的畫面
-            self.record_buffer.append(frame)
-
-        #設定秒數的錄影
-        if self.trigger_pitch_timer.is_time_up():
-            self.checkbox_controller(camera=False, record=False)
-            self.toggle_analyze_video(self.record_buffer)
-            self.trigger_pitch_timer.reset()
-
-    def start_recording(self):
         current_time = datetime.now().strftime("%Y%m%d_%H%M")
-        output_dir = f'../../Db/Record/C{self.ui.camera_id_input.value()}_Fps120_{current_time}'
+        output_dir = f'../../Db/Record/C{self.ui.cameraIdInput.value()}_Fps120_{current_time}'
         os.makedirs(output_dir, exist_ok=True)
-        video_filename = os.path.join(output_dir, f'C{self.ui.camera_id_input.value()}_Fps120_{current_time}.mp4')
-        self.video_name = f'C{self.ui.camera_id_input.value()}_Fps120_{current_time}'
-        frame_width = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(self.video_thread.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = int(self.video_thread.cap.get(cv2.CAP_PROP_FPS))
-        self.video_writer = VideoWriter(video_filename, frame_width, frame_height, fps=fps)
-        self.record_buffer = []
+        video_filename = os.path.join(output_dir, f'C{self.ui.cameraIdInput.value()}_Fps120_{current_time}.mp4')
+        self.camera.startRecording(video_filename)
 
-    def stop_recording(self):
-        if self.video_writer is not None:
-            self.video_writer.release()
-            self.video_writer = None
+    def toggleSelect(self, state:int):
+        """Select a person based on checkbox state."""
+        if state == 2:
+            if not self.ui.showSkeletonCheckBox.isChecked():
+                self.ui.selectCheckBox.setCheckState(0)
+                QMessageBox.warning(self, "無法選擇人", "請選擇顯示人體骨架!")
+                return
+            self.person_selector = PersonSelector()
+            frame_num = self.ui.frameSlider.value() if self.is_video else None
+            search_person_df = self.pose_estimater.getPersonDf(frame_num=frame_num) if frame_num is not None else self.pose_estimater.pre_person_df
+            self.person_selector.select(search_person_df = search_person_df)
+            self.pose_estimater.setPersonId(self.person_selector.selected_id)
+        else:
+            self.pose_estimater.setPersonId(None)
+            self.person_selector = None
 
-    def show_image(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
+    def toggleKptSelect(self, state:int):
+        """Toggle keypoint selection and trajectory visualization."""  
+        if state ==2:
+            if not self.ui.selectCheckBox.isChecked():
+                self.ui.selectKptCheckBox.setCheckState(0)
+                QMessageBox.warning(self, "無法選擇關節點", "請選擇人!")
+                return
+            self.kpt_selector = KptSelector()
+            self.pose_estimater.setKptId(10)
+            self.image_drawer.setShowTraj(True)
+        else:
+            self.kpt_selector = None
+            self.pose_estimater.setKptId(None)
+            self.pose_estimater.clearKptBuffer()
+            self.image_drawer.setShowTraj(False)
+
+    def toggleShowSkeleton(self, state:int):
+        """Toggle skeleton detection and FPS control."""
+        if state == 2 and self.ui.recordCheckBox.isChecked():
+            self.ui.showSkeletonCheckBox.setCheckState(0)
+            QMessageBox.warning(self, "無法選擇人", "請選擇顯示人體骨架!")
+            return
+        is_checked = state == 2
+        if not is_checked:
+            self.ui.selectCheckBox.setCheckState(0)
+            self.ui.selectKptCheckBox.setCheckState(0)
+            self.ui.showAngleCheckBox.setCheckState(0)
+        self.pose_estimater.setDetect(is_checked)
+        self.image_drawer.setShowSkeleton(is_checked)
+        if self.camera is not None and not self.is_video:
+            self.camera.setFPSControl(15 if is_checked else 1)
+
+    def toggleShowBbox(self, state:int):
+        """Toggle bounding box visibility."""
+        self.image_drawer.setShowBbox(state == 2)
+
+    def toggleShowAngleInfo(self, state:int):
+        if not self.ui.selectCheckBox.isChecked():
+            self.ui.showAngleCheckBox.setCheckState(0)
+            QMessageBox.warning(self, "無法顯示關節點角度資訊", "請選擇人!")
+            return
+        if state == 2:  
+            self.image_drawer.setShowAngleInfo(True)
+        else:
+            self.image_drawer.setShowAngleInfo(False)
+
+    def toggleShowGrid(self, state:int):
+        """Toggle gridline visibility."""
+        self.image_drawer.setShowGrid(state == 2)
+    
+    def changeCamera(self):
+        """Change the camera based on input value."""
+        self.camera.setCameraId(self.ui.cameraIdInput.value())
+
+    def analyzeFrame(self):
+        """Analyze and process each frame from the camera or video"""
+        fps = 0
+        if self.is_video:
+            frame_num = self.ui.frameSlider.value()
+            self.ui.frameNumLabel.setText(f'{frame_num}/{len(self.video_loader.video_frames) - 1}')
+            frame = self.video_loader.getVideoImage(frame_num)
+            _, _, fps= self.pose_estimater.detectKpt(frame, frame_num, is_video=True)
+            if self.pose_estimater.person_id is not None:
+                self.pose_analyzer.addAnalyzeInfo(frame_num)
+                self.graph_plotter.updateGraph(frame_num)
+                # self.importDatatoTable(frame_num)
+            if frame_num == self.video_loader.total_frames - 1:
+                self.video_loader.saveVideo()
+            self.updateFrame(frame_num=frame_num)
+
+        else:
+            if not self.camera.frame_buffer.empty():
+                frame = self.camera.frame_buffer.get().copy()
+                _, _, fps = self.pose_estimater.detectKpt(frame, is_video=False)
+                if self.is_pitching:
+                    self.pitherAnaylze()
+                self.updateFrame(frame=frame)
+                
+        self.ui.FPSInfoLabel.setText(f"{fps:02d}")
+    
+    def pitherAnaylze(self):
+        if self.record_checker is not None:
+            pos = self.pose_estimater.getPrePersonDf()
+            if self.record_checker.is_joint_in_area(pos):
+                self.initCountdownTimer(4)
+        else:
+            self.initRecorderTimer(4)
+
+    def initCountdownTimer(self, duration:int):
+        if self.countdown_timer is None:
+            self.countdown_timer = Timer(duration)
+            self.countdown_timer.start()
+    
+    def initRecorderTimer(self, duration:int):
+        if self.record_timer is None:
+            self.ui.showBboxCheckBox.setCheckState(0)
+            self.ui.selectKptCheckBox.setCheckState(0)
+            self.ui.selectCheckBox.setCheckState(0)
+            self.ui.showSkeletonCheckBox.setCheckState(0)
+            self.ui.recordCheckBox.setCheckState(2)
+            self.record_timer = Timer(duration)
+            self.record_timer.start()
+
+    def updateFrame(self, frame: np.ndarray = None, frame_num:int = None):
+        """Update the displayed frame with additional analysis."""
+        # 更新當前的frame和frame_num
+        if self.is_video and frame_num is not None:
+            frame = self.video_loader.getVideoImage(frame_num)
+        countdown_time = self.updateTimers() 
+        drawed_img = self.image_drawer.drawInfo(frame, frame_num, self.pose_estimater.kpt_buffer, countdown_time)
+        self.showImage(drawed_img, self.view_scene, self.ui.FrameView)
+
+    def updateTimers(self):
+        countdown_time = None
+        if self.countdown_timer is not None:
+            countdown_time = self.countdown_timer.get_remaining_time()
+            if countdown_time == 0:
+                self.resetCountdownTimer()
+        if self.record_timer is not None:
+            countdown_time = self.record_timer.get_remaining_time()
+            if countdown_time == 0:
+                self.resetRecordTimer()
+        return countdown_time
+
+    def resetCountdownTimer(self):
+        self.countdown_timer = None
+        self.record_checker = None
+
+    def resetRecordTimer(self):
+        self.record_timer = None
+        video_path = self.camera.video_path
+        self.video_loader.reset()
+        self.ui.recordCheckBox.setCheckState(0)
+        self.ui.startPitchCheckBox.setCheckState(0)
+        self.ui.cameraCheckBox.setCheckState(0)
+        self.video_loader.loadVideo(video_path)
+        self.checkVideoLoad()
+
+    def checkVideoLoad(self):
+        """檢查影片是否讀取完成，並更新 UI 元素。"""
+        # 檢查是否有影片名稱，若無則不執行後續操作
+        if not self.video_loader.video_name:
+            return
+        # 若影片正在讀取中，定時檢查讀取狀況
+        if self.video_loader.is_loading:
+            # self.ui.videoNameLabel.setText("讀取影片中")
+            QTimer.singleShot(100, self.checkVideoLoad)  # 每100ms 檢查一次
+            return
+        # 影片讀取完成後更新 UI 元素
+        self.updateVideoInfo()
+        self.initAnalyzeFrame()
+
+    def updateVideoInfo(self):
+        """更新與影片相關的資訊顯示在 UI 上。"""
+        self.reset()
+        self.initFrameSlider()
+        self.initGraph()
+        self.updateFrame(frame_num=0)
+        self.model.setImageSize(self.video_loader.video_size)
+        video_size = self.video_loader.video_size
+        self.ui.ResolutionLabel.setText(f"(0,0) - {video_size[0]} x {video_size[1]}")
+
+    def initAnalyzeFrame(self):
+        self.ui.showSkeletonCheckBox.setCheckState(2)
+        frame = self.video_loader.getVideoImage(0)
+        _, _, _= self.pose_estimater.detectKpt(frame, 0, is_video=True)
+        self.ui.selectCheckBox.setCheckState(2)
+        self.ui.selectKptCheckBox.setCheckState(2)
+        self.ui.showAngleCheckBox.setCheckState(2)
+        self.ui.playBtn.click()
+
+    def initFrameSlider(self):
+        """初始化影片滑桿和相關的標籤。"""
+        total_frames = self.video_loader.total_frames
+        self.ui.frameSlider.setMinimum(0)
+        self.ui.frameSlider.setMaximum(total_frames - 1)
+        self.ui.frameSlider.setValue(0)
+        self.ui.frameNumLabel.setText(f'0/{total_frames - 1}')
+
+    def initGraph(self):
+        """初始化圖表和模型設定。"""
+        total_frames = self.video_loader.total_frames
+        self.graph_plotter._init_graph(total_frames) 
+        self.showGraph(self.curve_scene, self.ui.CurveView)
+
+    def showGraph(self, scene:QGraphicsScene, graphicview:QGraphicsView):
         scene.clear()
-        image = cv2.circle(image, (0, 0), 10, (0, 0, 255), -1)
+        graph = self.graph_plotter.graph
+        graph.resize(graphicview.width(),graphicview.height())
+        scene.addWidget(graph)
+        graphicview.setScene(scene)
+        graphicview.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
+
+    def reset(self):
+        self.pose_estimater.reset()
+        self.pose_analyzer.reset()
+        self.graph_plotter.reset()
+        self.image_drawer.reset()
+        self.video_scene.clear()
+        self.curve_scene.clear()
+
+    def showImage(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
+        """Display an image in the QGraphicsView."""
+        scene.clear()
         h, w = image.shape[:2]
         qImg = QImage(image, w, h, 3 * w, QImage.Format_RGB888).rgbSwapped()
         pixmap = QPixmap.fromImage(qImg)
@@ -183,324 +422,23 @@ class PosePitchTabControl(QWidget):
         GraphicsView.setAlignment(Qt.AlignLeft)
         GraphicsView.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
 
-    def mergePersonData(self, pred_instances, person_ids: list, frame_num: int = None):
-        person_bboxes = pred_instances['bboxes']
-        if frame_num is None:
-            self.person_data = []
-
-        for person, pid, bbox in zip(pred_instances, person_ids, person_bboxes):
-            keypoints_data = np.hstack((
-                np.round(person['keypoints'][0], 2),
-                np.round(person['keypoint_scores'][0], 2).reshape(-1, 1),
-                np.full((len(person['keypoints'][0]), 1), False, dtype=bool)
-            ))
-
-            new_kpts = np.full((len(self.kpts_dict), keypoints_data.shape[1]), 0.9)
-            new_kpts[:26] = keypoints_data
-
-            person_info = {
-                'person_id': pid,
-                'bbox': bbox,
-                'keypoints': new_kpts
-            }
-
-            if frame_num is not None:
-                person_info['frame_number'] = frame_num
-
-            self.person_data.append(person_info)
-
-        return pd.DataFrame(self.person_data)
-
-    def real_time_analyzeFrame(self):
-        if not self.frame_buffer.empty():
-            frame = self.frame_buffer.get()
-            img = frame.copy()
-            if self.ui.show_skeleton_checkbox.isChecked():
-                self.detectKpt(img)
-                self.start_pitch()
-
-            self.update_frame(img)
-
-    def video_analyzeFrame(self):
-        frame_num = self.ui.frame_slider.value()
-
-        if len(self.record_buffer) == 0:
-            return
-
-        self.ui.frame_num_label.setText(f'{frame_num}/{len(self.record_buffer) - 1}')
-        
-        image = self.record_buffer[frame_num].copy()
-
-        if frame_num == len(self.record_buffer) - 1:
-        #     print(self.person_df)
-            self.ui.play_btn.click()
-            # saveVideo(self.video_name, self.record_buffer, self.person_df, select_id=self.select_person_id)
-            saveVideo(self.video_name, self.record_buffer, self.person_df, select_id=self.select_person_id)
-
-        if frame_num not in self.processed_frames:
-            self.detectKpt(image, frame_num= frame_num)
-        
-        # if self.select_person_id:
-        #     self.importDatatoTable(self.select_person_id, frame_num)
-        curr_person_df = self.obtain_data(frame_num = frame_num, person_id = self.select_person_id)
-        self.update_frame(image, curr_person_df)
-
-    def update_frame(self, image: np.ndarray, curr_person_df:pd.DataFrame = None):
-        if curr_person_df is None:
-            curr_person_df = self.person_df
-        
-        if not self.ui.record_checkbox.isChecked() and self.ui.camera_checkbox.isChecked():
-            image = drawRegion(image)
-
-        if not self.person_df.empty:
-            if self.ui.show_skeleton_checkbox.isChecked():
-                image = drawPointsandSkeleton(image, curr_person_df, joints_dict()['haple']['skeleton_links'],
-                                                points_color_palette='gist_rainbow', skeleton_palette_samples='jet',
-                                                points_palette_samples=10, confidence_threshold=0.3)
-            if self.ui.show_bbox_checkbox.isChecked():
-                image = drawBbox(curr_person_df, image)
-            # if self.ui.select_keypoint_checkbox.isChecked():
-            #     image = drawTraj(self.select_kpt_buffer,image)
-
-        if self.ui.show_line_checkbox.isChecked():
-            image = drawGrid(image)
-
-        self.show_image(image, self.camera_scene, self.ui.frame_view)
-
-    def smoothKpt(self, person_ids: list):
-        if self.pre_person_df.empty :
-            self.pre_person_df = self.person_df.copy()
-
-        if self.person_df.empty:
-            return
-        
-        for person_id in person_ids: 
-            pre_person_data = self.pre_person_df.loc[self.pre_person_df['person_id'] == person_id]
-            curr_person_data = self.person_df.loc[self.person_df['person_id'] == person_id]
-            
-            if curr_person_data.empty or pre_person_data.empty:
-                continue 
-            
-            pre_kpts = pre_person_data.iloc[0]['keypoints'] if not pre_person_data.empty else None
-            curr_kpts = curr_person_data.iloc[0]['keypoints'] if not curr_person_data.empty else None
-            
-            smoothed_kpts = []
-            
-            if curr_kpts is not None and pre_kpts is not None:
-                for pre_kpt, curr_kpt in zip(pre_kpts, curr_kpts): 
-                    pre_kptx, pre_kpty = pre_kpt[0], pre_kpt[1]
-                    curr_kptx, curr_kpty, curr_conf, curr_label = curr_kpt[0], curr_kpt[1], curr_kpt[2], curr_kpt[3]
-                    
-                    if all([pre_kptx != 0, pre_kpty != 0, curr_kptx != 0, curr_kpty != 0]):
-                        curr_kptx = self.smooth_filter(curr_kptx, pre_kptx)
-                        curr_kpty = self.smooth_filter(curr_kpty, pre_kpty)
-                    
-                    smoothed_kpts.append([curr_kptx, curr_kpty, curr_conf, curr_label])
-
-                self.person_df.at[curr_person_data.index[0], 'keypoints'] = smoothed_kpts
-        self.pre_person_df = self.person_df.copy()
-
     def mousePressEvent(self, event):
-        pos = event.pos()
-        scene_pos = self.ui.frame_view.mapToScene(pos)
+        """Handle mouse events for person and keypoint selection."""
+        if not self.ui.FrameView.rect().contains(event.pos()):
+            return
+        
+        scene_pos = self.ui.FrameView.mapToScene(event.pos())
         x, y = scene_pos.x(), scene_pos.y()
-        if event.button() == Qt.LeftButton:
-            if self.ui.select_checkbox.isChecked():
-                self.person_id_selector(x, y)
+        search_person_df = self.pose_estimater.pre_person_df
 
-            if self.ui.select_keypoint_checkbox.isChecked():
-                self.kpt_id_selector(x, y)
+        if self.ui.selectCheckBox.isChecked() and event.button() == Qt.LeftButton:
 
-    def person_id_selector(self, x: float, y: float):
-        curr_person_df = None
-        if len(self.record_buffer) != 0:
-            curr_person_df = self.obtain_data(frame_num = self.ui.frame_slider.value())
-        
-        if self.pre_person_df.empty and curr_person_df.empty:
-            return
-        
-        if curr_person_df is None:
-            search_person_df = self.pre_person_df  
-        else:
-            search_person_df = curr_person_df
+            self.person_selector.select(x, y, search_person_df)
+            self.pose_estimater.setPersonId(self.person_selector.selected_id)
 
-
-        selected_id = None
-        max_area = -1
-
-        for _, row in search_person_df.iterrows():
-            person_id = row['person_id']
-            x1, y1, x2, y2 = map(int, row['bbox'])
-            if x != 0 and y != 0:
-                if not (x1 <= x <= x2 and y1 <= y <= y2):
-                    continue
-            area = (x2 - x1) * (y2 - y1)
-
-            if area > max_area:
-                max_area = area
-                selected_id = person_id
-
-        self.select_person_id = selected_id
-
-    def kpt_id_selector(self, x: float, y: float):
-        def calculate_distance(point1, point2):
-            return np.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
-        if self.pre_person_df.empty :
-            return
-        
-        selected_id = None
-        min_distance = float('inf')
-        for _, row in self.pre_person_df.iterrows():
-            person_kpts = row['keypoints']
-            for kpt_id, kpt in enumerate(person_kpts):
-                
-                kptx, kpty, kpt_score, _= map(int, kpt)
-        
-                distance = calculate_distance([kptx, kpty], [x, y])
-                if distance < min_distance:
-                    min_distance = distance
-                    selected_id = kpt_id
-
-        self.select_kpt_id = selected_id
-
-    def start_pitch(self):
-        if self.select_person_id is None:
-            print("No pitcher")
-            return
-
-        trigger_kpt_idx = 10 if self.ui.pitch_input.currentIndex() == 0 else 9
-        person_kpt = self.obtain_data()
-
-        if person_kpt is None:
-            print("No kpt")
-            return
-
-        x, y, _, _ = person_kpt[trigger_kpt_idx]
-        x1, y1 = self.region[0]
-        x2, y2 = self.region[1]
-
-        if x1 <= x <= x2 and y1 <= y <= y2: 
-            if self.trigger_record_timer.start_time is None:
-                print("In region")
-                self.trigger_record_timer.start()
-        else:
-            self.trigger_record_timer.reset()
-            
-
-        if self.trigger_record_timer.is_time_up():
-            self.trigger_pitch_timer.start()
-            self.checkbox_controller(record=True, show_skeleton=False, show_bbox=False,
-                                      select_person=False, select_kpt=False, show_kpt_angle= False)
-            
-    def obtain_data(self, frame_num = None, person_id = None, is_kpt = False):
-        if self.person_df.empty:
-            return None
-        if frame_num is None:
-            person_kpt = self.person_df.loc[self.person_df['person_id'] == self.select_person_id, 'keypoints']
-            return person_kpt.to_numpy()[0] if not person_kpt.empty else None
-        else:
-            frame_data = self.person_df[self.person_df['frame_number'] == frame_num]
-        
-            if person_id is not None:
-                frame_data = frame_data[frame_data['person_id'] == person_id]
-            
-            if is_kpt:
-                frame_data = frame_data['keypoints']
-            
-            return frame_data
-
-    def checkbox_controller(self, camera:bool = None, record:bool = None, show_skeleton:bool = None, 
-                                show_bbox:bool = None, select_person:bool = None, select_kpt:bool = None, show_kpt_angle:bool = None):
-        
-        if camera is not None and camera != self.ui.camera_checkbox.isChecked():
-            self.ui.camera_checkbox.click()
-
-        if record is not None and record != self.ui.record_checkbox.isChecked():
-            print(record)
-            print(self.ui.record_checkbox.isChecked())
-            print("trigger record")
-            self.ui.record_checkbox.click()
-
-        if show_skeleton is not None and show_skeleton != self.ui.show_skeleton_checkbox.isChecked():
-            self.ui.show_skeleton_checkbox.click()
-
-        if show_bbox is not None and show_bbox != self.ui.show_bbox_checkbox.isChecked():
-            self.ui.show_bbox_checkbox.click()
-
-        if select_person is not None and select_person != self.ui.select_checkbox.isChecked():
-            self.ui.select_checkbox.click()
-
-        if select_kpt is not None and select_kpt != self.ui.select_keypoint_checkbox.isChecked():
-            self.ui.select_keypoint_checkbox.click()
-
-        if show_kpt_angle is not None and show_kpt_angle != self.ui.show_kpt_angle_checkbox.isChecked():
-            self.ui.show_kpt_angle_checkbox.click()
-
-    def video_silder(self, visible:bool):
-        elements = [
-            self.ui.back_key_btn,
-            self.ui.play_btn,
-            self.ui.forward_key_btn,
-            self.ui.frame_slider,
-            self.ui.frame_num_label
-        ]
-        
-        for element in elements:
-            element.setVisible(visible)
-
-    def video_ui_set(self, video):
-        self.ui.frame_slider.setMinimum(0)
-        self.ui.frame_slider.setMaximum(len(video) - 1)
-        self.ui.frame_slider.setValue(0)
-        self.ui.frame_num_label.setText(f'0/{len(video)-1}')
-        image = video[0].copy()
-        if self.ui.show_skeleton_checkbox.isChecked():
-            self.detectKpt(image, frame_num = 0)
-        self.update_frame(image)
-        self.ui.image_resolution_label.setText( "(0,0) -" + f" {video[0].shape[1]} x {video[0].shape[0]}")
-        
-    def detectKpt(self, image:np.ndarray, frame_num:int = None):
-        self.fps_timer.tic()
-        pred_instances, person_ids = processImage(self.model, image, select_id=self.select_person_id)
-        average_time = self.fps_timer.toc()
-        fps = int(1/max(average_time, 0.00001))
-        self.ui.fps_info_label.setText(f"{fps:02}")
-        self.person_df = self.mergePersonData(pred_instances, person_ids, frame_num)
-        self.smoothKpt(person_ids)
-        
-        if frame_num is not None:
-            self.processed_frames.add(frame_num)
-
-    def play_btn_clicked(self):
-        print("play btn click")
-        if len(self.record_buffer) == 0:
-            return
-        self.is_play = not self.is_play
-        if self.is_play:
-            self.ui.play_btn.setText("||")
-            self.playFrame(self.ui.frame_slider.value())
-        else:
-            self.ui.play_btn.setText("▶︎")
-
-    def keyPressEvent(self, event):
-        if event.key() == ord('D') or event.key() == ord('d'):
-            self.ui.frame_slider.setValue(self.ui.frame_slider.value() + 1)
-        elif event.key() == ord('A') or event.key() == ord('a'):
-            self.ui.frame_slider.setValue(self.ui.frame_slider.value() - 1)
-        else:
-            super().keyPressEvent(event)
-
-    def playFrame(self, start_num = 0):
-        for i in range(start_num, len(self.record_buffer)):
-            self.ui.frame_slider.setValue(i)
-            if not self.is_play:
-                break
-            if i > self.processed_images:
-                self.processed_images = i
-            if i == len(self.record_buffer) - 1 and self.is_play:
-                self.play_btn_clicked()
-            cv2.waitKey(15)
-
+        if self.ui.selectKptCheckBox.isChecked() and event.button() == Qt.LeftButton:
+            self.kpt_selector.select(x, y, search_person_df)
+            self.pose_estimater.setKptId(self.kpt_selector.selected_id)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

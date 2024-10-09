@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout
 
 from camera_widget import PoseCameraTabControl
 from video_widget import PoseVideoTabControl
-from pitch_widget_beta import PosePitchTabControl
+from pitch_widget import PosePitchTabControl
 from main_window import Ui_MainWindow
 from utils.model import Model
 

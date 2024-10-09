@@ -23,12 +23,12 @@ class PosePitchTabControl(QWidget):
         self.ui = Ui_pitch_ui()
         self.ui.setupUi(self)
         self.model = model
-        self.init_var()
+        self.initVar()
         self.init_pose_estimater()
-        self.bind_ui()
+        self.bindUI()
         self.video_state()
 
-    def init_var(self):
+    def initVar(self):
         self.camera = None
         self.timer = None
         self.record_timer = None
@@ -58,18 +58,18 @@ class PosePitchTabControl(QWidget):
         self.image_drawer = ImageDrawer(self.pose_estimater, self.pose_analyzer)
         self.video_loader = VideoLoader(self.image_drawer)
 
-    def bind_ui(self):
+    def bindUI(self):
         """Bind UI elements to their corresponding functions."""
-        self.ui.camera_checkbox.stateChanged.connect(self.toggle_camera)
-        self.ui.record_checkbox.stateChanged.connect(self.toggle_record)
+        self.ui.camera_checkbox.stateChanged.connect(self.toggleCamera)
+        self.ui.record_checkbox.stateChanged.connect(self.toggleRecord)
         self.ui.select_checkbox.stateChanged.connect(self.toggle_select)
         self.ui.show_skeleton_checkbox.stateChanged.connect(self.toggleShowSkeleton)
         self.ui.select_keypoint_checkbox.stateChanged.connect(self.toggleKptSelect)
         self.ui.show_bbox_checkbox.stateChanged.connect(self.toggleShowBbox)
-        self.ui.show_line_checkbox.stateChanged.connect(self.toggle_show_grid)
+        self.ui.show_line_checkbox.stateChanged.connect(self.toggleShowGrid)
         
         self.ui.start_pitch_checkbox.stateChanged.connect(self.toggle_pitching)
-        self.ui.camera_id_input.valueChanged.connect(self.change_camera)
+        self.ui.camera_id_input.valueChanged.connect(self.changeCamera)
         self.ui.pitch_input.currentIndexChanged.connect(self.change_pitcher)
 
         # video_widget
@@ -121,7 +121,7 @@ class PosePitchTabControl(QWidget):
             self.ui.select_keypoint_checkbox.setChecked(True)
             self.ui.play_btn.click()
 
-    def toggle_camera(self, state):
+    def toggleCamera(self, state):
         """Toggle the camera on/off based on checkbox state."""
         if state == 2:  # 開啟攝影機
             self.camera = Camera()
@@ -129,7 +129,7 @@ class PosePitchTabControl(QWidget):
             self.timer.timeout.connect(self.analyzeFrame)
 
             # 開啟攝影機並顯示解析度和幀率
-            frame_width, frame_height, fps = self.camera.toggle_camera(True)
+            frame_width, frame_height, fps = self.camera.toggleCamera(True)
             self.ui.image_resolution_label.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
             self.model.setImageSize((frame_width, frame_height,3))
             # 啟動定時器並更新 UI
@@ -138,7 +138,7 @@ class PosePitchTabControl(QWidget):
 
         else:
             if self.camera is not None:
-                self.camera.toggle_camera(False)
+                self.camera.toggleCamera(False)
             if self.timer is not None:
                 self.timer.stop()
             self.update_frame()
@@ -148,10 +148,10 @@ class PosePitchTabControl(QWidget):
             # self.update_frame()
             self.video_silder(visible=True)
 
-    def toggle_record(self, state):
+    def toggleRecord(self, state):
         """Start or stop video recording."""
         if state == 2:
-            self.start_recording()
+            self.startRecording()
             print("record!!")
         else:
             if self.camera is None:
@@ -159,7 +159,7 @@ class PosePitchTabControl(QWidget):
             print("stop record!!")
             self.camera.stop_recording()
 
-    def start_recording(self):
+    def startRecording(self):
         """Start recording the video."""
         if self.camera is None:
             return
@@ -167,7 +167,7 @@ class PosePitchTabControl(QWidget):
         output_dir = f'../../Db/Record/C{self.ui.camera_id_input.value()}_Fps120_{current_time}'
         os.makedirs(output_dir, exist_ok=True)
         video_filename = os.path.join(output_dir, f'C{self.ui.camera_id_input.value()}_Fps120_{current_time}.mp4')
-        self.camera.start_recording(video_filename)
+        self.camera.startRecording(video_filename)
 
     def toggle_select(self, state):
         """Select a person based on checkbox state."""
@@ -223,20 +223,20 @@ class PosePitchTabControl(QWidget):
         self.pose_estimater.setDetect(is_checked)
         self.image_drawer.setShowSkeleton(is_checked)
         if self.camera is not None:
-            self.camera.set_fps_control(15 if is_checked else 1)
+            self.camera.setFPSControl(15 if is_checked else 1)
 
     def toggleShowBbox(self, state):
         """Toggle bounding box visibility."""
         self.image_drawer.setShowBbox(state == 2)
 
-    def toggle_show_grid(self, state):
+    def toggleShowGrid(self, state):
         """Toggle gridline visibility."""
         self.image_drawer.setShowGrid(state == 2)
 
-    def change_camera(self):
+    def changeCamera(self):
         """Change the camera based on input value."""
         if self.camera is not None:
-            self.camera.set_camera_idx(self.ui.camera_id_input.value())
+            self.camera.setCameraId(self.ui.camera_id_input.value())
 
     def change_pitcher(self):
         """Change the pitcher based on input value. 9: "左腕", 10: "右腕","""
@@ -276,9 +276,9 @@ class PosePitchTabControl(QWidget):
             img = self.video_loader.getVideoImage(frame_num)
             show_img = self.image_drawer.drawInfo(img = img, frame_num=frame_num, kpt_buffer = self.pose_estimater.kpt_buffer)
             
-        self.show_image(show_img, self.view_scene, self.ui.frame_view)
+        self.showImage(show_img, self.view_scene, self.ui.frame_view)
 
-    def show_image(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
+    def showImage(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
         """Display an image in the QGraphicsView."""
         scene.clear()
         if image is not None:
