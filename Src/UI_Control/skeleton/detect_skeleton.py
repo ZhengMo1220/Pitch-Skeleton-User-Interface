@@ -27,7 +27,6 @@ except (ImportError, ModuleNotFoundError):
 
 class PoseEstimater:
     def __init__(self, model: Model =None):
-        
         self.model = model
         self.img_shape = (0,0,0)
         self.person_df = pd.DataFrame()
