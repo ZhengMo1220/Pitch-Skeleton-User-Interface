@@ -35,7 +35,7 @@ class PoseVideoTabControl(QWidget):
         self.ui.loadProcessedVideoBtn.clicked.connect(
             lambda: self.loadVideo(is_processed=True))
         
-        self.ui.playBtn.clicked.connect(self.play_btn_clicked)
+        self.ui.playBtn.clicked.connect(self.playBtnClicked)
         self.ui.backKeyBtn.clicked.connect(
             lambda: self.ui.frameSlider.setValue(self.ui.frameSlider.value() - 1)
         )
@@ -75,9 +75,9 @@ class PoseVideoTabControl(QWidget):
 
         if self.label_kpt:
             if event.button() == Qt.LeftButton:
-                self.sendtoTable(x, y, 1)
+                self.sendToTable(x, y, 1)
             elif event.button() == Qt.RightButton:
-                self.sendtoTable(0, 0, 0)
+                self.sendToTable(0, 0, 0)
             self.label_kpt = False
 
             self.update_frame(self.ui.frameSlider.value())
@@ -102,9 +102,9 @@ class PoseVideoTabControl(QWidget):
 
     def initVar(self):
         self.is_play = False
-        self.video_scene = QGraphicsScene()
+        self.view_scene = QGraphicsScene()
         self.curve_scene = QGraphicsScene()
-        self.video_scene.clear()
+        self.view_scene.clear()
         self.curve_scene.clear()
         self.correct_kpt_idx = 0
         self.label_kpt = False
@@ -198,10 +198,10 @@ class PoseVideoTabControl(QWidget):
                 break
             self.ui.frameSlider.setValue(i)
             if i == self.video_loader.total_frames - 1 and self.is_play:
-                self.play_btn_clicked()
+                self.playBtnClicked()
             cv2.waitKey(15)
 
-    def play_btn_clicked(self):
+    def playBtnClicked(self):
         if self.video_loader.video_name == "":
             QMessageBox.warning(self, "無法播放影片", "請讀取影片!")
             return
@@ -222,7 +222,7 @@ class PoseVideoTabControl(QWidget):
         # if self.pose_estimater.person_id is not None:
             # self.pose_analyzer.addAnalyzeInfo(frame_num)
             # self.graph_plotter.updateGraph(frame_num)
-        # self.importDatatoTable(frame_num)
+        # self.importDataToTable(frame_num)
         self.update_frame(frame_num)
         if frame_num == self.video_loader.total_frames - 1:
             self.ui.playBtn.click()
@@ -231,7 +231,7 @@ class PoseVideoTabControl(QWidget):
     def update_frame(self, frame_num:int):
         image = self.video_loader.getVideoImage(frame_num)
         drawed_img = self.image_drawer.drawInfo(image, frame_num, self.pose_estimater.kpt_buffer)
-        self.showImage(drawed_img, self.video_scene, self.ui.FrameView)
+        self.showImage(drawed_img, self.view_scene, self.ui.FrameView)
     
     def toggle_detect(self):
         self.ui.showSkeletonCheckBox.setChecked(True)
@@ -287,7 +287,7 @@ class PoseVideoTabControl(QWidget):
         for i in range(4):
             header.setDefaultAlignment(Qt.AlignLeft)
 
-    def importDatatoTable(self, frame_num:int):
+    def importDataToTable(self, frame_num:int):
         self.clearTableView()
         person_id = self.pose_estimater.person_id
         if person_id is None:
@@ -325,7 +325,7 @@ class PoseVideoTabControl(QWidget):
         self.correct_kpt_idx = row
         self.label_kpt = True
      
-    def sendtoTable(self, kptx:float, kpty:float, kpt_label:int):
+    def sendToTable(self, kptx:float, kpty:float, kpt_label:int):
         kptx_item = QTableWidgetItem(str(kptx))
         kpty_item = QTableWidgetItem(str(kpty))
         if kpt_label :

@@ -70,10 +70,10 @@ class PosePitchTabControl(QWidget):
         
         self.ui.start_pitch_checkbox.stateChanged.connect(self.toggle_pitching)
         self.ui.camera_id_input.valueChanged.connect(self.changeCamera)
-        self.ui.pitch_input.currentIndexChanged.connect(self.change_pitcher)
+        self.ui.pitch_input.currentIndexChanged.connect(self.changePitcher)
 
         # video_widget
-        self.ui.play_btn.clicked.connect(self.play_btn_clicked)
+        self.ui.play_btn.clicked.connect(self.playBtnClicked)
         self.ui.back_key_btn.clicked.connect(
             lambda: self.ui.frame_slider.setValue(self.ui.frame_slider.value() - 1)
         )
@@ -134,7 +134,7 @@ class PosePitchTabControl(QWidget):
             self.model.setImageSize((frame_width, frame_height,3))
             # 啟動定時器並更新 UI
             self.timer.start(1)
-            self.video_silder(visible=False)
+            self.videoSilder(visible=False)
 
         else:
             if self.camera is not None:
@@ -146,7 +146,7 @@ class PosePitchTabControl(QWidget):
             self.camera = None
             self.timer = None
             # self.update_frame()
-            self.video_silder(visible=True)
+            self.videoSilder(visible=True)
 
     def toggleRecord(self, state):
         """Start or stop video recording."""
@@ -238,7 +238,7 @@ class PosePitchTabControl(QWidget):
         if self.camera is not None:
             self.camera.setCameraId(self.ui.camera_id_input.value())
 
-    def change_pitcher(self):
+    def changePitcher(self):
         """Change the pitcher based on input value. 9: "左腕", 10: "右腕","""
         self.ui.camera_checkbox.setChecked(False)
         if self.ui.pitch_input.currentIndex() == 0:
@@ -261,7 +261,7 @@ class PosePitchTabControl(QWidget):
             _, self.person_df, fps= self.pose_estimater.detectKpt(image,frame_num)
             self.ui.fps_info_label.setText(f"{fps:02d}")
             if self.pose_estimater.person_id is not None:
-                self.importDatatoTable(frame_num)
+                self.importDataToTable(frame_num)
                 self.pose_analyzer.addAnalyzeInfo(frame_num)
                 self.graph_plotter.updateGraph(frame_num)
             self.update_frame(frame_num = frame_num)
@@ -311,9 +311,9 @@ class PosePitchTabControl(QWidget):
 
         if self.label_kpt:
             if event.button() == Qt.LeftButton:
-                self.sendtoTable(x, y, 1)
+                self.sendToTable(x, y, 1)
             elif event.button() == Qt.RightButton:
-                self.sendtoTable(0, 0, 0)
+                self.sendToTable(0, 0, 0)
             self.label_kpt = False
 
     def playFrame(self, start_num:int =0):
@@ -322,10 +322,10 @@ class PosePitchTabControl(QWidget):
                 break
             self.ui.frame_slider.setValue(i)
             if i == self.video_loader.total_frames - 1 and self.is_play:
-                self.play_btn_clicked()
+                self.playBtnClicked()
             cv2.waitKey(15)
 
-    def play_btn_clicked(self):
+    def playBtnClicked(self):
         if self.video_loader.video_name == "":
             QMessageBox.warning(self, "無法播放影片", "請讀取影片!")
             return
@@ -337,7 +337,7 @@ class PosePitchTabControl(QWidget):
         if self.is_play:
             self.playFrame(self.ui.frame_slider.value())
 
-    def video_silder(self, visible:bool):
+    def videoSilder(self, visible:bool):
         elements = [
             self.ui.back_key_btn,
             self.ui.play_btn,
@@ -374,7 +374,7 @@ class PosePitchTabControl(QWidget):
         for i in range(4):
             header.setDefaultAlignment(Qt.AlignLeft)
 
-    def importDatatoTable(self, frame_num:int):
+    def importDataToTable(self, frame_num:int):
         self.clearTableView()
         person_id = self.pose_estimater.person_id
         if person_id is None:
@@ -412,7 +412,7 @@ class PosePitchTabControl(QWidget):
         self.correct_kpt_idx = row
         self.label_kpt = True
     
-    def sendtoTable(self, kptx:float, kpty:float, kpt_label:int):
+    def sendToTable(self, kptx:float, kpty:float, kpt_label:int):
         kptx_item = QTableWidgetItem(str(kptx))
         kpty_item = QTableWidgetItem(str(kpty))
         if kpt_label :

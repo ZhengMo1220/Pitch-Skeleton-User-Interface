@@ -330,7 +330,8 @@ class ImageDrawer():
 
     def setShowAngleInfo(self, status:bool):
         self.show_angle_info = status
-        self.setAngleInfoPos()
+        if status:
+            self.setAngleInfoPos()
     
     def setShowCountdown(self,status:bool):
         self.show_countdown = status
