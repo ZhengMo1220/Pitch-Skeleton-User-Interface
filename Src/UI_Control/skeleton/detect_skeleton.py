@@ -182,7 +182,7 @@ class PoseEstimater:
 
         average_time = self.fps_timer.toc()
         fps = int(1/max(average_time, 0.00001))
-
+        fps = fps if fps < 100 else 0
         return image, self.person_df, fps
 
     def smoothKpt(self, person_ids: list, frame_num=None):
