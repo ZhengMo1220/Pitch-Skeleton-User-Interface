@@ -157,7 +157,7 @@ class PoseEstimater:
             return image, pd.DataFrame(), 0
 
         fps = 0
-        # self.fps_timer.tic()
+        self.fps_timer.tic()
         # if not is_processed:
         if is_video: 
             #影片處理方式
@@ -179,12 +179,6 @@ class PoseEstimater:
                 if person_data is not None:
                     keypoint = person_data[self.kpt_id][:2]  # 確保取出的是有效的 [x, y] 數據
                     self.kpt_buffer.append(keypoint)
-
-        # if self.kpt_id and is_processed:
-        #     person_data = self.getPersonDf(is_select=True, is_kpt=True)
-        #     if person_data is not None:
-        #         keypoint = person_data[self.kpt_id][:2]  # 確保取出的是有效的 [x, y] 數據
-        #         self.kpt_buffer.append(keypoint)
 
         average_time = self.fps_timer.toc()
         fps = int(1/max(average_time, 0.00001))
@@ -343,11 +337,11 @@ class PoseEstimater:
 
     def setPersonId(self, person_id):
         self.person_id = person_id
-        print(self.person_id)
+        print(f'person id: {self.person_id}')
 
     def setKptId(self, kpt_id):
         self.kpt_id = kpt_id
-        print(self.kpt_id)
+        print(f'person id: {self.kpt_id}')
     
     def setPitchHandId(self,kpt_id):
         self.pitch_hand_id = kpt_id

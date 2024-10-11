@@ -38,8 +38,8 @@ class Model(object):
 
     def setDetectParser(self) -> ArgumentParser:
         parser = ArgumentParser()
-        parser.add_argument('--det-config', default='../mmyolo_main/configs/yolov8/yolov8_x_mask-refine_syncbn_fast_8xb16-500e_coco.py', help='Config file for detection')
-        parser.add_argument('--det-checkpoint', default='../../Db/pretrain/yolov8_x_syncbn_fast_8xb16-500e_coco_20230218_023338-5674673c.pth', help='Checkpoint file for detection')
+        parser.add_argument('--det-config', default='../mmyolo_main/configs/yolov8/yolov8_s_syncbn_fast_8xb16-500e_coco.py', help='Config file for detection')
+        parser.add_argument('--det-checkpoint', default='../../Db/pretrain/yolov8_s_syncbn_fast_8xb16-500e_coco_20230117_180101-5aa5f0f1.pth', help='Checkpoint file for detection')
         parser.add_argument(
         '--device', default='cuda:0', help='Device used for inference')
         parser.add_argument(

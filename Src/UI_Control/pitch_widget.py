@@ -11,6 +11,7 @@ from cv_utils.cv_control import Camera, VideoLoader
 from utils.selector import PersonSelector, KptSelector
 from utils.analyze import PoseAnalyzer, JointAreaChecker
 from ui_utils.table_control import KeypointTable
+from ui_utils.graphicview_control import FrameView
 import cv2
 from utils.vis_graph import GraphPlotter
 from utils.vis_image import ImageDrawer
@@ -69,6 +70,7 @@ class PosePitchTabControl(QWidget):
     def bindVideoUI(self):
         self.kpt_table = KeypointTable(self.ui.KptTable, self.pose_estimater)
         self.ui.KptTable.cellActivated.connect(self.kpt_table.onCellClicked)
+        self.frame_view = FrameView(self.ui.FrameView, self.view_scene, self.video_loader)
         self.ui.playBtn.clicked.connect(self.playBtnClicked)
         self.ui.backKeyBtn.clicked.connect(
             lambda: self.ui.frameSlider.setValue(self.ui.frameSlider.value() - 1)
@@ -240,6 +242,7 @@ class PosePitchTabControl(QWidget):
 
     def toggleShowSkeleton(self, state:int):
         """Toggle skeleton detection and FPS control."""
+        print("skeleton: "+ str(state))
         if state == 2 and self.ui.recordCheckBox.isChecked():
             self.ui.showSkeletonCheckBox.setCheckState(0)
             QMessageBox.warning(self, "無法選擇人", "請選擇顯示人體骨架!")
@@ -275,7 +278,8 @@ class PosePitchTabControl(QWidget):
     
     def changeCamera(self):
         """Change the camera based on input value."""
-        self.camera.setCameraId(self.ui.cameraIdInput.value())
+        if self.camera is not None:
+            self.camera.setCameraId(self.ui.cameraIdInput.value())
 
     def analyzeFrame(self):
         """Analyze and process each frame from the camera or video"""
@@ -305,7 +309,6 @@ class PosePitchTabControl(QWidget):
                 
         self.ui.FPSInfoLabel.setText(f"{fps:02d}")
     
-
     def handleVideoEnd(self):
         """Handle the logic when video reaches its end."""
         self.play_times -= 1
@@ -320,14 +323,17 @@ class PosePitchTabControl(QWidget):
             # Stop playback and reset
             self.playBtnClicked()
             self.ui.cameraCheckBox.setCheckState(2)
+            self.ui.showSkeletonCheckBox.setCheckState(0)
+            self.ui.showSkeletonCheckBox.setCheckState(2)
+            self.play_times = 2
 
     def pitherAnaylze(self):
         if self.record_checker is not None:
             pos = self.pose_estimater.getPrePersonDf()
             if self.record_checker.is_joint_in_area(pos):
-                self.initCountdownTimer(4)
+                self.initCountdownTimer(2)
         else:
-            self.initRecorderTimer(4)
+            self.initRecorderTimer(2)
 
     def initCountdownTimer(self, duration:int):
         if self.countdown_timer is None:
@@ -420,9 +426,14 @@ class PosePitchTabControl(QWidget):
         self.ui.frameSlider.setValue(0)
         self.ui.frameNumLabel.setText(f'0/{total_frames - 1}')
 
+    def resetFrameSlider(self):
+        self.ui.frameSlider.setValue(0)
+        self.ui.frameSlider.setRange(0, 0)
+
     def initGraph(self):
         """初始化圖表和模型設定。"""
         total_frames = self.video_loader.total_frames
+        print("video frames: "+ str(total_frames))
         self.graph_plotter._init_graph(total_frames) 
         self.showGraph(self.curve_scene, self.ui.CurveView)
 
@@ -439,12 +450,17 @@ class PosePitchTabControl(QWidget):
         self.pose_analyzer.reset()
         self.graph_plotter.reset()
         self.image_drawer.reset()
+        self.resetFrameSlider()
         self.view_scene.clear()
         self.curve_scene.clear()
 
     def showImage(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
         """Display an image in the QGraphicsView."""
         scene.clear()
+        if image is None:
+            print(self.video_loader.total_frames)
+            # print(self.video_loader.video_frames)
+            exit()
         h, w = image.shape[:2]
         qImg = QImage(image, w, h, 3 * w, QImage.Format_RGB888).rgbSwapped()
         pixmap = QPixmap.fromImage(qImg)
