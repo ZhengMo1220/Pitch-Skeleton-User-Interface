@@ -49,8 +49,10 @@ class PosePitchTabControl(QWidget):
         pg.setConfigOption('foreground', 'k')
 
     def setupComponents(self): 
-        self.camera = None
-        self.timer = None
+        self.camera = Camera()
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.analyzeFrame)
+
         self.countdown_timer = None
         self.record_checker = None
         self.record_timer = None
@@ -59,6 +61,14 @@ class PosePitchTabControl(QWidget):
         self.graph_plotter = GraphPlotter(self.pose_analyzer)
         self.image_drawer = ImageDrawer(self.pose_estimater, self.pose_analyzer)
         self.video_loader = VideoLoader(self.image_drawer)
+
+    def resizeEvent(self, event):
+        new_size = event.size()
+        print(f"PoseCameraTabControl resized to: {new_size.width()}x{new_size.height()}")
+        # 在此執行你想要的操作
+        if self.video_loader.video_name is not None:
+            self.updateFrame(frame_num=self.ui.frameSlider.value())
+        super().resizeEvent(event)  
 
     def bindUI(self):
         """Bind UI element to their corresponding functions."""
@@ -145,9 +155,6 @@ class PosePitchTabControl(QWidget):
             self.ui.showAngleCheckBox.setCheckState(0)
             self.ui.selectCheckBox.setCheckState(0)
             self.ui.selectKptCheckBox.setCheckState(0)
-            self.camera = Camera()
-            self.timer = QTimer()
-            self.timer.timeout.connect(self.analyzeFrame)
             self.is_video = False
             frame_width, frame_height, fps = self.camera.toggleCamera(True)
             self.model.setImageSize((frame_width, frame_height))
@@ -164,8 +171,6 @@ class PosePitchTabControl(QWidget):
             self.curve_scene.clear()
             self.is_video = True
             self.videoSilder(visible=True)
-            self.camera = None
-            self.timer = None
 
     def togglePitching(self, state):
         if state == 2:
@@ -174,13 +179,8 @@ class PosePitchTabControl(QWidget):
                 QMessageBox.warning(self, "無法開始投球模式", "請先開啟相機")
                 return
             if not self.ui.showSkeletonCheckBox.isChecked():
-                self.ui.startPitchCheckBox.setCheckState(0)
-                QMessageBox.warning(self, "無法開始投球模式", "請選擇顯示人體骨架!")
-                return
-            if not self.ui.selectCheckBox.isChecked():
-                self.ui.startPitchCheckBox.setCheckState(0)
-                QMessageBox.warning(self, "無法開始投球模式", "請選擇人!")
-                return
+                self.ui.showSkeletonCheckBox.setCheckState(2)
+             
             self.is_pitching = True
             self.record_checker = JointAreaChecker(self.camera.frame_size)
         else:
@@ -304,6 +304,9 @@ class PosePitchTabControl(QWidget):
                 frame = self.camera.frame_buffer.get().copy()
                 _, _, fps = self.pose_estimater.detectKpt(frame, is_video=False)
                 if self.is_pitching:
+                    if self.ui.startPitchCheckBox.isChecked() and not self.ui.recordCheckBox.isChecked() and self.pose_estimater.person_id is None:
+                        self.ui.selectCheckBox.setCheckState(0)
+                        self.ui.selectCheckBox.setCheckState(2)
                     self.pitherAnaylze()
                 self.updateFrame(frame=frame)
                 
@@ -325,13 +328,16 @@ class PosePitchTabControl(QWidget):
             self.ui.cameraCheckBox.setCheckState(2)
             self.ui.showSkeletonCheckBox.setCheckState(0)
             self.ui.showSkeletonCheckBox.setCheckState(2)
+            self.ui.selectCheckBox.setCheckState(2)
+            self.ui.startPitchCheckBox.setCheckState(2)
             self.play_times = 2
 
     def pitherAnaylze(self):
         if self.record_checker is not None:
             pos = self.pose_estimater.getPrePersonDf()
-            if self.record_checker.is_joint_in_area(pos):
-                self.initCountdownTimer(2)
+            if self.pose_estimater.setPersonId is not None:
+                if self.record_checker.is_joint_in_area(pos):
+                    self.initCountdownTimer(2)
         else:
             self.initRecorderTimer(2)
 
@@ -358,6 +364,7 @@ class PosePitchTabControl(QWidget):
         countdown_time = self.updateTimers() 
         drawed_img = self.image_drawer.drawInfo(frame, frame_num, self.pose_estimater.kpt_buffer, countdown_time)
         self.showImage(drawed_img, self.view_scene, self.ui.FrameView)
+        self.graph_plotter.resize_graph(self.ui.CurveView.width(),self.ui.CurveView.height())
 
     def updateTimers(self):
         countdown_time = None

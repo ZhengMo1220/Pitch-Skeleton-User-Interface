@@ -61,6 +61,9 @@ class GraphPlotter():
         # Add the scatter plot to the graph
         self.graph.addItem(scatter)
     
+    def resize_graph(self,width, height):
+        self.graph.resize(width, height)
+
     def setAngleName(self, angle_name):
         self.angle_name = angle_name
     

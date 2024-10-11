@@ -44,6 +44,13 @@ class PoseVideoTabControl(QWidget):
         pg.setConfigOption('background', 'w')
         pg.setConfigOption('foreground', 'k')
 
+    def resizeEvent(self, event):
+        new_size = event.size()
+        # 在此執行你想要的操作
+        if self.video_loader.video_name is not None:
+            self.updateFrame(self.ui.frameSlider.value())
+        super().resizeEvent(event)  
+
     def initFrameSlider(self):
         """初始化影片滑桿和相關的標籤。"""
         total_frames = self.video_loader.total_frames
@@ -121,7 +128,7 @@ class PoseVideoTabControl(QWidget):
             elif event.button() == Qt.RightButton:
                 self.kpt_table.sendToTable(0, 0, 0, self.ui.frameSlider.value())
         if self.video_loader.video_name is not None:
-            self.updateFrame(self.ui.frameSlider.value())
+            self.updateFrame(frame_num=self.ui.frameSlider.value())
 
     def keyPressEvent(self, event):
         if event.key() == ord('D') or event.key() == ord('d'):
@@ -240,6 +247,7 @@ class PoseVideoTabControl(QWidget):
         image = self.video_loader.getVideoImage(frame_num)
         drawed_img = self.image_drawer.drawInfo(image, frame_num, self.pose_estimater.kpt_buffer)
         self.showImage(drawed_img, self.view_scene, self.ui.FrameView)
+        self.graph_plotter.resize_graph(self.ui.CurveView.width(),self.ui.CurveView.height())
     
     def toggleDetect(self):
         self.ui.showSkeletonCheckBox.setChecked(True)

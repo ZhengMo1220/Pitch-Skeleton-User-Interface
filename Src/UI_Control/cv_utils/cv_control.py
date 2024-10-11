@@ -84,6 +84,7 @@ class Camera:
 
     def setCameraId(self, new_idx: int):
         self.camera_idx = new_idx
+        print(f'camera id: {self.camera_idx}')
 
     def setFPSControl(self, fps:int):
         self.fps_control = fps
