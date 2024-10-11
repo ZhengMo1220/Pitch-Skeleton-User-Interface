@@ -153,9 +153,9 @@ class ImageDrawer():
         
         # 設置文字的大小、顏色與位置
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 4
+        font_scale = 20
         color = (0, 0, 255)  # 紅色
-        thickness = 8
+        thickness = 15
 
         # 計算文字的邊界框來居中顯示
         text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]

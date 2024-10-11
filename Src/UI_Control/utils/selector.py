@@ -27,11 +27,6 @@ class PersonSelector:
             if area > max_area:
                 max_area = area
                 self.selected_id = person_id
-
-    
-    def get_select_id(self):
-        print(self.selected_id)
-        return self.selected_id
     
     def reset(self):
         self.selected_id = None
@@ -59,10 +54,6 @@ class KptSelector:
                     selected_id = kpt_id
 
         self.selected_id = selected_id
-    
-    def get_select_id(self):
-        print(self.selected_id)
-        return self.selected_id
 
     def reset(self):
         self.selected_id = None
