@@ -5,11 +5,11 @@
 1. Clone this repo.
 2. Setup conda environment:
     ```
-    conda create -n Pitcher python=3.7 -y
+    conda create -n Pitcher python=3.8 -y
     conda activate Pitcher
     pip install -r requirements.txt
-    # CUDA 11.7
-    pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
+    # CUDA 11.8
+    conda install pytorch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 pytorch-cuda=11.8 -c pytorch -c nvidia
     # 需要去環境中將anaconda3\envs\your_envs_name\libiomp5md.dll刪除，不然會跳warning
     conda install -c conda-forge faiss-gpu
     pip install cython_bbox
@@ -37,10 +37,7 @@
     ```
 7. Setup mmengine_main environment:
     ```
-    cd Src\mmengine_main
-    pip install -r requirements.txt
-    pip install -v -e .
-    cd ..\..\
+    mim install mmengine
     ```
 8. Setup mmpretrain_main environment:
     ```
