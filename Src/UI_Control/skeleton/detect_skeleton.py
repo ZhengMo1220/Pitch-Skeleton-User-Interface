@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import pandas as pd
 from utils.one_euro_filter import OneEuroFilter
@@ -12,7 +13,6 @@ from mmpose.apis import init_model as init_pose_estimator
 from mmpose.evaluation.functional import nms
 from mmpose.structures import merge_data_samples
 from utils.timer import FPSTimer
-
 import torch
 import torch.autograd.profiler as profiler
 
@@ -117,9 +117,10 @@ class PoseEstimater:
                 "right_points_indices": [[6, 18], [6, 8], [8, 10], [19, 12], [12, 14], [14, 16], [21, 25], [23, 25], [16, 25]],  # Indices of right hand, leg, and foot keypoints
                 "angle_dict":{
                     # 'l_elbow_angle': [5, 7, 9],
-                    '右手肘': [6, 8, 10]
+                    '右手肘': [6, 8, 10],
                     # 'l_shoulder_angle': [18, 5, 7],
-                    # 'r_shoulder_angle': [18, 6, 8],
+                    '右肩膀': [18, 6, 8],
+                    '右腋窩': [8, 6, 19]
                     # 'l_knee_angle': [11, 13, 15],
                     # 'r_knee_angle': [12, 14, 16]
                 }
@@ -154,6 +155,7 @@ class PoseEstimater:
   
     def detectKpt(self, image:np.ndarray, frame_num:int = None, is_video:bool = False, is_processed:bool=False):
         if not self.is_detect:
+            # print('not detect')
             return image, pd.DataFrame(), 0
 
         fps = 0
@@ -162,15 +164,15 @@ class PoseEstimater:
         if is_video: 
             #影片處理方式
             if frame_num not in self.processed_frames:
-                pred_instances, person_ids = self.processImage(self.model, image, select_id=self.person_id)
+                pred_instances, person_ids = self.processImage(image, select_id=self.person_id)
                 self.person_df = self.mergePersonData(pred_instances, person_ids, frame_num)
                 self.smoothKpt(person_ids, frame_num)
                 self.processed_frames.add(frame_num)
             if self.kpt_id is not None:
-                self.kpt_buffer = self.updateKptBuffer(frame_num)
+                self.kpt_buffer = self.updateKptBuffer(frame_num)                      
         else:
             #real time 處理方式
-            pred_instances, person_ids = self.processImage(self.model, image, select_id=self.person_id)
+            pred_instances, person_ids = self.processImage(image, select_id=self.person_id)
             self.person_df = self.mergePersonData(pred_instances, person_ids)
             self.smoothKpt(person_ids, frame_num)
             self.pre_person_df = self.person_df.copy()
@@ -234,7 +236,8 @@ class PoseEstimater:
             # 更新當前幀的數據
             self.person_df.at[curr_person_data.index[0], 'keypoints'] = smoothed_kpts
            
-    def processImage(self, model, img, select_id=None):
+
+    def processImage(self, img, select_id=None):
         """
         處理單張圖像，進行物件偵測、跟蹤和姿態估計。
 
@@ -248,29 +251,38 @@ class PoseEstimater:
         """
        
         # 進行物件偵測
-        
-        result = inference_detector(model.detector, img, test_pipeline= model.detector_test_pipeline)
-        
-        pred_instances = result.pred_instances
-        det_result = pred_instances[pred_instances.scores > model.detect_args.score_thr].cpu().numpy()
-        
-        # 篩選指定類別的邊界框
-        bboxes = det_result.bboxes[det_result.labels == model.detect_args.det_cat_id]
-        scores = det_result.scores[det_result.labels == model.detect_args.det_cat_id]
-        bboxes = bboxes[nms(np.hstack((bboxes, scores[:, None])), model.detect_args.nms_thr), :4]
-        # 將新偵測的邊界框更新到跟蹤器
-        online_targets = model.tracker.update(
-            np.hstack((bboxes, np.full((bboxes.shape[0], 2), [0.9, 0]))), img.copy()
-        )
     
+        result = inference_detector(self.model.detector, img, test_pipeline= self.model.detector_test_pipeline) # prediction
+        pred_instances = result.pred_instances
+        det_result = pred_instances[pred_instances.scores > self.model.detect_args.score_thr].cpu().numpy()
+        # 篩選指定類別的邊界框
+        bboxes = det_result.bboxes[det_result.labels == self.model.detect_args.det_cat_id]
+        scores = det_result.scores[det_result.labels == self.model.detect_args.det_cat_id]
+        bboxes = bboxes[nms(np.hstack((bboxes, scores[:, None])), self.model.detect_args.nms_thr), :4]
+        # 將新偵測的邊界框更新到跟蹤器
+        online_targets = []
+        track_id = 1  # 手动编号 track_id
+
+        for bbox in bboxes:
+            x1, y1, x2, y2 = bbox  # bbox 是 [x1, y1, x2, y2]
+            w = x2 - x1
+            h = y2 - y1
+            tlwh = [x1, y1, w, h]  # 转换为 tlwh 格式
+            
+            online_targets.append({
+                'tlwh': tlwh,   # 原本 tracker 提供的 tlwh
+                'track_id': track_id  # 人工分配 track_id
+            })
+            track_id += 1  # 递增 ID
+
         # 過濾出有效的邊界框和追蹤ID
-        online_bbox, online_ids = self.filterValidTargets(online_targets, select_id)
+        # online_bbox, online_ids = self.filterValidTargets(online_targets, select_id)
+        online_bbox, online_ids = self.filterBiggestTargets(online_targets, select_id)
 
         # 姿態估計
-        pose_results = inference_topdown(model.pose_estimator, img, np.array(online_bbox))
+        pose_results = inference_topdown(self.model.pose_estimator, img, np.array(online_bbox))
         data_samples = merge_data_samples(pose_results)
         
-    
         return data_samples.get('pred_instances', None), online_ids
     
     def filterValidTargets(self, online_targets, select_id: int = None):
@@ -323,6 +335,53 @@ class PoseEstimater:
         # 返回結果
         return valid_bbox.cpu().tolist(), valid_track_ids.cpu().tolist()
 
+    def filterBiggestTargets(self, online_targets, select_id: int = None):
+        if not online_targets:
+            return [], []
+
+        tlwhs = []
+        track_ids = []
+
+        for target in online_targets:
+            tlwhs.append(target['tlwh'])  # 使用字典的 'tlwh' 键
+            track_ids.append(target['track_id'])  # 使用字典的 'track_id' 键
+
+        # 轉換為 NumPy array
+        tlwhs = np.array(tlwhs)
+        track_ids = np.array(track_ids)
+
+        # 將數據轉為張量並放到 GPU 上
+        tlwhs = torch.tensor(tlwhs, device='cuda')  # shape: (n, 4)
+        track_ids = torch.tensor(track_ids, device='cuda')  # shape: (n,)
+
+        # 計算面積 w * h
+        areas = tlwhs[:, 2] * tlwhs[:, 3]  # w * h
+
+        # 過濾掉面積過小的
+        valid_mask = areas > 10
+
+        if select_id is not None:
+            valid_mask &= (track_ids == select_id)  # 確保符合 select_id
+
+        # 過濾有效數據
+        valid_tlwhs = tlwhs[valid_mask].cpu()
+        valid_track_ids = track_ids[valid_mask].cpu()
+        valid_areas = areas[valid_mask].cpu()
+
+        if len(valid_tlwhs) == 0:
+            return [], []
+
+        # 找出面積最大的索引
+        max_idx = torch.argmax(valid_areas).item()
+
+
+        # 轉換 (x, y, w, h) -> (x1, y1, x2, y2)
+        max_tlwh = valid_tlwhs[max_idx]
+        max_bbox = [max_tlwh[0], max_tlwh[1], max_tlwh[0] + max_tlwh[2], max_tlwh[1] + max_tlwh[3]]
+        max_id = valid_track_ids[max_idx]
+
+        return [max_bbox], [1]
+
     def correct_person_id(self, before_correctId:int, after_correctId:int):
         if self.person_df.empty:
             return
@@ -341,7 +400,7 @@ class PoseEstimater:
 
     def setKptId(self, kpt_id):
         self.kpt_id = kpt_id
-        print(f'person id: {self.kpt_id}')
+        # print(f'kpt id: {self.kpt_id}')
     
     def setPitchHandId(self,kpt_id):
         self.pitch_hand_id = kpt_id
@@ -349,7 +408,7 @@ class PoseEstimater:
     def setDetect(self, status:bool):
         self.is_detect = status
 
-    def updateKptBuffer(self, frame_num:int, window_length=17, polyorder=2):
+    def updateKptBuffer(self, frame_num:int, window_length=3, polyorder=2):
         filtered_df = self.person_df[
             (self.person_df['person_id'] == self.person_id) & 
             (self.person_df['frame_number'] < frame_num)
@@ -407,20 +466,18 @@ class PoseEstimater:
 
         return data
     
-    def getPrePersonDf(self):
+    def getPrePersonDf(self, *joint_ids):
         if self.pre_person_df.empty:
-            return pd.DataFrame()
-        condition = pd.Series([True] * len(self.pre_person_df))  # 初始條件設為全為 True
-
-        condition &= (self.pre_person_df['person_id'] == self.person_id)
- 
-        data = self.pre_person_df.loc[condition].copy()
+            return tuple(None for _ in joint_ids)
+        
+        condition = self.pre_person_df['person_id'] == self.person_id
+        data = self.pre_person_df.loc[condition]
         
         if data.empty:
-            return None
-
-        data = data['keypoints'].iloc[0][self.pitch_hand_id]
-        return (data[0], data[1])
+            return tuple(None for _ in joint_ids)
+        
+        joint_data = tuple(data['keypoints'].iloc[0][joint_id] for joint_id in joint_ids)
+        return joint_data
     
     def setProcessedData(self, person_df:pd.DataFrame):
         if person_df.empty:

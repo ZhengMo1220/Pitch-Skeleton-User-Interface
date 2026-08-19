@@ -8,19 +8,15 @@ import os
 from camera_ui import Ui_camera_ui
 from datetime import datetime
 from cv_utils.cv_control import Camera
-from utils.selector import PersonSelector, KptSelector
-from utils.vis_image import ImageDrawer
-from skeleton.detect_skeleton import PoseEstimater
-from utils.model import Model
 
 class PoseCameraTabControl(QWidget):
-    def __init__(self, model:Model, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.ui = Ui_camera_ui()
         self.ui.setupUi(self)
-        self.model = model
+        # self.model = model
+        # self.init_pose_estimater()
         self.initVar()
-        self.init_pose_estimater()
         self.bindUI()
 
     def initVar(self):
@@ -29,31 +25,23 @@ class PoseCameraTabControl(QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.analyzeFrame)
         self.camera_scene = QGraphicsScene()
-
-    def init_pose_estimater(self):
-        """Initialize the pose estimator and related components."""
-        self.person_selector = PersonSelector()
-        self.kpt_selector = KptSelector()
-        self.pose_estimater = PoseEstimater(self.model)
-        self.image_drawer = ImageDrawer(self.pose_estimater)
+        self.camera_scene_2 = QGraphicsScene()
+        self.last_frame_cf = None
+        self.last_frame_cs = None
 
     def bindUI(self):
         """Bind UI elements to their corresponding functions."""
         self.ui.cameraCheckBox.stateChanged.connect(self.toggleCamera)
         self.ui.recordCheckBox.stateChanged.connect(self.toggleRecord)
-        self.ui.selectCheckBox.stateChanged.connect(self.toggleSelect)
-        self.ui.showSkeletonCheckBox.stateChanged.connect(self.toggleShowSkeleton)
-        self.ui.selectKptCheckBox.stateChanged.connect(self.toggleKptSelect)
-        self.ui.showBboxCheckBox.stateChanged.connect(self.toggleShowBbox)
-        self.ui.showLineCheckBox.stateChanged.connect(self.toggleShowGrid)
         self.ui.CameraIdInput.valueChanged.connect(self.changeCamera)
+        self.ui.pictureButton.clicked.connect(self.savePicture)
 
     def toggleCamera(self, state:int):
         """Toggle the camera on/off based on checkbox state."""
         if state == 2:
-            frame_width, frame_height, fps = self.camera.toggleCamera(True)
-            self.model.setImageSize((frame_width, frame_height))
-            self.ui.ResolutionLabel.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
+            # frame_width, frame_height, fps = 
+            self.camera.toggleCamera(True)
+            # self.ui.ResolutionLabel.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
             self.timer.start(1)
         else:
             self.camera.toggleCamera(False)
@@ -72,47 +60,10 @@ class PoseCameraTabControl(QWidget):
         current_time = datetime.now().strftime("%Y%m%d_%H%M")
         output_dir = f'../../Db/Record/C{self.ui.CameraIdInput.value()}_Fps120_{current_time}'
         os.makedirs(output_dir, exist_ok=True)
-        video_filename = os.path.join(output_dir, f'C{self.ui.CameraIdInput.value()}_Fps120_{current_time}.mp4')
+        video_filename = os.path.join(output_dir, f'CF_{current_time}.mp4')
+        video_filename_2 = os.path.join(output_dir, f'CS_{current_time}.mp4')
         self.ui.showSkeletonCheckBox.setChecked(False)
-        self.camera.startRecording(video_filename)
-
-    def toggleSelect(self, state:int):
-        """Select a person based on checkbox state."""
-        if not self.ui.showSkeletonCheckBox.isChecked():
-            self.ui.selectCheckBox.setCheckState(0)
-            QMessageBox.warning(self, "無法選擇人", "請選擇顯示人體骨架!")
-            return
-        if state == 2:
-            self.person_selector.select(search_person_df = self.pose_estimater.pre_person_df)
-            self.pose_estimater.setPersonId(self.person_selector.selected_id)
-        else:
-            self.pose_estimater.setPersonId(None)
-
-    def toggleKptSelect(self, state:int):
-        """Toggle keypoint selection and trajectory visualization."""
-        if not self.ui.selectCheckBox.isChecked():
-            self.ui.selectKptCheckBox.setCheckState(0)
-            QMessageBox.warning(self, "無法選擇關節點", "請選擇人!")
-            return
-        is_checked = state == 2
-        self.pose_estimater.setKptId(10 if is_checked else None)
-        self.pose_estimater.clearKptBuffer()
-        self.image_drawer.setShowTraj(is_checked)
-
-    def toggleShowSkeleton(self, state:int):
-        """Toggle skeleton detection and FPS control."""
-        is_checked = state == 2
-        self.pose_estimater.setDetect(is_checked)
-        self.image_drawer.setShowSkeleton(is_checked)
-        self.camera.setFPSControl(15 if is_checked else 1)
-
-    def toggleShowBbox(self, state:int):
-        """Toggle bounding box visibility."""
-        self.image_drawer.setShowBbox(state == 2)
-
-    def toggleShowGrid(self, state:int):
-        """Toggle gridline visibility."""
-        self.image_drawer.setShowGrid(state == 2)
+        self.camera.startRecording(video_filename, video_filename_2)
 
     def changeCamera(self):
         """Change the camera based on input value."""
@@ -120,16 +71,57 @@ class PoseCameraTabControl(QWidget):
 
     def analyzeFrame(self):
         """Analyze and process each frame from the camera."""
-        if not self.camera.frame_buffer.empty():
+        if not self.camera.frame_buffer.empty() and not self.camera.frame_buffer_2.empty():
             frame = self.camera.frame_buffer.get().copy()
-            _, _, fps = self.pose_estimater.detectKpt(frame, is_video=False)
-            self.ui.FPSInfoLabel.setText(f"{fps:02d}")
-            self.update_frame(frame)
+            frame_2 = self.camera.frame_buffer_2.get().copy()
+            self.last_frame_cf = frame.copy()
+            self.last_frame_cs = frame_2.copy()
+            # _, _, fps = self.pose_estimater.detectKpt(frame, is_video=False)
+            # self.ui.FPSInfoLabel.setText(f"{fps:02d}")
+            self.update_frame(frame, frame_2)
 
-    def update_frame(self, frame: np.ndarray):
+    def savePicture(self):
+        """Save current CF/CS snapshots from latest buffered frames."""
+        if self.last_frame_cf is None or self.last_frame_cs is None:
+            QMessageBox.warning(self, "無法儲存照片", "目前沒有可儲存的影像，請先開啟相機。")
+            return
+
+        output_dir = f'../../Db/Record/Calibrate_Picture'
+        cf_dir = os.path.join(output_dir, 'cf')
+        cs_dir = os.path.join(output_dir, 'cs')
+        os.makedirs(cf_dir, exist_ok=True)
+        os.makedirs(cs_dir, exist_ok=True)
+
+        # Use shared running index so cf/cs are always paired (01, 02, ...).
+        max_idx = 0
+        for d in (cf_dir, cs_dir):
+            for name in os.listdir(d):
+                stem, ext = os.path.splitext(name)
+                if ext.lower() not in ('.jpg', '.jpeg', '.png'):
+                    continue
+                if stem.isdigit():
+                    max_idx = max(max_idx, int(stem))
+
+        next_idx = max_idx + 1
+        filename = f"{next_idx:02d}.jpg"
+        cf_path = os.path.join(cf_dir, filename)
+        cs_path = os.path.join(cs_dir, filename)
+
+        # QImage 顯示用 rgbSwapped，這裡直接用原始 BGR frame 儲存即可。
+        ok_cf = cv2.imwrite(cf_path, self.last_frame_cf)
+        ok_cs = cv2.imwrite(cs_path, self.last_frame_cs)
+
+        if ok_cf and ok_cs:
+            # QMessageBox.information(self, "照片已儲存", f"CF: {cf_path}\nCS: {cs_path}")
+            pass
+        else:
+            QMessageBox.warning(self, "儲存失敗", "照片儲存失敗，請確認資料夾權限或磁碟空間。")
+
+    def update_frame(self, frame: np.ndarray, frame_2: np.ndarray):
         """Update the displayed frame with additional analysis."""
-        drawed_img = self.image_drawer.drawInfo(img = frame, kpt_buffer = self.pose_estimater.kpt_buffer)
-        self.showImage(drawed_img, self.camera_scene, self.ui.FrameView)
+        # drawed_img = self.image_drawer.drawInfo(img = frame, kpt_buffer = self.pose_estimater.kpt_buffer)
+        self.showImage(frame, self.camera_scene, self.ui.FrameView)
+        self.showImage(frame_2, self.camera_scene_2, self.ui.FrameView_2)
 
     def showImage(self, image: np.ndarray, scene: QGraphicsScene, GraphicsView: QGraphicsView):
         """Display an image in the QGraphicsView."""
