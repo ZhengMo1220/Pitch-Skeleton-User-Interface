@@ -1,0 +1,24 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+rapsodo_data.json
+backup/
+*.log
+rapsodo_ocr.log
+test_frame.png
+
+# One-shot verification logs produced by redirecting tools/video_player.py
+# stdout+stderr during Fix 2 / Fix 3 verification runs (run_log.txt,
+# run_log2.txt, run_log3a.txt, run_log3b.txt, ...).
+run_log*.txt
+
+# Runtime-generated OCR diagnostic artefacts (failure crops, trigger frames,
+# run logs). These are produced every time tools/video_player.py runs and
+# must not be committed — see CHANGELOG修正 3 for the debug pipeline.
+debug/
+
+# One-shot investigation tools kept on disk but excluded from git, matching
+# how tools/experiment_tesseract_psm.py was handled during Fix 1.
+tools/debug_ev_null.py
+.claude/
