@@ -1,6 +1,12 @@
 import sys
 import os
+os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.path.join(os.environ["CONDA_PREFIX"], "Library", "plugins", "platforms")
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout
+
+# vispy 必須在 PySpin 等第三方 DLL 被載入前鎖定 Qt 後端，
+# 否則 PySpin 附帶的 DLL 會與 Qt 的 QtOpenGL 衝突，導致載入失敗。
+import vispy
+vispy.use('pyqt5')
 
 from camera_widget import PoseCameraTabControl
 from video_widget_2 import PoseVideoTabControl
