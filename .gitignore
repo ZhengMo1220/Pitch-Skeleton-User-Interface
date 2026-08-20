@@ -163,3 +163,7 @@ cython_debug/
 Db
 Src/mmpose_main/work_dirs
 Src/mmpose_main/data
+
+# Machine-specific runtime caches / test media (too large for GitHub's 100MB limit)
+Src/UI_Control/trt_cache/
+Src/UI_Control/rapsodo_data_extraction/K_zone/input.mp4
