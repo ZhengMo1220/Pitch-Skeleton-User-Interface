@@ -27,8 +27,13 @@
 
 ## 第五階段：MSI EdgeXpert（Grace Blackwell / ARM64）遷移評估
 
-- [ ] **確認 FLIR 官方是否有 ARM64 Linux 版 Spinnaker SDK** — 整個遷移能否成立的前提，需向 FLIR 官網或代理商確認
-- [ ] **重新建置 ARM64 Linux 版完整套件環境** — 待上一項確認可行後才需要進行，預期許多 Windows 預編譯 wheel 沒有對應版本，需從源碼編譯
+> 測試流程與檢查點見 [GB10_CAMERA_TEST_PLAN.md](GB10_CAMERA_TEST_PLAN.md)（老師交辦：確認相機能否在 GB10 上被偵測並擷取畫面）。
+
+- [x] **確認 FLIR 官方是否有 ARM64 Linux 版 Spinnaker SDK** — 有，廠商已提供 `spinnaker-4.4.0.246-noble-arm64-pkg.tar.gz`，明確支援 Ubuntu 24.04/22.04 LTS + ARM64
+- [ ] **確認該 SDK 是否含 Python 綁定（PySpin）** — 目前拿到的壓縮檔僅含 C/C++ 函式庫與 GUI 工具，無 Python 綁定，已詢問廠商、等待回覆
+- [ ] **確認 GB10 DGX OS 的實際 Ubuntu 基礎版本** — 決定廠商 SDK 能否直接安裝，機器到手後第一步要做的檢查
+- [ ] **在 GB10 上實測相機偵測與畫面擷取**（僅需 C++ SDK，不需等 Python 綁定）— 按測試計畫階段 0-2 執行
+- [ ] **重新建置 ARM64 Linux 版完整套件環境** — 待上述硬體驗證通過、且取得 Python 綁定後才需要進行，範圍是把整套 GUI 系統移植過去，時間成本高得多，不併入老師交辦的硬體驗證任務
 
 ---
 
