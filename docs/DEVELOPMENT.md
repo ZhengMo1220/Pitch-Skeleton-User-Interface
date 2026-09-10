@@ -74,8 +74,9 @@ self.camera2 = FlirCameraSystem(CONFIG_2, SN2)
 ### 相機規格參考（`camera_config/*.yaml`）
 
 - 解析度 1920×1084，179fps，`BayerRG8` 原始格式（需程式端做色彩還原，對應 UI 上的曝光/紅色/藍色調色滑桿）
-- 透過 GPIO 硬體訊號線做多相機同步觸發（Primary 輸出 `ExposureActive` 訊號、Secondary 由 `Line3` 接收觸發），非純軟體時間戳記同步
-- 目前程式僅支援兩台相機（側面視角），無第三支相機（正面視角）的處理邏輯
+- 透過 GPIO 硬體訊號線做多相機同步觸發：`camera1`（正面）在 `DualFlirSystem.__init__` 中被設為 Primary（`configure_gpio_primary()`，輸出 `ExposureActive` 訊號），`camera2`（側面）被設為 Secondary（`configure_gpio_secondary()`，由 `Line3` 接收觸發），非純軟體時間戳記同步
+- **已實測驗證**：僅接 USB 資料線、未接 GPIO 同步線時，Secondary 相機會因等不到觸發訊號而逾時（`Failed waiting for EventData on NEW_BUFFER_DATA event`）；接上同步線後雙機可正常同步擷取畫面
+- 目前程式僅支援兩台相機（正面 + 側面各一），無第二支側面相機（論文原始架構為 2 側面 + 1 正面）的處理邏輯
 
 ## 背景：系統設計依據
 
@@ -83,7 +84,27 @@ self.camera2 = FlirCameraSystem(CONFIG_2, SN2)
 
 - 原始硬體架設：3 部高速工業相機（2 側面 + 1 正面）+ Rapsodo Pro 2.0 投球追蹤系統（獨立設備，量測結果未納入本系統演算法）
 - 核心流程：雙攝影機校正（Zhang's method）→ YOLOv11+ViTPose 2D 骨架偵測 → 三角測量重建 3D 骨架 → 投球四階段切分（Foot Contact / Maximum External Rotation / Ball Release）→ 生物力學參數計算（肩髖分離角、肩外旋角、手腕速度等）
-- 系統架構採「即時擷取（Live）」與「離線分析（Replay）」分離設計，避免即時運算拖慢影像擷取效能——這也是目前 GUI 相機分頁不涉及即時骨架推論的設計依據
+- 系統架構採「即時擷取（Live）」與「離線分析（Replay）」分離設計，避免即時運算拖慢影像擷取效能
+
+### 鏡頭規格（論文表 22）
+
+| 位置 | 型號 | 焦距 | 光圈 | 用途 |
+|---|---|---|---|---|
+| c1, c2（側面 ×2） | KOWA LM8HC | 8mm | F/1.8 | 視角較大，完整涵蓋投手從抬腿到跟隨動作的整個過程 |
+| c3（正面） | KOWA LM50HC | 50mm | F/1.4 | 較高人體解析度，提升關節辨識品質 |
+
+> 曾誤判正面鏡頭為 75mm——那是設備交接清單裡的庫存/歷史紀錄，非論文正式採用規格。查證鏡頭焦距等硬體規格時，以論文本文為準，交接清單僅供財產追蹤參考。
+
+### GUI 分頁與即時操作的實際對應關係
+
+依交接文件《交接程式操作文件_Ui》第 10 節：**`Src/UI_Control/camera_widget.py`（「2D 相機」分頁）目前入口未啟用**，是獨立於主流程之外的備用實作。真正的雙攝影機即時操作、自動投球偵測、自動錄影，是整合在 **「2D」分頁**（`PosePitchTabControl`，即 `pitch_widget.py`）裡的 `cameraCheckBox`（開啟相機）/`startPitchCheckBox`（開始投球）等控制項。
+
+雙視角畫面的左右對應（追蹤自 `cv_thread.py` → `DualFlirSystem.get_grayscale_images()` → `pitch_widget.py updateFrame()`，並經論文原文「介面左上方提供正面攝影機與側面攝影機之同步播放畫面」交叉驗證）：
+
+| 畫面位置 | UI 元件 | 對應相機 | 序號 |
+|---|---|---|---|
+| 左邊 | `FrameView` | 正面攝影機（camera1） | `25462483` |
+| 右邊 | `FrameView_2` | 側面攝影機（camera2） | `25462481` |
 
 ## Git 歷史說明
 
