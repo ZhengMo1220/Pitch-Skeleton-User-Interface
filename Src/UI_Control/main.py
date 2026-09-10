@@ -24,8 +24,8 @@ class Main(QMainWindow):
         self.init_tabs()
 
     def init_tabs(self):
-        # self.camera_tab = PoseCameraTabControl()
-        # self.ui.Two_d_Tab.addTab(self.camera_tab, "2D 相機")
+        self.camera_tab = PoseCameraTabControl()
+        self.ui.Two_d_Tab.addTab(self.camera_tab, "2D 相機")
         self.pitch_tab = PosePitchTabControl(self.model, self)
         self.ui.Two_d_Tab.addTab(self.pitch_tab, "2D")
         self.video_tab = PoseVideoTabControl(self.model)
