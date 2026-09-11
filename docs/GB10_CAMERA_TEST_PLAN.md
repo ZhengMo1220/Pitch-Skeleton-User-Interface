@@ -15,12 +15,27 @@
 
 ## 階段 0：確認 GB10 的作業系統版本
 
-這一步決定廠商提供的 SDK 能不能直接用，是最優先要做的事。
+這一步決定廠商提供的 SDK 能不能直接用，是最優先要做的事。廠商給的 SDK 檔名是
+`spinnaker-4.4.0.246-noble-arm64-pkg.tar.gz`——`noble` 是 Ubuntu 24.04 的代號，
+`arm64` 是 CPU 架構，這份 SDK 就是專門為「Ubuntu 24.04 + ARM64」打造的。GB10 實際
+是不是這個組合，必須先核對，避免裝到一半才發現版本不合、白忙一場。
 
 ```bash
 cat /etc/os-release
 uname -m
 ```
+
+**這兩行指令在做什麼：**
+- `cat /etc/os-release`：`cat` 是顯示檔案內容的指令，`/etc/os-release` 是 Linux 系統
+  裡固定會有的檔案，記錄目前裝的是哪個發行版、哪個版本。輸出會類似：
+  ```
+  NAME="Ubuntu"
+  VERSION="24.04 LTS (Noble Numbat)"
+  VERSION_ID="24.04"
+  ```
+  要看的是 `VERSION_ID` 這一行。
+- `uname -m`：顯示 CPU 架構的指令，會印出一個字，例如 `aarch64`（ARM 64 位元，
+  GB10 預期會顯示這個）或 `x86_64`（一般 Intel/AMD 架構）。
 
 **判斷標準：**
 - `VERSION_ID` 顯示 `24.04` 或 `22.04`，且 `uname -m` 顯示 `aarch64` → 跟廠商 SDK 完全對應，可以直接進行階段 1
