@@ -27,7 +27,7 @@
 
 ## 第五階段：MSI EdgeXpert（Grace Blackwell / ARM64）遷移評估
 
-> 測試流程與檢查點見 [GB10_CAMERA_TEST_PLAN.md](GB10_CAMERA_TEST_PLAN.md)（老師交辦：確認相機能否在 GB10 上被偵測並擷取畫面）。
+> 測試流程與檢查點見 [GB10_CAMERA_TEST_PLAN.md](GB10_CAMERA_TEST_PLAN.md)（老師交辦：確認相機能否在 GB10 上被偵測並擷取畫面）；廠商 SDK 原文 README 中文翻譯見 [README_ARM_zh-TW.md](README_ARM_zh-TW.md)。
 
 - [x] **確認 FLIR 官方是否有 ARM64 Linux 版 Spinnaker SDK** — 有，廠商已提供 `spinnaker-4.4.0.246-noble-arm64-pkg.tar.gz`，明確支援 Ubuntu 24.04/22.04 LTS + ARM64
 - [ ] **確認該 SDK 是否含 Python 綁定（PySpin）** — 目前拿到的壓縮檔僅含 C/C++ 函式庫與 GUI 工具，無 Python 綁定，已詢問廠商、等待回覆
