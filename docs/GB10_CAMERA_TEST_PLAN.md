@@ -114,7 +114,30 @@ sudo sh remove_spinnaker_arm.sh
 官方 README 說明：這個腳本會移除所有 Spinnaker 函式庫，並還原被安裝程序修改過的 udev 權限規則（也就是恢復 Ubuntu 預設的 USB 裝置權限設定）。
 
 **卸載後建議額外確認：**
-- 階段 1 額外裝的相依套件（`libusb-1.0-0 qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools`）不會被 `remove_spinnaker_arm.sh` 移除，這些是 Ubuntu 官方套件、非常通用（Qt 相關工具很多軟體都會用到），一般不需要特地移除；如果對方要求恢復到「完全乾淨、不多裝任何東西」的狀態，可另外執行 `sudo apt-get remove libusb-1.0-0 qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools`（但先確認這些套件沒有被系統其他既有程式依賴，避免移除後影響到原本就在跑的東西）
+- 階段 1 額外裝的相依套件（`libusb-1.0-0 qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools`）不會被 `remove_spinnaker_arm.sh` 移除——這個卸載腳本只認得「自己（Spinnaker 安裝腳本）裝過的東西」，不會去動你在那之前自己手動 `apt-get install` 裝的套件，就像去別人家借工具箱，用完把工具箱放回原位，但自己另外帶去的工具，箱子主人不會幫你收。
+
+  這些套件是 Ubuntu 官方套件、非常通用（Qt 相關工具很多軟體都會用到），**一般不需要特地移除**。如果對方要求恢復到「完全乾淨、不多裝任何東西」的狀態，才需要額外處理：
+
+  1. **先模擬執行，不要直接刪**，確認移除會不會牽連到其他東西：
+     ```bash
+     sudo apt-get remove --dry-run libusb-1.0-0 qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools
+     ```
+     `--dry-run` 只會列出「如果真的執行會發生什麼事」，不會真的刪除任何東西。看輸出結果：
+     - 只列出這五個套件本身，沒有額外列出一堆「以下套件將被移除，因為依賴...」的警告 → 移除安全
+     - 列出了預期之外的其他套件名稱 → 代表有其他程式依賴它們，移除會連帶弄壞那些程式，不建議繼續
+
+  2. 也可以用 `apt-cache rdepends <套件名>` 個別查詢「誰依賴這個套件」，例如：
+     ```bash
+     apt-cache rdepends libusb-1.0-0
+     ```
+
+  3. 確認沒問題後才真的執行：
+     ```bash
+     sudo apt-get remove libusb-1.0-0 qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools
+     ```
+
+  > 如果不確定或嫌麻煩，**留著這幾個通用套件不移除，遠比手滑刪錯東西、弄壞借來的機器風險低**，沒有強制要求乾淨到底的話，建議直接跳過這一步。
+
 - 確認解壓縮出來的 `spinnaker-4.4.0.246-noble-arm64` 資料夾與原始的 `.tar.gz` 壓縮檔本身，測試完後一併從機器上刪除
 
 ## 記錄建議
