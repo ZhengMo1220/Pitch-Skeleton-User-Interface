@@ -112,15 +112,18 @@
 - [ ] 解決 [P2-001] 參數來源統一問題
 - [ ] 評估第二支側面相機整合（現有程式僅支援 `SN1`/`SN2` 兩台）
 
-### GB10（MSI EdgeXpert / ARM64）遷移評估
+### GB10（MSI EdgeXpert / ARM64）— 已降級為次要任務
 
-> 測試流程見 [GB10_CAMERA_TEST_PLAN.md](GB10_CAMERA_TEST_PLAN.md)；廠商 SDK 中譯見 [README_ARM_zh-TW.md](README_ARM_zh-TW.md)
+**2026-09-21 定位變更**：GB10 只作為「監看 5 支攝影機畫面」之用，**不跑骨架分析**。分析主力維持 Windows + RTX 4090（未來可能換 5090）。因此原本規劃的「整套 GUI 系統移植到 ARM64」不再需要，相關測試計畫文件已由使用者移出專案。
 
 - [x] 確認 FLIR 有 ARM64 Linux 版 Spinnaker SDK — 廠商已提供 `spinnaker-4.4.0.246-noble-arm64-pkg.tar.gz`
-- [ ] 確認該 SDK 是否含 Python 綁定（PySpin）— 已詢問廠商，等待回覆
-- [ ] 確認 GB10 DGX OS 的實際 Ubuntu 基礎版本
-- [ ] 在 GB10 上實測相機偵測與畫面擷取
-- [ ] 評估整套 GUI 系統移植可行性（需先取得 PySpin）
+- [ ] （暫停）其餘 GB10 相關驗證，待實際需要監看功能時再啟動
+
+### 台鋼場地架設（未來，非當前工作）
+
+場勘圖：`docs/TSG_Bullpen_Carmera_Positionpicture.jpg`
+
+- [ ] **相機介面選型待決策**：場勘規劃線長 8～32 公尺（編號 1-3 至收線箱 1：30m/25m/22m；編號 4-8 至收線箱 2：32m/24m/19m/21m/8m），遠超過 USB3 被動線材約 3 公尺的極限。若改用 GigE 網路型相機，`camera_objects/single_camera/flir_camera_system.py` 需調整（GigE 的初始化參數、頻寬設定與同步機制皆與 USB3 不同，GPIO 實體線同步可能改為 PTP 網路時間同步）。若沿用 USB3 則需驗證主動式延長線或光纖延長方案在 179fps 下的穩定性。
 
 ---
 
