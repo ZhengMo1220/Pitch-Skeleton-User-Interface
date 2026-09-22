@@ -5,6 +5,30 @@
 
 ---
 
+## 【當前工作交接狀態】
+
+> **接手的 AI 請先讀這一段。** 這裡記錄「上一位助手做到哪、下一步該做什麼」，每完成一個階段性步驟就會更新。
+> 若此區塊顯示「無進行中任務」，代表上一段工作已告一段落，可直接從下方待辦清單挑選。
+
+**更新時間**：2026-09-22
+**當前任務**：修復 2D 分頁問題
+**狀態**：[P1-002] 已修復並驗證通過；[P1-001] 尚未處理
+
+**已完成**：
+- [P1-002] 單影片模式崩潰 — **已修復**（commit `6fb5aad`）。在 `detect_skeleton.py` 補上 `person_df_by_frame` 屬性（四處純新增：`__init__`、`mergePersonData`、`setProcessedData`、`reset`），使用者實測單影片分析可完成、關鍵幀正常偵測
+- 新舊架構差異分析完成（見下方「架構遷移現況」）
+- 文件體系重整、README 補上 SDK 安裝流程
+
+**下一步**：
+1. 處理 [P1-001]：單影片模式選 CF（正面）時會用正面影片跑側面專用分析，產生無意義數據且無警告。三個候選解法見該問題條目，需先與使用者討論選哪個
+2. 之後可考慮：檢查 `video_widget_2.py`、`video_widget_compare.py` 是否有類似未完成重構痕跡
+
+**注意事項**：
+- 修改程式碼前必須先向使用者說明計畫並取得同意
+- 2D 分頁單影片模式已可用，但選 CF 仍有 [P1-001] 的資料正確性問題，建議暫時只選 CS（側面）
+
+---
+
 ## 第一部分：協作規範（AI 必讀）
 
 ### 專案背景
@@ -21,6 +45,9 @@
 4. **發現新問題就登記到下方「問題追蹤」**，附日期、症狀、成因、影響範圍，不要只留在對話裡。
 5. **修 bug 前先確認根因**，不要只讓錯誤訊息消失。這個專案已知有「兩套互相矛盾的相機參數」「新舊兩版 PoseEstimater」這類結構性問題，表面修補會累積更多技術債。
 6. **重構時參考 code smell 原則**，但以「不破壞現有可運作功能」為最高優先，大範圍重構須先與使用者討論。
+7. **每完成一個階段性步驟，立即更新本文件最上方的「當前工作交接狀態」區塊。** 不要等到任務全部完成、也不要等到對話快結束才寫——隨時可能因為用量耗盡、當機或使用者離開而中斷，文件必須永遠保持在「下一位接手者看得懂」的狀態。使用者也可隨時說「記錄交接狀態」要求立即更新。
+   - 觸發時機：完成一次分析、做完一個決策、改完一個檔案、發現新問題
+   - 必寫內容：當前任務、已完成什麼、下一步具體動作、待決策事項
 
 ### 環境
 
@@ -56,12 +83,40 @@
 ### [P1-002] 單影片模式分析結束時崩潰：`person_df_by_frame` 屬性不存在
 
 - **登記日期**：2026-08-19（2026-09-17、2026-09-20 重複遇到）
-- **狀態**：`OPEN`
+- **狀態**：`FIXED`（2026-09-22，commit `6fb5aad`）
+- **實際修法**：在 `detect_skeleton.py` 補上 `person_df_by_frame`，四處純新增（`__init__:42`、`mergePersonData:161`、`setProcessedData:498`、`reset:518`），未修改任何既有邏輯。已由使用者實測驗證。
+- **未做的部分**：新版實作中，此字典同時用於讓 `getPersonDf` 變成 O(1) 查找（取代全表掃描）。本次只恢復正確性、未套用該效能優化，因為修改查詢路徑會影響即時模式與雙影片模式，風險不對等，應併入架構遷移一併處理。
 - **優先序**：高
 - **症狀**：2D 分頁單影片模式勾選「檢視骨架影片」，完整掃描跑完後跳出錯誤對話框「單影片分析失敗：'PoseEstimater' object has no attribute 'person_df_by_frame'」。
 - **成因**：`pitch_widget.py:2203` 呼叫 `_mirror_single_video_analysis()`，該函式在 `pitch_widget.py:2144-2147` 存取 `self.pose_estimater_2.person_df_by_frame`。但 `pitch_widget.py` import 的是**舊版** `skeleton/detect_skeleton.py` 的 `PoseEstimater`，該類別沒有此屬性；有此屬性的是**新版** `skeleton/detect_skeleton_new.py`。屬於未完成的重構——呼叫端已改用新版 API，import 卻仍指向舊版。
 - **影響**：單影片模式完全無法完成分析。雙影片模式不受影響（不走此路徑）。
 - **可能解法（待討論）**：(a) 比對新舊版 `PoseEstimater` 差異，將 import 切換到新版並驗證相容性；(b) 將缺少的屬性/邏輯補回舊版；(c) 完成重構、移除舊版。需先做差異分析再決定。
+
+### [P2-002] 未完成的架構遷移：新舊兩套推論後端並存
+
+- **登記日期**：2026-09-22（分析 P1-002 時發現）
+- **狀態**：`OPEN`
+- **優先序**：中（現行舊架構可運作，新架構是效能優化性質）
+
+學長姐曾進行一次**完整的推論後端更換**，四個組件中三個已完成、一個缺件，整體未啟用：
+
+| 角色 | 現行（使用中） | 新版（已寫好但未啟用） |
+|---|---|---|
+| Model | `utils/model.py` | `utils/model_v1.py` |
+| PoseEstimater | `skeleton/detect_skeleton.py`（505 行） | `skeleton/detect_skeleton_new.py`（1040 行） |
+| 人物偵測 | mmdet `inference_detector` | ultralytics YOLO `.track()` |
+| 姿態推論 | mmpose `inference_topdown`（PyTorch） | ONNX Runtime + TensorRT |
+| 模型檔 | `Db/pretrain/vitpose_Sk26.pth` | `Db/pretrain/ViTPose_26kpts_fixed.onnx` ← **缺件** |
+
+**注意命名陷阱**：這裡的 `model_v1.py` 是**新**版、`model.py` 是**舊**版，與 `UI_Control_v1`（舊版）的命名邏輯相反。
+
+**新版對 Model 的額外要求**（現行 `model.py` 不滿足）：`run_pose()`、`pose_input_shape`、`detector.track()`。這些只有 `model_v1.py` 有。
+
+**證據顯示新版曾實際運作過**：`Src/UI_Control/trt_cache/` 內有兩個約 330MB 的 TensorRT engine 檔（`*_sm120.engine`），是編譯後的推論引擎快取，代表 ONNX 模型確實被載入執行過。
+
+**關於缺件**：`ViTPose_26kpts_fixed.onnx` 是姿態估測模型（26 關節點，對應 HALPE-26）。它應是由 `vitpose_Sk26.pth`（1.18GB，仍在）**轉檔**產生，而非另外訓練——專案內有 `Src/UI_Control/pth2onnx.py` 這支轉檔工具。因此若要啟用新架構，是「重新轉檔」而非「重新訓練」，成本可控。
+
+**待評估**：是否要完成這次遷移。效益是推論速度（ONNX+TensorRT 通常顯著快於 PyTorch），成本是需重新轉檔、驗證分析結果一致性、並確認 ultralytics 追蹤行為與現行 mmdet 是否等價。
 
 ### [P2-001] 系統存在兩套互相矛盾的相機校正參數
 
