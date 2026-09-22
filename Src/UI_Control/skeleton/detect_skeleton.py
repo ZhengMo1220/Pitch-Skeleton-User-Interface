@@ -37,6 +37,9 @@ class PoseEstimater:
         self.fps = None
         self.person_data = []
         self.processed_frames = set()
+        # 以幀號為索引的快取，供單影片分析結束時複製分析結果使用
+        # （pitch_widget._mirror_single_video_analysis 依賴此屬性）
+        self.person_df_by_frame = {}
         self.fps_timer = FPSTimer()
         self.smooth_filter = OneEuroFilter()
         self.is_detect = False
@@ -151,7 +154,14 @@ class PoseEstimater:
 
             self.person_data.append(person_info)
 
-        return pd.DataFrame(self.person_data)
+        result_df = pd.DataFrame(self.person_data)
+
+        # 同步維護以幀號為索引的快取
+        if frame_num is not None and not result_df.empty:
+            self.person_df_by_frame[int(frame_num)] = \
+                result_df[result_df['frame_number'] == frame_num].copy()
+
+        return result_df
   
     def detectKpt(self, image:np.ndarray, frame_num:int = None, is_video:bool = False, is_processed:bool=False):
         if not self.is_detect:
@@ -484,6 +494,11 @@ class PoseEstimater:
             return
         self.person_df = person_df
         self.processed_frames = {frame_num for frame_num in self.person_df['frame_number']}
+        # 從既有資料重建幀號快取（此路徑不經過 mergePersonData）
+        self.person_df_by_frame = {
+            int(fn): group.copy()
+            for fn, group in self.person_df.groupby('frame_number')
+        }
 
     def update_person_df(self, x:float, y:float,frame_num:int, correct_kpt_idx:int):
         self.person_df.loc[(self.person_df['frame_number'] == frame_num) &
@@ -500,6 +515,7 @@ class PoseEstimater:
         self.fps = None
         self.person_data = []
         self.processed_frames = set()
+        self.person_df_by_frame = {}
         self.fps_timer = FPSTimer()
         self.smooth_filter = OneEuroFilter()
         self.is_detect = False
