@@ -147,4 +147,41 @@ def load_stereo_calibration():
         "K_S": intr_s[0], "dist_S": intr_s[1],
         "F": fund["F"],
         "front": front, "side": side,
+        "F_estimated_at": fund.get("estimated_at"),
     }, None
+
+
+# ---------- 錄影快照 ----------
+# 校正值只對「錄影當下的相機擺位」有效，因此每筆錄影資料夾各存一份，
+# 日後重新校正也不會影響舊錄影的 3D 重建。
+
+SNAPSHOT_NAME = "calibration.json"
+_MATRIX_KEYS = ("K_F", "dist_F", "K_S", "dist_S", "F")
+
+
+def save_snapshot(folder, front_sn=None, side_sn=None):
+    """把目前的校正值存進錄影資料夾。回傳 (是否成功, 說明)。
+
+    front_sn / side_sn 為實際錄影的相機序號，與校正角色不符時不存。
+    """
+    calib, reason = load_stereo_calibration()
+    if calib is None:
+        return False, reason
+    if front_sn and side_sn and (str(front_sn), str(side_sn)) != (calib["front"], calib["side"]):
+        return False, (f"錄影相機 front={front_sn} side={side_sn} 與校正角色 "
+                       f"front={calib['front']} side={calib['side']} 不符")
+
+    data = {k: (np.asarray(v).tolist() if k in _MATRIX_KEYS else v) for k, v in calib.items()}
+    data["saved_at"] = datetime.now().isoformat(timespec="seconds")
+    write_json(os.path.join(folder, SNAPSHOT_NAME), data)
+    return True, f"校正快照已存入 {SNAPSHOT_NAME}"
+
+
+def load_snapshot(folder):
+    """讀取錄影資料夾內的校正快照（矩陣已轉為 ndarray）；沒有則回傳 None。"""
+    data = read_json(os.path.join(folder, SNAPSHOT_NAME))
+    if data is None:
+        return None
+    for k in _MATRIX_KEYS:
+        data[k] = np.array(data[k], dtype=np.float64)
+    return data
