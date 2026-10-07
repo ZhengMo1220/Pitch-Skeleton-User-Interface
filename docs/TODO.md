@@ -10,11 +10,11 @@
 > **接手的 AI 請先讀這一段。** 這裡記錄「上一位助手做到哪、下一步該做什麼」，每完成一個階段性步驟就會更新。
 > 若此區塊顯示「無進行中任務」，代表上一段工作已告一段落，可直接從下方待辦清單挑選。
 
-**更新時間**：2026-10-07 17:40
-**當前任務**：校正流程改為自動讀寫 `Db\Calibration`（已完成 1～4 步並 commit），等使用者決定 3D 分頁做法與兩個新發現的問題
+**更新時間**：2026-10-07 18:00
+**當前任務**：校正流程自動化已全部完成並 push。下一步：使用者用新版 `calib.py` 做 SN24380117 內參 → 重跑 02（產生含兩台內參的 R、t）→ 實機錄一球確認資料夾出現 `calibration.json`，並用 3D 分頁開新錄影與一筆舊錄影驗證
 **實驗室演練設定**：正面 SN24380119（primary）、側面 SN24380117（secondary）
 
-### 本輪已完成（皆已 commit，尚未 push）
+### 本輪已完成（皆已 commit 並 push）
 1. 新增 `cv_utils/calib_store.py`：校正檔路徑與讀寫集中於此（`Db\Calibration\{camera_roles.json, intrinsic\, extrinsic\}`）
 2. `calib.py`：輸出改到 `Db\Calibration\intrinsic\`；log 最新在上 + 時間戳；第 4 區改為「儲存角色」寫 `camera_roles.json`（原 `stereo_calib.json` 輸出移除，現行流程無人讀取）
 3. `01`：輸出改到 `extrinsic\`；`02`：讀 `extrinsic\`、F 存 `fundamental.json`（含角色、內點數、門檻）、移除用寫死舊 F/K 覆蓋的段落，改用真實內參算 R、t（缺內參則略過）
@@ -22,8 +22,9 @@
 5. `cv_thread.py`：序號優先讀 `camera_roles.json`，舊 `camera_serials.json` 仍相容；example 檔移除
 6. 資料搬移：`intrinsics_all.json`、`calib_SN24380119.npz` → `Db\Calibration\intrinsic\`；演練點位 → `extrinsic\`；舊設備點位備份 → `extrinsic\old_rig_backup_20261007\`；`Src\UI_Control\selected_points_*.json` 已從 git 移除（本機版已被 01 清空成 `{}`，原內容在 git 歷史）
 
-### 待使用者決定
-- **3D 分頁（`video_widget_2.py`）做法**：已評估，建議 (c)「錄影時把校正值快照存進該筆錄影資料夾 `calibration.json`，3D 分頁優先讀資料夾內的快照，沒有則退回目前寫死值」。改動點：`calib_store` 加 snapshot/load 函式、`pitch_widget.py` 第 771 與 2433 行建立資料夾後各加一行、`video_widget_2.py` 的 `loadVideo`/`loadProcessedData` 在建 `Triangulate3DViewer` 前取參數，並同步更新 `setupComponents` 建的兩個 `PoseAnalyzer`（`utils/analyze_3d.py` 內含自己的 `Triangulate3DViewer`）
+7. **錄影校正快照（使用者選 (c)，分三個 commit）**：`calib_store.save_snapshot/load_snapshot`；`pitch_widget.saveCalibrationSnapshot()` 在手動與自動錄影建資料夾後寫 `calibration.json`（校正不齊或相機與角色不符時只印原因、不影響錄影）；`video_widget_2.applyCalibration()` 載入錄影時讀快照並同步更新兩個 `PoseAnalyzer.viewer3D` 的 K/F，無快照則用 `default_calibration`（原寫死值），舊錄影行為不變。已用假物件測試兩條路徑；**尚未實機錄影驗證**
+
+### 其他結論
 - **[已修正 2026-10-07] `calib.py` 重投影誤差算錯**：原寫法 `cv2.norm(L2)/N` 低估約 √N 倍，已改為 RMS，並加入自動品質判斷（RMS 門檻 0.5/1.0、單組異常剔除、3×3 覆蓋、最大傾斜 ≥20°、樣本 ≥15、重複樣本拒收）。以模擬資料驗證四種情境通過。既有結果：SN25462483 實際 RMS 3.93 px（不合格，需重做）；SN24380119 RMS 0.449 px（合格）
 - **[已確認] SN24380119 為 8mm 鏡頭**（使用者 2026-10-07 確認）：fx 1411.8 × 5.86 µm ≈ 8.3 mm，內參合理。先前「兩台皆 6mm」的前提有誤；SN24380117 鏡頭尚未確認
 
@@ -54,7 +55,7 @@
 - [ ] 01 正面/側面分兩個視窗點，順序容易對錯 → 改為左右並排同時標註
 - [ ] 校正桿是白色球，可自動偵測球心，人只負責確認順序
 - [x] 02 結果存檔、移除寫死值（2026-10-07 完成）
-- [ ] `video_widget_2.py` 的 K_F/K_S/F 寫死 → 見上方「待使用者決定」（同 P2-001）
+- [x] `video_widget_2.py` 改為讀錄影資料夾的校正快照（2026-10-07 完成，同 P2-001）
 - [ ] 02 內點門檻與去畸變
 - [ ] 拍照、標註、計算整合為單一校正工具
 
@@ -212,7 +213,7 @@
 ### [P2-001] 系統存在兩套互相矛盾的相機校正參數
 
 - **登記日期**：2026-09-20
-- **狀態**：`OPEN`
+- **狀態**：`FIXED`（2026-10-07，待實機驗證）：3D 分頁改讀每筆錄影的 `calibration.json` 快照；無快照的舊錄影仍用寫死值
 - **優先序**：中（影響 3D 重建精度，但 2D 分析不受影響）
 - **症狀**：`stereo_calib.json` 與 `video_widget_2.py` 寫死的參數數值差異極大（正面內參 fx：1060.45 vs 7927.87，約 7.5 倍）。
 - **成因**：`video_widget_2.py:193-233` 將 `K_F`、`K_S`、`F` 直接寫死在建構子中，且保留 5 組被註解的歷史版本 `F` 矩陣（僅 `#0505` 那組生效）。3D 分頁實際使用的是寫死的這套，不是 JSON 檔。
