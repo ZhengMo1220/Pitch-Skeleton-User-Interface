@@ -20,6 +20,7 @@ import pyqtgraph as pg
 from utils.model import Model
 from PitchingAnalyzer import PitchingAnalyzer
 from cv_utils.cv_thread import FramesToVideoWriterThread
+from cv_utils import calib_store
 from capture_tablet_images import TabletImageCaptureThread
 import cv2
 import json
@@ -758,6 +759,17 @@ class PosePitchTabControl(QWidget):
             self.camera.stop_recording()
             self.load_video_list("../../Db/Record")
 
+    def saveCalibrationSnapshot(self):
+        """把目前的校正值存進這筆錄影的資料夾，3D 分頁日後依此重建。"""
+        thread = getattr(self.camera, 'video_thread', None)
+        front_sn = getattr(thread, 'serial_front', None)
+        side_sn = getattr(thread, 'serial_side', None)
+        try:
+            ok, msg = calib_store.save_snapshot(self.output_dir, front_sn, side_sn)
+        except Exception as e:
+            ok, msg = False, str(e)
+        print(f"[Calibration] {msg}" if ok else f"[Calibration] 未存校正快照：{msg}")
+
     def startRecording(self):
         """Start recording the video."""
         if self.camera is None:
@@ -769,6 +781,7 @@ class PosePitchTabControl(QWidget):
         current_time = datetime.now().strftime("%Y%m%d_%H%M")
         self.output_dir = f'../../Db/Record/{current_date}_Pitcher{pitcher_id}/{current_time}_P{pitch_no:02d}'
         os.makedirs(self.output_dir, exist_ok=True)
+        self.saveCalibrationSnapshot()
         self.video_filename = os.path.join(self.output_dir, f'CF_{current_time}_Pitcher{pitcher_id}_P{pitch_no:02d}.mp4')
         self.video_filename_2 = os.path.join(self.output_dir, f'CS_{current_time}_Pitcher{pitcher_id}_P{pitch_no:02d}.mp4')
         self.camera.startRecording(self.video_filename, self.video_filename_2)
@@ -2431,6 +2444,7 @@ class PosePitchTabControl(QWidget):
         current_time = datetime.now().strftime("%Y%m%d_%H%M")
         self.output_dir = f'../../Db/Record/{current_date}_Pitcher{pitcher_id}/{current_time}_P{pitch_no:02d}'
         os.makedirs(self.output_dir, exist_ok=True)
+        self.saveCalibrationSnapshot()
         self.video_filename = os.path.join(self.output_dir, f'CF_{current_time}_Pitcher{pitcher_id}_P{pitch_no:02d}.mp4')
         self.video_filename_2 = os.path.join(self.output_dir, f'CS_{current_time}_Pitcher{pitcher_id}_P{pitch_no:02d}.mp4')
 
