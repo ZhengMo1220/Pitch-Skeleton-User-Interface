@@ -1,138 +1,156 @@
 # Pitch-Skeleton-User-Interface
 
-> 開發者/維護者請另外參考 [DEVELOPMENT.md](docs/DEVELOPMENT.md)（環境問題排查、硬體相關細節、系統設計背景）。
+棒球投手骨架分析系統：雙台 FLIR 高速相機同步錄影，以 YOLO + ViTPose 偵測 2D 骨架，並以雙相機三角測量重建 3D 骨架。
 
-## Usage
-### Installation
+> 開發者／維護者請另外參考 [DEVELOPMENT.md](docs/DEVELOPMENT.md)（環境問題排查、相機校正流程、硬體細節、系統設計背景）。
 
-1. Clone this repo.
-2. Setup conda environment:
-    ```
-    conda create -n Pitcher python=3.8 -y
-    conda activate Pitcher
-    pip install -r requirements.txt
-    # CUDA 11.8
-    pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
-    conda install -c conda-forge faiss-gpu
-    pip install cython_bbox
-    ```
-3. setup openmim
-    ``` 
-    pip install -U openmim
-    mim install mmcv-full
-    mim install "mmcv==2.0.1"
-    mim install "mmdet==3.1.0"
-    ``` 
-5. Setup mmpose environment:
-    ```
-    cd Src\mmpose_main
-    pip install -r requirements.txt
-    pip install -v -e .
-    cd ..\..\
-    ```
-6. Setup mmyolo environment:
-    ```
-    cd Src\mmyolo_main
-    pip install -r requirements.txt
-    pip install -v -e .
-    cd ..\..\
-    ```
-7. Setup mmengine_main environment:
-    ```
-    mim install mmengine
-    ```
-8. Setup mmpretrain_main environment:
-    ```
-    cd Src\mmpretrain_main
-    pip install -r requirements.txt
-    pip install -v -e .
-    cd ..\..\
-    ```
-9. Setup vispy:
-    ```
-    pip install vispy
-    ```
-10. Setup FLIR camera SDK（僅在需要接實體 FLIR 相機時需要）
+## 安裝
 
-    **必須使用 Spinnaker SDK 4.0.0.116**，不要自行到官網下載最新版。原因見下方說明。
+以下步驟會建立與實驗室主機**版本完全一致**的環境（2026-10-07 已在全新環境實測通過）。
 
-    安裝包內含六個檔案，請向專案維護者索取（檔案約 195MB，未納入 git）：
+### 0. 事先準備
 
-    ```text
-    TeledyneCommonComponentsSetup.exe
-    Spinnaker_GenICam_v140_x64.msi
-    Spinnaker_Binaries_v140_x64.msi
-    Spinnaker_GenTL_v140_x64.msi
-    Spinnaker_Drivers_x64.msi
-    spinnaker_python-4.0.0.116-cp38-cp38-win_amd64.whl
-    ```
+| 項目 | 說明 |
+|---|---|
+| 作業系統 | Windows 10/11 64-bit |
+| 顯示卡 | NVIDIA，驅動版本 **≥ 520**（需支援 CUDA 11.8）。實驗室為 RTX 4090／驅動 560.94。**RTX 50 系列不支援**此環境 |
+| 軟體 | [Anaconda](https://www.anaconda.com/download)、[Git](https://git-scm.com/)、[Visual Studio 2022 Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)（勾選「使用 C++ 的桌面開發」，部分套件需現場編譯） |
+| 不在 git 裡的檔案 | **模型權重**（3.1 GB）與 **Spinnaker SDK 安裝包**（191 MB），向專案維護者索取 |
 
-    **安裝步驟：**
+CUDA Toolkit 不必另外安裝：PyTorch 與 mmcv 使用的是自帶 CUDA 11.8 的預編譯版本。
 
-    a. 先確認 Python 版本（必須是 3.8 且為 64-bit，否則 wheel 無法安裝）：
-    ```powershell
-    conda activate Pitcher
-    python -c "import sys,struct; print(sys.version); print('Bits:',struct.calcsize('P')*8)"
-    ```
+### 1. 取得程式碼與模型權重
 
-    b. 關閉相機程式、拔除 FLIR 相機，以系統管理員身分**依序**安裝前五個檔案：
-    `TeledyneCommonComponentsSetup.exe` → `Spinnaker_GenICam_v140_x64.msi` → `Spinnaker_Binaries_v140_x64.msi` → `Spinnaker_GenTL_v140_x64.msi` → `Spinnaker_Drivers_x64.msi`
-    （若顯示已安裝，選 `Repair`；詢問是否安裝驅動程式時選允許）
+```
+git clone https://github.com/ZhengMo1220/Pitch-Skeleton-User-Interface.git
+```
 
-    c. **重新啟動 Windows**（udev/驅動權限需重開機才生效）
+把模型權重（`.pth` 檔）放到 `Db\pretrain\`：
 
-    d. 安裝 PySpin wheel：
-    ```powershell
-    conda activate Pitcher
-    python -m pip install "<解壓縮路徑>\spinnaker_python-4.0.0.116-cp38-cp38-win_amd64.whl"
-    ```
+```
+Db\pretrain\
+├─ epoch_210.pth                                                   ← 骨架模型（程式預設使用）
+├─ yolov8_s_syncbn_fast_8xb16-500e_coco_20230117_180101-5aa5f0f1.pth ← 人物偵測（程式預設使用）
+└─ 其他 .pth（備用模型）
+```
 
-    e. 驗證版本一致（SDK 與 PySpin 必須同為 4.0.0.116）：
-    ```powershell
-    python -c "import PySpin; s=PySpin.System.GetInstance(); v=s.GetLibraryVersion(); print(f'Spinnaker SDK: {v.major}.{v.minor}.{v.type}.{v.build}'); s.ReleaseInstance()"
-    ```
+前人留下的[雲端硬碟連結](https://drive.google.com/drive/folders/1D7Q5bTnTAfKkfLuppqUo4_8W4t0wrCmP?usp=sharing)也有部分權重，但尚未確認是否包含上面兩個預設使用的檔案，以維護者提供的版本為準。
 
-    f. 接上相機後確認能偵測到：
-    ```powershell
-    python -c "import PySpin; s=PySpin.System.GetInstance(); cs=s.GetCameras(); print('Camera count:',cs.GetSize()); cs.Clear(); s.ReleaseInstance()"
-    ```
+### 2. 建立 conda 環境
 
-    > **為什麼鎖定 4.0.0.116**：PySpin 與 Spinnaker SDK 的版本必須嚴格一致，混搭會出現 `DLL load failed while importing PySpin`。而 PySpin 的 wheel 同時也綁定 Python 版本（`cp38` = Python 3.8），本專案的 OpenMMLab 生態系（mmcv 2.0.1 / mmdet 3.1.0 / torch 2.0.1）建構於 Python 3.8 之上，較新的 Spinnaker 版本已逐步不再提供 cp38 的 wheel，因此升級 SDK 會連帶要求升級 Python 與整套 AI 套件。在完成該項評估前，請維持此版本。
+以下指令**一律在「Anaconda Prompt」中、於專案根目錄執行**。
 
-    > **相機序號**：專案預設使用序號 `25462483`（正面）與 `25462481`（側面），寫死於 `Src\UI_Control\cv_utils\cv_thread.py`。若你的相機序號不同，即使 SDK 安裝成功仍會開不了相機，需修改該檔案。
+```
+conda create -n Pitcher --file environment\conda_explicit.txt -y
+conda activate Pitcher
+```
 
-> 安裝過程中若遇到任何錯誤，請先查閱 [DEVELOPMENT.md](docs/DEVELOPMENT.md) 的「環境建置已知問題」章節，裡面記錄了目前已知的問題成因與解法。
+### 3. 安裝 Python 套件
 
-### Data Preparation
-To obtain the vitpose、yolo and fast-reid wights, it can be downloaded from the https://drive.google.com/drive/folders/1D7Q5bTnTAfKkfLuppqUo4_8W4t0wrCmP?usp=sharing. The resulting data directory should look like this:
-    
-    ${POSE_ROOT}
-    |-- Db
-    -- |-- pretrain
-            |-- vitpose_Sk26.pth
-            |-- yolov7_x_syncbn_fast_8x16b-300e_coco_20221124_215331-ef949a68.pth
-    -- |-- Record (for output data)
-            |-- {video_name}.mp4 (原始影片)
-            |-- {video_name}_Sk26.mp4 (將原始影片畫上骨架資訊)
-            |-- {video_name}.json (將偵測出來的結果紀錄，裡面包含了人物的bounding box info. 和 26 個關節點位置)
-            
-    |-- Src
+```
+pip install --no-deps -r environment\requirements-lock.txt
+pip install --no-build-isolation cython_bbox==0.1.5
+```
 
-### Demo
-1. Demo command
+> **一定要加 `--no-deps`**：照清單原樣安裝才會與實驗室環境一致。實驗室環境有兩處刻意保留的版本不一致（刻意不裝 `opencv-python-headless`，因為它會蓋掉有視窗功能的 opencv；`protobuf` 比 onnx 要求的低一版但可正常運作），讓 pip 自動解析依賴會直接報錯中止。
 
-    > 必須先切換到 `Src\UI_Control` 目錄再執行，不能從專案根目錄執行。
+### 4. 安裝專案內的三個 OpenMMLab 子專案
 
-    ```
-    cd Src\UI_Control
-    python main.py
-    ```
-2. 2D 相機
-    ```
-    利用相機去進行骨架偵測
-    ```
-3. 2D 影片
-    ```
-    利用影片進行骨架偵測
-    ```
-    
+```
+cd Src\mmpose_main
+pip install --no-deps --no-build-isolation -e .
+cd ..\mmyolo_main
+pip install --no-deps --no-build-isolation -e .
+cd ..\mmpretrain_main
+pip install --no-deps --no-build-isolation -e .
+cd ..\..
+```
+
+### 5. 安裝 FLIR 相機 SDK（Spinnaker 4.0.0.116）
+
+**必須使用 4.0.0.116**，不要到官網下載最新版（原因見本節最後）。
+
+a. 關閉所有相機程式、拔除相機，以系統管理員身分**依序**安裝：
+
+`TeledyneCommonComponentsSetup.exe` → `Spinnaker_GenICam_v140_x64.msi` → `Spinnaker_Binaries_v140_x64.msi` → `Spinnaker_GenTL_v140_x64.msi` → `Spinnaker_Drivers_x64.msi`
+
+（若顯示已安裝，選 `Repair`；詢問是否安裝驅動程式時選允許）
+
+b. **重新啟動 Windows**
+
+c. 安裝 Python 版 SDK：
+
+```
+conda activate Pitcher
+pip install "<安裝包路徑>\spinnaker_python-4.0.0.116-cp38-cp38-win_amd64.whl"
+```
+
+> **為什麼鎖定 4.0.0.116**：PySpin 與 Spinnaker SDK 版本必須完全一致，混搭會出現 `DLL load failed while importing PySpin`。PySpin 的 wheel 也綁定 Python 版本（`cp38` = Python 3.8），而本專案的 OpenMMLab 套件建構於 Python 3.8，較新的 Spinnaker 已不提供 cp38 版本，升級 SDK 等於要整套環境一起升級。
+
+### 6. 驗證
+
+```
+conda activate Pitcher
+python -c "import torch, mmcv, mmdet, mmpose, mmyolo, PySpin; print(torch.__version__, torch.cuda.is_available(), mmcv.__version__)"
+```
+
+預期輸出：`2.0.1+cu118 True 2.0.1`
+
+接上相機後確認偵測得到（若顯示 0 台，先關閉 SpinView 等佔用相機的程式）：
+
+```
+python -c "import PySpin; s=PySpin.System.GetInstance(); cs=s.GetCameras(); print('Camera count:', cs.GetSize()); cs.Clear(); s.ReleaseInstance()"
+```
+
+> 安裝或執行時遇到錯誤，請先查閱 [DEVELOPMENT.md](docs/DEVELOPMENT.md) 的「環境建置已知問題」。注意：**務必先 `conda activate Pitcher` 再執行任何程式**，直接呼叫環境裡的 `python.exe` 可能載入到其他環境的數學函式庫而當機。
+
+## 執行
+
+必須先切換到 `Src\UI_Control` 再執行（程式以相對路徑讀取設定與模型）：
+
+```
+conda activate Pitcher
+cd Src\UI_Control
+python main.py
+```
+
+| 分頁 | 用途 |
+|---|---|
+| 2D | 雙相機即時畫面、自動偵測投球並錄影、回放與投球階段分析（主要功能） |
+| 2D 相機 | 雙相機同步拍照（用於外參校正） |
+| 3D | 3D 骨架重建與回放 |
+| 回放比較 | 多筆結果比對 |
+
+雙相機錄影需接 **GPIO 同步線**（正面相機為 primary），且兩台相機需接在**不同的 USB 控制器**上（單台 179 FPS 約佔 3 Gbps）。
+
+## 相機校正
+
+新架設或移動相機後需要重新校正，結果自動存到 `Db\Calibration\`，錄影時會把當下的校正值一起存進該筆錄影資料夾。
+
+```
+cd Src\UI_Control
+python calib.py                  # 1. 每台相機的內參，並指定正面／側面
+python main.py                   # 2.「2D 相機」分頁拍校正桿照片
+python 01_ball_detect_manual.py  # 3. 標註對應點
+python 02_ransac_8points.py      # 4. 計算 F 矩陣
+python 03_3d.py                  # 5.（選用）驗證
+```
+
+詳細步驟與注意事項見 [DEVELOPMENT.md「相機校正流程」](docs/DEVELOPMENT.md)。
+
+## 資料夾結構
+
+```
+Db\                      ← 不在 git 裡
+├─ pretrain\             模型權重
+├─ Calibration\          相機校正結果
+└─ Record\               錄影與分析結果
+    └─ <日期>_Pitcher<編號>\<時間>_P<球數>\
+        ├─ CF_*.mp4 / CS_*.mp4        正面／側面原始影片
+        ├─ CF_*.json / CS_*.json      骨架偵測結果
+        ├─ *_BRandRapsodo.json        球離手與 Rapsodo 資料
+        └─ calibration.json           錄影當下的校正值
+environment\             環境版本鎖定檔
+Src\UI_Control\          主程式
+docs\                    開發文件
+```
