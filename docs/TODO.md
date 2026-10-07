@@ -17,7 +17,12 @@
 - 已完成：UI_Control 資料檔整理（2026-10-07）。舊設備校正 → `Db\Calibration\old_rig_20260223\`（`side_camera_calib.npz` 改名 `front_camera_calib.npz`，內容其實是正面 50mm 內參 fx 7927.87）；輸出/截圖 → `Db\Archive\UI_Control_20261007\`；4 支舊工具改用 `calib_store.OLD_RIG_DIR` 並實測可讀。注意：舊的 `stereo_calib.json` 與 `stereo_calib.npz` 本來就是兩次不同校正（fx 1060.45 vs 1061.90），勿用 `extract_calib.py` 覆蓋 json
 - `trt_cache\`（660MB，sm120 = RTX 50 系列的 TensorRT 引擎，僅 `utils/model_v1.py` 使用）：使用者要求**保留**，未來可能部署到 5090。評估時注意：TensorRT 引擎同時綁定 GPU 架構與 TensorRT/onnxruntime 版本，現行環境（torch 2.0.1+cu118、onnxruntime 1.8.0）不支援 sm120，換 5090 需整套環境升級，屆時快取很可能須重建
 - 暫緩：3D 分頁讀取校正快照的實機驗證（使用者目前不使用 3D 分析；被 P1-007 擋住）
-- 下一步：使用者要討論 GitHub 多人協作
+- GitHub 協作（2026-10-07 討論中，使用者先了解再決定）：
+  - 已打標籤 `v2026.10.07`（指向 cbd06d6）
+  - 使用者筆電暫用 Download ZIP 取得程式（無法 push/pull，日後改用 git clone）
+  - 待使用者執行：repo 改私人（已確認 0 fork）
+  - 待使用者決定：A 建組織 + 成員 Read + fork/PR，或 B 學生方案 Pro + main 分支保護（建議 A）
+  - 待使用者決定：雲端硬碟 `118_mVMTLW6fZl6LcJljtjAKD-0s6X4_6` 目前為「知道連結者皆可檢視」，是否改「限制」；README 寫「需維護者授權」與現況不符，依決定修正
 **實驗室演練設定**：正面 SN24380119（primary）、側面 SN24380117（secondary）
 
 ### 本輪已完成（皆已 commit 並 push）
