@@ -13,10 +13,11 @@
 **更新時間**：2026-10-07 19:30
 **當前任務**：
 - 筆電安裝包 `C:\Users\user\Downloads\Pitcher_筆電安裝包\` **已實測通過**（全新 conda 環境照「安裝順序.txt」安裝 → 版本與 Pitcher 環境逐一比對一致（僅刻意排除 mmcv-full）→ 實際載入 YOLO + ViTPose 模型與 PySpin 成功），測試環境已刪除。試裝過程修正 4 個問題：pip 用 cp950 讀 requirements（鎖定檔改純 ASCII）、原環境有刻意的依賴不一致（改 `--no-deps`）、mm 子專案 setup.py 需 torch（加 `--no-build-isolation`）、freeze 漏 setuptools（補 60.2.0）。另注意：未 `conda activate` 直接呼叫 python.exe 時，numpy 會載到 base 環境的 MKL 而當機，安裝與執行一律在已啟動的環境中進行
-- 待辦：依安裝包更新 README 安裝段落（先給使用者看）
+- 已完成：README 改寫（2026-10-07）。版本鎖定檔放進 repo 的 `environment\`（不用 `env\`：`.gitignore` 的 `ENV/` 在 Windows 不分大小寫會忽略它）。根目錄舊的 `requirements.txt`（numpy==1.23.5 等）已過時、README 不再引用，待決定是否刪除
 - 已完成：UI_Control 資料檔整理（2026-10-07）。舊設備校正 → `Db\Calibration\old_rig_20260223\`（`side_camera_calib.npz` 改名 `front_camera_calib.npz`，內容其實是正面 50mm 內參 fx 7927.87）；輸出/截圖 → `Db\Archive\UI_Control_20261007\`；4 支舊工具改用 `calib_store.OLD_RIG_DIR` 並實測可讀。注意：舊的 `stereo_calib.json` 與 `stereo_calib.npz` 本來就是兩次不同校正（fx 1060.45 vs 1061.90），勿用 `extract_calib.py` 覆蓋 json
 - `trt_cache\`（660MB，sm120 = RTX 50 系列的 TensorRT 引擎，僅 `utils/model_v1.py` 使用）：使用者要求**保留**，未來可能部署到 5090。評估時注意：TensorRT 引擎同時綁定 GPU 架構與 TensorRT/onnxruntime 版本，現行環境（torch 2.0.1+cu118、onnxruntime 1.8.0）不支援 sm120，換 5090 需整套環境升級，屆時快取很可能須重建
-- 待使用者實測：P1-006 修正後用 3D 分頁開 20261007 錄影，確認印出「使用錄影時的校正快照」
+- 暫緩：3D 分頁讀取校正快照的實機驗證（使用者目前不使用 3D 分析；被 P1-007 擋住）
+- 下一步：使用者要討論 GitHub 多人協作
 **實驗室演練設定**：正面 SN24380119（primary）、側面 SN24380117（secondary）
 
 ### 本輪已完成（皆已 commit 並 push）
