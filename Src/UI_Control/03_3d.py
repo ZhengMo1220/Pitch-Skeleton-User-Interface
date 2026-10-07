@@ -1,11 +1,13 @@
 import numpy as np
 import cv2
 import json
+
+from cv_utils import calib_store
 # scale of 0505: 21556.837 mm/px
 # === Step 1: 載入資料 ===
-with open("selected_points_cs.json", "r") as f:
+with open(calib_store.POINTS_JSON["cs"], "r") as f:
     fdata = json.load(f)
-with open("selected_points_cf.json", "r") as f:
+with open(calib_store.POINTS_JSON["cf"], "r") as f:
     data = json.load(f)
 
 pts_left = np.array(fdata["01.jpg"])    # 左相機
@@ -16,6 +18,7 @@ pts1 = pts_left.T
 pts2 = pts_right.T
 
 # === Step 2: 相機內參 ===
+# 下方寫死的是舊設備的數值，只在讀不到 Db/Calibration 的校正檔時使用
 K_R = np.array([
     [7.92787455e+03, 0.0, 8.69870446e+02],
     [0.0, 8.03959073e+03, 7.16810004e+02],
@@ -54,6 +57,15 @@ F = np.array([
         [ 1.58917237e-07,  2.44307598e-07, -3.48771760e-03],
         [-9.75476979e-05,  7.35402506e-04,  1.00000000e+00]
     ]) 
+
+# 優先使用 Db/Calibration 的校正結果（L = 側面 cs，R = 正面 cf）
+calib, reason = calib_store.load_stereo_calibration()
+if calib is not None:
+    K_L, K_R, F = calib["K_S"], calib["K_F"], calib["F"]
+    print(f"使用校正檔：正面 SN{calib['front']}、側面 SN{calib['side']}")
+else:
+    print(f"警告：{reason}")
+    print("      改用程式內寫死的舊設備數值，結果不代表目前的相機")
 
 
 # === Step 4: 計算本質矩陣與分解為 R, t ===
