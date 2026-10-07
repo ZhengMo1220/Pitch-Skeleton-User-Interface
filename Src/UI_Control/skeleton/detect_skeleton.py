@@ -115,7 +115,7 @@ class PoseEstimater:
                     [20, 24], [22, 24], [15, 24],   #左腳
                     [21, 25], [23, 25], [16, 25]    #右腳
                 ],
-                
+
                 "left_points_indices": [[5, 18], [5, 7], [7, 9],[19, 11], [11, 13], [13, 15], [20, 24], [22, 24], [15, 24]],  # Indices of left hand, leg, and foot keypoints
                 "right_points_indices": [[6, 18], [6, 8], [8, 10], [19, 12], [12, 14], [14, 16], [21, 25], [23, 25], [16, 25]],  # Indices of right hand, leg, and foot keypoints
                 "angle_dict":{
@@ -162,7 +162,7 @@ class PoseEstimater:
                 result_df[result_df['frame_number'] == frame_num].copy()
 
         return result_df
-  
+
     def detectKpt(self, image:np.ndarray, frame_num:int = None, is_video:bool = False, is_processed:bool=False):
         if not self.is_detect:
             # print('not detect')
@@ -171,7 +171,7 @@ class PoseEstimater:
         fps = 0
         self.fps_timer.tic()
         # if not is_processed:
-        if is_video: 
+        if is_video:
             #影片處理方式
             if frame_num not in self.processed_frames:
                 pred_instances, person_ids = self.processImage(image, select_id=self.person_id)
@@ -179,7 +179,7 @@ class PoseEstimater:
                 self.smoothKpt(person_ids, frame_num)
                 self.processed_frames.add(frame_num)
             if self.kpt_id is not None:
-                self.kpt_buffer = self.updateKptBuffer(frame_num)                      
+                self.kpt_buffer = self.updateKptBuffer(frame_num)
         else:
             #real time 處理方式
             pred_instances, person_ids = self.processImage(image, select_id=self.person_id)
@@ -204,7 +204,7 @@ class PoseEstimater:
             if curr_frame == 0:
                 return  # 初始幀，無需處理
             pre_frame_num = curr_frame - 1
-        
+
         # 用於即時處理時的前一幀數據
         if frame_num is None and self.pre_person_df.empty:
             self.pre_person_df = self.person_df.copy()
@@ -212,7 +212,7 @@ class PoseEstimater:
         # 當前幀無數據時，跳過處理
         if self.person_df.empty:
             return
-        
+
         for person_id in person_ids:
             # 如果使用 frame_slider，根據前後幀數據進行處理
             if frame_num is not None:
@@ -224,10 +224,10 @@ class PoseEstimater:
             else:
                 pre_person_data = self.pre_person_df.loc[self.pre_person_df['person_id'] == person_id]
                 curr_person_data = self.person_df.loc[self.person_df['person_id'] == person_id]
-            
+
             if curr_person_data.empty or pre_person_data.empty:
                 continue  # 當前幀或前幀沒有該 person_id 的數據，跳過
-            
+
             pre_kpts = torch.tensor(pre_person_data.iloc[0]['keypoints'], device='cuda')
             curr_kpts = torch.tensor(curr_person_data.iloc[0]['keypoints'], device='cuda')
             smoothed_kpts = []
@@ -236,16 +236,16 @@ class PoseEstimater:
             for pre_kpt, curr_kpt in zip(pre_kpts, curr_kpts):
                 pre_kptx, pre_kpty = pre_kpt[0], pre_kpt[1]
                 curr_kptx, curr_kpty, curr_conf, curr_label = curr_kpt[0], curr_kpt[1], curr_kpt[2], curr_kpt[3]
-                
+
                 if all([pre_kptx.item() != 0, pre_kpty.item() != 0, curr_kptx.item() != 0, curr_kpty.item() != 0]):
                     curr_kptx = self.smooth_filter(curr_kptx, pre_kptx)
                     curr_kpty = self.smooth_filter(curr_kpty, pre_kpty)
-                
+
                 smoothed_kpts.append([curr_kptx.cpu().item(), curr_kpty.cpu().item(), curr_conf.item(), curr_label.item()])
-            
+
             # 更新當前幀的數據
             self.person_df.at[curr_person_data.index[0], 'keypoints'] = smoothed_kpts
-           
+
 
     def processImage(self, img, select_id=None):
         """
@@ -259,9 +259,9 @@ class PoseEstimater:
         Returns:
             Tuple: 預測的姿態實例和在線的追蹤ID。
         """
-       
+
         # 進行物件偵測
-    
+
         result = inference_detector(self.model.detector, img, test_pipeline= self.model.detector_test_pipeline) # prediction
         pred_instances = result.pred_instances
         det_result = pred_instances[pred_instances.scores > self.model.detect_args.score_thr].cpu().numpy()
@@ -278,7 +278,7 @@ class PoseEstimater:
             w = x2 - x1
             h = y2 - y1
             tlwh = [x1, y1, w, h]  # 转换为 tlwh 格式
-            
+
             online_targets.append({
                 'tlwh': tlwh,   # 原本 tracker 提供的 tlwh
                 'track_id': track_id  # 人工分配 track_id
@@ -292,9 +292,9 @@ class PoseEstimater:
         # 姿態估計
         pose_results = inference_topdown(self.model.pose_estimator, img, np.array(online_bbox))
         data_samples = merge_data_samples(pose_results)
-        
+
         return data_samples.get('pred_instances', None), online_ids
-    
+
     def filterValidTargets(self, online_targets, select_id: int = None):
         """
         過濾出有效的追蹤目標。
@@ -395,7 +395,7 @@ class PoseEstimater:
     def correct_person_id(self, before_correctId:int, after_correctId:int):
         if self.person_df.empty:
             return
-    
+
         if (before_correctId not in self.person_df['person_id'].unique()) or (after_correctId not in self.person_df['person_id'].unique()):
             return
 
@@ -411,7 +411,7 @@ class PoseEstimater:
     def setKptId(self, kpt_id):
         self.kpt_id = kpt_id
         # print(f'kpt id: {self.kpt_id}')
-    
+
     def setPitchHandId(self,kpt_id):
         self.pitch_hand_id = kpt_id
 
@@ -420,7 +420,7 @@ class PoseEstimater:
 
     def updateKptBuffer(self, frame_num:int, window_length=3, polyorder=2):
         filtered_df = self.person_df[
-            (self.person_df['person_id'] == self.person_id) & 
+            (self.person_df['person_id'] == self.person_id) &
             (self.person_df['frame_number'] < frame_num)
         ]
         if filtered_df.empty:
@@ -431,7 +431,7 @@ class PoseEstimater:
             kpt = kpts[self.kpt_id]
             if kpt is not None and len(kpt) >= 2:
                 kpt_buffer.append((kpt[0], kpt[1]))
-        
+
         # 如果緩衝區長度大於等於窗口長度，則應用Savgol濾波器進行平滑
         if len(kpt_buffer) >= window_length:
             # 確保窗口長度為奇數且不超過緩衝區長度
@@ -439,15 +439,15 @@ class PoseEstimater:
                 window_length = len(kpt_buffer) if len(kpt_buffer) % 2 == 1 else len(kpt_buffer) - 1
             # 確保多項式階數小於窗口長度
             current_polyorder = min(polyorder, window_length - 1)
-            
+
             # 分別提取x和y座標
             x = np.array([point[0] for point in kpt_buffer])
             y = np.array([point[1] for point in kpt_buffer])
-            
+
             # 應用Savgol濾波器
             x_smooth = savgol_filter(x, window_length=window_length, polyorder=current_polyorder)
             y_smooth = savgol_filter(y, window_length=window_length, polyorder=current_polyorder)
-            
+
             # 將平滑後的座標重新打包
             smoothed_points = list(zip(x_smooth, y_smooth))
         else:
@@ -455,40 +455,40 @@ class PoseEstimater:
             smoothed_points = kpt_buffer
 
         return smoothed_points
-    
+
     def getPersonDf(self, frame_num=None, is_select=False, is_kpt=False):
         if self.person_df.empty:
             return pd.DataFrame()
         condition = pd.Series([True] * len(self.person_df))  # 初始條件設為全為 True
         if frame_num is not None:
             condition &= (self.person_df['frame_number'] == frame_num)
-        
+
         if is_select and self.person_id is not None:
             condition &= (self.person_df['person_id'] == self.person_id)
- 
+
         data = self.person_df.loc[condition].copy()
-        
+
         if data.empty:
             return None
-        
+
         if is_kpt:
             data = data['keypoints'].iloc[0]
 
         return data
-    
+
     def getPrePersonDf(self, *joint_ids):
         if self.pre_person_df.empty:
             return tuple(None for _ in joint_ids)
-        
+
         condition = self.pre_person_df['person_id'] == self.person_id
         data = self.pre_person_df.loc[condition]
-        
+
         if data.empty:
             return tuple(None for _ in joint_ids)
-        
+
         joint_data = tuple(data['keypoints'].iloc[0][joint_id] for joint_id in joint_ids)
         return joint_data
-    
+
     def setProcessedData(self, person_df:pd.DataFrame):
         if person_df.empty:
             return
