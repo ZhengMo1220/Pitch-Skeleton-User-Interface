@@ -1,7 +1,7 @@
 """
 相機內參校正工具（單台相機，棋盤格法）
 
-與外參校正（calib_extrin.py）分開：內參只跟「相機機身 + 鏡頭」的組合有關，
+與外參校正分開：內參只跟「相機機身 + 鏡頭」的組合有關，
 與安裝位置無關，因此一台一台單獨校正即可，不需要雙機同步或 GPIO 觸發線。
 
 使用方式：
@@ -9,11 +9,11 @@
     python calib.py
 
 流程：下拉選單選相機 → 連接 → 確認棋盤格規格 → 擷取 10~15 組不同角度
-      → 執行校正 → 自動存成 calib_SN<序號>.npz
+      → 執行校正 → 自動存到 Db/Calibration/intrinsic/
+      → 第 4 區指定正面/側面，寫入 Db/Calibration/camera_roles.json
 """
 import os
 import sys
-import json
 from datetime import datetime
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "True")
@@ -29,13 +29,9 @@ from PyQt5.QtGui import QImage, QPixmap
 
 import PySpin
 from camera_objects.single_camera.flir_camera_system import FlirCameraSystem
+from cv_utils import calib_store
 
 CONFIG_PATH = r".\camera_config\GH3_camera_config.yaml"
-
-# 所有已校正相機的內參，以序號為鍵累積保存
-INTRINSICS_JSON = "intrinsics_all.json"
-# 下游（calib_extrin.py、calibrated_3d_viewer.py）實際讀取的檔案
-STEREO_JSON = "stereo_calib.json"
 
 
 def list_cameras():
@@ -159,20 +155,20 @@ class CalibWindow(QMainWindow):
         act_layout.addWidget(self.btn_reset)
         layout.addWidget(act_group)
 
-        # 角色指定與輸出
-        role_group = QGroupBox("4. 指定角色並產生 stereo_calib.json（三台都校正完後再做）")
+        # 角色指定：拍照時決定哪台當 primary，3D 計算時決定用哪台的內參
+        role_group = QGroupBox("4. 指定正面 / 側面相機（拍外參照片與 3D 計算都依此設定）")
         role_layout = QHBoxLayout(role_group)
         self.cmb_front = QComboBox()
         self.cmb_front.setMinimumWidth(140)
         self.cmb_side = QComboBox()
         self.cmb_side.setMinimumWidth(140)
-        self.btn_export = QPushButton("產生 stereo_calib.json")
-        self.btn_export.clicked.connect(self.export_stereo_json)
-        role_layout.addWidget(QLabel("正面 (camera_front):"))
+        self.btn_save_roles = QPushButton("儲存角色")
+        self.btn_save_roles.clicked.connect(self.save_roles)
+        role_layout.addWidget(QLabel("正面 (primary):"))
         role_layout.addWidget(self.cmb_front)
-        role_layout.addWidget(QLabel("側面 (camera_side):"))
+        role_layout.addWidget(QLabel("側面 (secondary):"))
         role_layout.addWidget(self.cmb_side)
-        role_layout.addWidget(self.btn_export)
+        role_layout.addWidget(self.btn_save_roles)
         role_layout.addStretch()
         layout.addWidget(role_group)
 
@@ -182,8 +178,11 @@ class CalibWindow(QMainWindow):
         layout.addWidget(self.log_area)
 
     def log(self, msg):
-        self.log_area.append(msg)
-        self.log_area.ensureCursorVisible()
+        # 最新訊息插在最上方，擷取成功與否不必捲動就看得到；多行訊息維持原本順序
+        cursor = self.log_area.textCursor()
+        cursor.movePosition(cursor.Start)
+        cursor.insertText(f"[{datetime.now():%H:%M:%S}] {msg}\n")
+        self.log_area.moveCursor(cursor.Start)
 
     # ---------- 相機 ----------
 
@@ -202,6 +201,8 @@ class CalibWindow(QMainWindow):
         for sn, model in cams:
             self.cmb_camera.addItem(f"SN={sn}   {model}", userData=sn)
         self.log(f"偵測到 {len(cams)} 台相機。")
+        if hasattr(self, "cmb_front"):
+            self.refresh_role_combos()
 
     def connect_camera(self):
         if self.camera is not None:
@@ -353,14 +354,18 @@ class CalibWindow(QMainWindow):
             total_err += cv2.norm(self.imgpoints[i], proj, cv2.NORM_L2) / len(proj)
         mean_err = total_err / len(self.objpoints)
 
-        self.log("校正完成")
-        self.log(f"  RMS: {ret:.4f}")
-        self.log(f"  平均重投影誤差: {mean_err:.4f} px  (< 0.5 為佳)")
-        self.log(f"  fx={mtx[0,0]:.2f}  fy={mtx[1,1]:.2f}")
-        self.log(f"  cx={mtx[0,2]:.2f}  cy={mtx[1,2]:.2f}")
-        self.log(f"  畸變係數: {np.round(dist.ravel(), 6)}")
+        # 結果合成一則訊息，避免「最新在上」時多行順序顛倒
+        self.log(
+            f"校正完成 SN={self.connected_sn}\n"
+            f"  RMS: {ret:.4f}\n"
+            f"  平均重投影誤差: {mean_err:.4f} px  (< 0.5 為佳)\n"
+            f"  fx={mtx[0,0]:.2f}  fy={mtx[1,1]:.2f}\n"
+            f"  cx={mtx[0,2]:.2f}  cy={mtx[1,2]:.2f}\n"
+            f"  畸變係數: {np.round(dist.ravel(), 6)}"
+        )
 
-        out_name = f"calib_SN{self.connected_sn}.npz"
+        os.makedirs(calib_store.INTRINSIC_DIR, exist_ok=True)
+        out_name = os.path.join(calib_store.INTRINSIC_DIR, f"calib_SN{self.connected_sn}.npz")
         np.savez(
             out_name,
             mtx=mtx, dist=dist,
@@ -385,22 +390,9 @@ class CalibWindow(QMainWindow):
 
     def _append_to_json(self, mtx, dist, rms, mean_err):
         """把這台相機的內參累積寫入 intrinsics_all.json（以序號為鍵）。
-
-        下游（calib_extrin.py、calibrated_3d_viewer.py）讀的是 stereo_calib.json，
-        其結構只有 camera_front / camera_side 兩個固定鍵。這裡先以序號保存所有相機，
-        待確定哪台擔任正面/側面後，再用「產生 stereo_calib.json」按鈕組合輸出。
+        3D 計算時再依 camera_roles.json 取出正面/側面各自的內參。
         """
-        path = INTRINSICS_JSON
-        data = {}
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception as e:
-                self.log(f"讀取既有 {path} 失敗，將重建：{e}")
-                data = {}
-
-        data[self.connected_sn] = {
+        entry = {
             "intrinsic_matrix": mtx.tolist(),
             "distortion_coefficients": dist.tolist(),
             "fx": float(mtx[0, 0]),
@@ -416,62 +408,56 @@ class CalibWindow(QMainWindow):
             "calibrated_at": datetime.now().isoformat(timespec="seconds"),
         }
 
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        try:
+            count = calib_store.save_intrinsic(self.connected_sn, entry)
+        except Exception as e:
+            self.log(f"寫入 {calib_store.INTRINSICS_JSON} 失敗：{e}")
+            return
 
-        self.log(f"已累積寫入 {path}（目前共 {len(data)} 台）")
+        self.log(f"已累積寫入 {calib_store.INTRINSICS_JSON}（目前共 {count} 台）")
         self.refresh_role_combos()
 
     def refresh_role_combos(self):
-        """更新正面/側面下拉選單的可選序號"""
-        sns = []
-        if os.path.exists(INTRINSICS_JSON):
-            try:
-                with open(INTRINSICS_JSON, "r", encoding="utf-8") as f:
-                    sns = list(json.load(f).keys())
-            except Exception:
-                pass
+        """更新正面/側面下拉選單：可選「已校正」或「目前連接」的相機，並預選現有角色"""
+        try:
+            sns = list(calib_store.load_intrinsics().keys())
+        except Exception:
+            sns = []
+        for i in range(self.cmb_camera.count()):
+            sn = self.cmb_camera.itemData(i)
+            if sn and sn not in sns:
+                sns.append(sn)
 
-        for cmb in (self.cmb_front, self.cmb_side):
-            current = cmb.currentText()
+        roles = calib_store.load_roles()
+        for cmb, role_idx in ((self.cmb_front, 0), (self.cmb_side, 1)):
+            current = cmb.currentText() or (roles[role_idx] if roles else "")
             cmb.clear()
             cmb.addItems(sns)
             idx = cmb.findText(current)
             if idx >= 0:
                 cmb.setCurrentIndex(idx)
 
-    def export_stereo_json(self):
-        """依指定的正面/側面相機，產生下游可直接使用的 stereo_calib.json"""
+    def save_roles(self):
+        """寫入 camera_roles.json：拍外參照片時決定 primary，3D 計算時決定內參"""
         front_sn = self.cmb_front.currentText()
         side_sn = self.cmb_side.currentText()
 
         if not front_sn or not side_sn:
-            self.log("請先完成校正，並選擇正面與側面相機。")
+            self.log("請先選擇正面與側面相機。")
             return
         if front_sn == side_sn:
             self.log("正面與側面不能是同一台相機。")
             return
 
-        try:
-            with open(INTRINSICS_JSON, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception as e:
-            self.log(f"讀取 {INTRINSICS_JSON} 失敗：{e}")
-            return
-
-        output = {
-            "camera_front": data[front_sn],
-            "camera_side": data[side_sn],
-            "_note": "內參由 calib.py 產生；stereo 外參需另外執行 calib_extrin.py",
-        }
-
-        with open(STEREO_JSON, "w", encoding="utf-8") as f:
-            json.dump(output, f, indent=2, ensure_ascii=False)
-
-        self.log(f"已產生 {STEREO_JSON}")
-        self.log(f"  camera_front = SN{front_sn}")
-        self.log(f"  camera_side  = SN{side_sn}")
-        self.log("  接下來可執行 calib_extrin.py 進行外參校正。")
+        calib_store.save_roles(front_sn, side_sn)
+        intr = calib_store.load_intrinsics()
+        missing = [sn for sn in (front_sn, side_sn) if sn not in intr]
+        msg = (f"已儲存角色至 {calib_store.ROLES_JSON}\n"
+               f"  正面 = SN{front_sn}\n"
+               f"  側面 = SN{side_sn}")
+        if missing:
+            msg += f"\n  注意：{', '.join('SN' + s for s in missing)} 尚未做內參校正"
+        self.log(msg)
 
     def reset_samples(self):
         self.objpoints = []
