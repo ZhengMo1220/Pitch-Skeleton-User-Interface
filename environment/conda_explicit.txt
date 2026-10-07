@@ -1,0 +1,40 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: win-64
+# created-by: conda 24.11.3
+@EXPLICIT
+https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.7.22-h4c7d964_0.conda
+https://conda.anaconda.org/conda-forge/noarch/cuda-version-12.9-h4f385c5_3.conda
+https://repo.anaconda.com/pkgs/main/win-64/ucrt-10.0.22621.0-haa95532_0.conda
+https://conda.anaconda.org/conda-forge/noarch/cuda-cudart_win-64-12.9.79-he0c23c2_0.conda
+https://conda.anaconda.org/conda-forge/win-64/libwinpthread-12.0.0.r4.gg4f2fc60ca-h57928b3_10.conda
+https://repo.anaconda.com/pkgs/main/win-64/vc14_runtime-14.44.35208-h4927774_10.conda
+https://repo.anaconda.com/pkgs/main/win-64/vc-14.3-h2df5915_10.conda
+https://repo.anaconda.com/pkgs/main/win-64/vs2015_runtime-14.44.35208-ha6b5a95_10.conda
+https://conda.anaconda.org/conda-forge/win-64/cuda-cudart-12.9.79-he0c23c2_0.conda
+https://conda.anaconda.org/conda-forge/win-64/cuda-nvrtc-12.9.86-hac47afa_1.conda
+https://conda.anaconda.org/conda-forge/win-64/libcurand-10.3.10.19-hac47afa_1.conda
+https://repo.anaconda.com/pkgs/main/win-64/libffi-3.4.4-hd77b12b_1.conda
+https://conda.anaconda.org/conda-forge/win-64/libiconv-1.18-hc1393d2_3.conda
+https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.3-hfd05255_1.conda
+https://conda.anaconda.org/conda-forge/win-64/libzlib-1.3.2-hfd05255_3.conda
+https://conda.anaconda.org/conda-forge/win-64/llvm-openmp-22.1.8-h4fa8253_0.conda
+https://conda.anaconda.org/conda-forge/win-64/openssl-3.6.3-hf411b9b_1.conda
+https://repo.anaconda.com/pkgs/main/win-64/sqlite-3.50.2-hda9a48d_1.conda
+https://conda.anaconda.org/conda-forge/win-64/libcublas-12.9.2.10-hac47afa_0.conda
+https://conda.anaconda.org/conda-forge/win-64/libxml2-16-2.15.3-h692994f_0.conda
+https://repo.anaconda.com/pkgs/main/win-64/python-3.8.20-h8205438_0.conda
+https://conda.anaconda.org/conda-forge/win-64/libxml2-2.15.3-hbc0d294_0.conda
+https://conda.anaconda.org/conda-forge/win-64/python_abi-3.8-2_cp38.tar.bz2
+https://repo.anaconda.com/pkgs/main/win-64/wheel-0.44.0-py38haa95532_0.conda
+https://conda.anaconda.org/conda-forge/win-64/libhwloc-2.13.0-default_h049141e_1000.conda
+https://repo.anaconda.com/pkgs/main/win-64/pip-24.2-py38haa95532_0.conda
+https://conda.anaconda.org/conda-forge/win-64/tbb-2023.0.0-hd3d4ead_2.conda
+https://conda.anaconda.org/conda-forge/win-64/mkl-2026.1.0-hac47afa_234.conda
+https://conda.anaconda.org/conda-forge/win-64/libblas-3.11.0-9_h8455456_mkl.conda
+https://conda.anaconda.org/conda-forge/win-64/libcblas-3.11.0-9_h2a3cdd5_mkl.conda
+https://conda.anaconda.org/conda-forge/win-64/liblapack-3.11.0-9_hf9ab0e9_mkl.conda
+https://conda.anaconda.org/conda-forge/win-64/libfaiss-1.8.0-cuda126h2919ac3_2_cuda.conda
+https://conda.anaconda.org/conda-forge/win-64/numpy-1.24.4-py38h1d91fd2_0.conda
+https://conda.anaconda.org/conda-forge/win-64/faiss-1.8.0-py38cuda120h6c7c792_1_cuda.conda
+https://conda.anaconda.org/conda-forge/win-64/faiss-gpu-1.8.0-h3722977_2.conda
