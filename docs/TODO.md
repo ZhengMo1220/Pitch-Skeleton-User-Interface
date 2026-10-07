@@ -202,6 +202,17 @@
 - **成因**：2D 分頁（`pitch_widget.py`）把球離手資料存成 **`CF_`**`..._BRandRapsodo.json`，3D 分頁（`video_widget_2.py:495`）卻用 `video_name_2`（**`CS_`**）組檔名，且 `display_roi_from_json` 沒有檔案存在檢查。第一次崩潰使 `viewer3d` 停在 `None`，之後的 `reset()` 再崩潰。`Db\Record` 內所有既有的 BRandRapsodo 檔皆為 `CF_` 開頭。非本輪校正修改造成（該行來自 234609e 前人程式碼）。`video_widget_compare.py:650,651,696` 有相同寫法。
 - **建議修正**：先找 `CF_`、再找 `CS_`（與 `pitch_widget.py:2073` 一致），都沒有就略過 ROI 顯示；`reset()` 對 `viewer3d is None` 防呆。
 
+### [P1-007] 3D 分頁載入影片時崩潰：Rapsodo 球速資料為空
+
+- **登記日期**：2026-10-07（P1-006 修正後，使用者驗證校正快照時發現）
+- **狀態**：`OPEN`（暫緩：使用者表示目前尚不使用 3D 分析）
+- **優先序**：中（3D 分頁目前無法載入任何錄影，但 3D 分析暫未使用）
+- **症狀**：`AttributeError: 'NoneType' object has no attribute 'get'`（`video_widget_2.py:638`）
+- **成因**：`BRandRapsodo.json` 的 `metrics` 在所有錄影中皆為 `null`（球速轉速靠 Rapsodo 平板 OCR 取得，而 OCR 初始化一直失敗，見 P3-002）。`data.get("metrics", {})` 在鍵存在但值為 null 時回傳 None；即使有 dict，`'N/A'` 也無法套用 `:.1f` 格式
+- **建議修正**：`metrics = data.get("metrics") or {}`，球速/轉速缺值時顯示 N/A（約 3 行）
+- **附帶**：欄位為 `velocity_mph`，畫面標示卻是 `kph`，單位不一致，有資料後會差 1.6 倍
+- **連帶待驗證**：錄影校正快照的「3D 分頁讀取」端尚未實機驗證（崩潰發生在 `applyCalibration` 之前）。錄影端已驗證：5 球皆有 `calibration.json`
+
 ### [P2-003] 自動錄影實際只有約 66～69 FPS，不是 179 FPS
 
 - **登記日期**：2026-10-07
