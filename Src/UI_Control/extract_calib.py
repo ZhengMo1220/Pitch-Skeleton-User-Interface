@@ -1,8 +1,10 @@
+import os
 import numpy as np
 import json
+from cv_utils import calib_store
 
 # 加載校正參數
-calib_data = np.load("stereo_calib.npz")
+calib_data = np.load(os.path.join(calib_store.OLD_RIG_DIR, "stereo_calib.npz"))
 
 print("=" * 60)
 print("立體相機校正參數提取")
@@ -66,9 +68,10 @@ output_data = {
     }
 }
 
-with open("stereo_calib.json", "w", encoding="utf-8") as f:
+out_path = os.path.join(calib_store.OLD_RIG_DIR, "stereo_calib.json")
+with open(out_path, "w", encoding="utf-8") as f:
     json.dump(output_data, f, indent=2)
 
 print("\n" + "=" * 60)
-print("✅ 校正參數已儲存至 stereo_calib.json")
+print(f"✅ 校正參數已儲存至 {out_path}")
 print("=" * 60)

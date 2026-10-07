@@ -7,6 +7,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 import numpy as np
 import json
 from pathlib import Path
+from cv_utils import calib_store
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QSlider)
 from PyQt5.QtCore import Qt, QTimer
@@ -250,8 +251,8 @@ class Animation3DViewer(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
-    # 預設使用當前目錄的 calibrated_3d_frames.json
-    json_file = Path(__file__).parent / "calibrated_3d_frames.json"
+    # 預設使用舊設備資料夾的 calibrated_3d_frames.json
+    json_file = Path(calib_store.OLD_RIG_DIR) / "calibrated_3d_frames.json"
     
     # 也可以從命令列參數指定文件
     if len(sys.argv) > 1:

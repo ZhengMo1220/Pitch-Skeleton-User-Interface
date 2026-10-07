@@ -34,6 +34,10 @@ POINTS_JSON = {
 }
 FUNDAMENTAL_JSON = os.path.join(EXTRINSIC_DIR, "fundamental.json")
 
+# 舊設備（2026-02 前人）的校正資料，供 calib_extrin.py、calibrated_3d_viewer.py、
+# extract_calib.py、view_3d_animation.py 等舊工具讀寫；主流程不使用
+OLD_RIG_DIR = os.path.join(CALIB_DIR, "old_rig_20260223")
+
 
 def read_json(path):
     """讀取 JSON；檔案不存在回傳 None。"""
