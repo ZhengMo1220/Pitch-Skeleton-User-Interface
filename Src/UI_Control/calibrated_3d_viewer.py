@@ -9,6 +9,7 @@ import cv2
 import json
 from vispy import scene, app
 from pathlib import Path
+from cv_utils import calib_store
 
 
 class Calibrated3DViewer:
@@ -23,7 +24,7 @@ class Calibrated3DViewer:
             calib_folder: 校正文件所在文件夾，如果為None則使用當前目錄
         """
         if calib_folder is None:
-            calib_folder = Path(__file__).parent
+            calib_folder = Path(calib_store.OLD_RIG_DIR)
         else:
             calib_folder = Path(calib_folder)
         
@@ -44,7 +45,7 @@ class Calibrated3DViewer:
         self.init_vispy()
         
         # 自動存檔設置
-        self.save_json_path = "calibrated_3d_frames.json"
+        self.save_json_path = os.path.join(calib_store.OLD_RIG_DIR, "calibrated_3d_frames.json")
         self.auto_save = True
 
     def load_calibration(self, calib_folder):

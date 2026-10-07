@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 import json
 from pathlib import Path
+from cv_utils import calib_store
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QTableWidget, QTableWidgetItem, QMessageBox, QTextEdit, QFileDialog)
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QTimer, QSize
@@ -96,7 +97,7 @@ class ExtrinsicCalibWindow(QMainWindow):
 
     def load_intrinsics(self):
         """從 stereo_calib.json 載入內參"""
-        calib_file = Path(__file__).parent / "stereo_calib.json"
+        calib_file = Path(calib_store.OLD_RIG_DIR) / "stereo_calib.json"
         
         if calib_file.exists():
             try:
@@ -356,10 +357,11 @@ class ExtrinsicCalibWindow(QMainWindow):
                 "image_points_side": self.points_2d_side
             }
             
-            with open("extrinsics.json", "w", encoding="utf-8") as f:
+            out_path = os.path.join(calib_store.OLD_RIG_DIR, "extrinsics.json")
+            with open(out_path, "w", encoding="utf-8") as f:
                 json.dump(extrinsics_data, f, indent=2)
             
-            self.log("✅ 外參已儲存至 extrinsics.json")
+            self.log(f"✅ 外參已儲存至 {out_path}")
             
         except Exception as e:
             self.log(f"❌ 計算失敗: {str(e)}")
