@@ -449,7 +449,8 @@ class PoseVideoTabControl(QWidget):
         
         self.resetPhaseDetection()
         # self.reset3DInfo()
-        self.viewer3d.reset()
+        if self.viewer3d is not None:
+            self.viewer3d.reset()
         self.person_selector.reset()
         self.person_selector_2.reset()
         self.kpt_selector.reset()
@@ -492,8 +493,19 @@ class PoseVideoTabControl(QWidget):
         self.ui.showSkeletonCheckBox.setChecked(False)
         self.keyframe_logger = SimpleKeyframeLogger(self.video_loader.folder_path)
 
-        rapsodo_json_path = os.path.join(self.video_loader.folder_path, f"{os.path.splitext(self.video_loader.video_name_2)[0]}_BRandRapsodo.json")
-        self.display_roi_from_json(rapsodo_json_path, self.ui.RoiLabel, self.ui.RoiLabel_2, self.ui.RapsodoDataLabel_2, self.spin_direction_widget)
+        # 2D 分頁把球離手資料存成 CF_..._BRandRapsodo.json：先找 CF、再找 CS，都沒有就略過
+        video_names = sorted([self.video_loader.video_name, self.video_loader.video_name_2],
+                             key=lambda name: not os.path.basename(str(name)).startswith("CF_"))
+        rapsodo_json_path = None
+        for name in video_names:
+            candidate = os.path.join(self.video_loader.folder_path, f"{os.path.splitext(os.path.basename(str(name)))[0]}_BRandRapsodo.json")
+            if os.path.exists(candidate):
+                rapsodo_json_path = candidate
+                break
+        if rapsodo_json_path:
+            self.display_roi_from_json(rapsodo_json_path, self.ui.RoiLabel, self.ui.RoiLabel_2, self.ui.RapsodoDataLabel_2, self.spin_direction_widget)
+        else:
+            print("[3D] 此錄影沒有 BRandRapsodo.json，略過球離手畫面顯示")
 
         layout = self.ui.vispy_widget.layout()
         while layout.count():
