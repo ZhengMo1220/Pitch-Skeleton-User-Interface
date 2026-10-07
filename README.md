@@ -15,7 +15,7 @@
 | 作業系統 | Windows 10/11 64-bit |
 | 顯示卡 | NVIDIA，驅動版本 **≥ 520**（需支援 CUDA 11.8）。實驗室為 RTX 4090／驅動 560.94。**RTX 50 系列不支援**此環境 |
 | 軟體 | [Anaconda](https://www.anaconda.com/download)、[Git](https://git-scm.com/)、[Visual Studio 2022 Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)（勾選「使用 C++ 的桌面開發」，部分套件需現場編譯） |
-| 不在 git 裡的檔案 | **模型權重**（3.1 GB）與 **Spinnaker SDK 安裝包**（191 MB），向專案維護者索取 |
+| 不在 git 裡的檔案 | **模型權重**與 **Spinnaker SDK** 打包為 `Pitcher_筆電安裝包.zip`（約 3 GB），從[雲端硬碟](https://drive.google.com/drive/folders/118_mVMTLW6fZl6LcJljtjAKD-0s6X4_6?usp=sharing)下載（需維護者授權）。解壓縮後內含 `安裝順序.txt`、`01_Spinnaker_4.0.0.116\`、`02_模型權重_Db_pretrain\` |
 
 CUDA Toolkit 不必另外安裝：PyTorch 與 mmcv 使用的是自帶 CUDA 11.8 的預編譯版本。
 
@@ -25,7 +25,7 @@ CUDA Toolkit 不必另外安裝：PyTorch 與 mmcv 使用的是自帶 CUDA 11.8 
 git clone https://github.com/ZhengMo1220/Pitch-Skeleton-User-Interface.git
 ```
 
-把模型權重（`.pth` 檔）放到 `Db\pretrain\`：
+把安裝包 `02_模型權重_Db_pretrain\` 裡的 `.pth` 檔全部複製到 `Db\pretrain\`：
 
 ```
 Db\pretrain\
@@ -33,8 +33,6 @@ Db\pretrain\
 ├─ yolov8_s_syncbn_fast_8xb16-500e_coco_20230117_180101-5aa5f0f1.pth ← 人物偵測（程式預設使用）
 └─ 其他 .pth（備用模型）
 ```
-
-前人留下的[雲端硬碟連結](https://drive.google.com/drive/folders/1D7Q5bTnTAfKkfLuppqUo4_8W4t0wrCmP?usp=sharing)也有部分權重，但尚未確認是否包含上面兩個預設使用的檔案，以維護者提供的版本為準。
 
 ### 2. 建立 conda 環境
 
@@ -70,7 +68,7 @@ cd ..\..
 
 **必須使用 4.0.0.116**，不要到官網下載最新版（原因見本節最後）。
 
-a. 關閉所有相機程式、拔除相機，以系統管理員身分**依序**安裝：
+a. 關閉所有相機程式、拔除相機，以系統管理員身分**依序**安裝安裝包 `01_Spinnaker_4.0.0.116\` 內的檔案：
 
 `TeledyneCommonComponentsSetup.exe` → `VCRedist_v140_x64.msi` → `Spinnaker_GenICam_v140_x64.msi` → `Spinnaker_Binaries_v140_x64.msi` → `Spinnaker_GenTL_v140_x64.msi` → `Spinnaker_Drivers_x64.msi`
 
@@ -82,7 +80,7 @@ c. 安裝 Python 版 SDK：
 
 ```
 conda activate Pitcher
-pip install "<安裝包路徑>\spinnaker_python-4.0.0.116-cp38-cp38-win_amd64.whl"
+pip install "<安裝包路徑>_Spinnaker_4.0.0.116\spinnaker_python-4.0.0.116-cp38-cp38-win_amd64.whl"
 ```
 
 > **為什麼鎖定 4.0.0.116**：PySpin 與 Spinnaker SDK 版本必須完全一致，混搭會出現 `DLL load failed while importing PySpin`。PySpin 的 wheel 也綁定 Python 版本（`cp38` = Python 3.8），而本專案的 OpenMMLab 套件建構於 Python 3.8，較新的 Spinnaker 已不提供 cp38 版本，升級 SDK 等於要整套環境一起升級。
