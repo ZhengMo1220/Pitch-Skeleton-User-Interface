@@ -4,6 +4,8 @@ import numpy as np
 import os
 import json
 
+from cv_utils import calib_store
+
 # === 設定圖像資料夾路徑清單 ===
 img_folders = [
     ('cf', '../../Db/Record/Calibrate_Picture/cf'),
@@ -77,8 +79,9 @@ def process_folder(folder_name, img_folder):
     show_image()
     plt.show()
 
-    # 儲存點位
-    out_json = f'selected_points_{folder_name}.json'
+    # 儲存點位（Db/Calibration/extrinsic/）
+    out_json = calib_store.POINTS_JSON[folder_name]
+    os.makedirs(os.path.dirname(out_json), exist_ok=True)
     with open(out_json, 'w') as f:
         json.dump(all_points, f, indent=2)
     print(f"📝 所有點位已儲存至 {out_json}")
