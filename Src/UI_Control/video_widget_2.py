@@ -25,6 +25,7 @@ import pyqtgraph as pg
 from triangulate_3d_viewer import Triangulate3DViewer
 import time
 from utils.keyframe_export import SimpleKeyframeLogger
+from cv_utils import calib_store
 
 class SliderColorOverlay(QWidget):
     def __init__(self, slider: QSlider, segments: list, segment_half_thickness: int = 10):
@@ -231,6 +232,8 @@ class PoseVideoTabControl(QWidget):
             [ 1.58917237e-07,  2.44307598e-07, -3.48771760e-03],
             [-9.75476979e-05,  7.35402506e-04,  1.00000000e+00]
         ]) #0505
+        # 上面寫死的是舊設備的參數：錄影資料夾沒有校正快照（calibration.json）時才使用
+        self.default_calibration = (self.K_F, self.K_S, self.F)
         
         pg.setConfigOptions(foreground=QColor(113,148,116), antialias = True)
         pg.setConfigOption('background', 'w')
@@ -498,9 +501,23 @@ class PoseVideoTabControl(QWidget):
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
+        self.applyCalibration(self.video_loader.folder_path)
         self.viewer3d = Triangulate3DViewer(self.K_S, self.K_F, self.F)
         self.viewer3d.setJsonPaths(self.video_loader.folder_path, self.video_loader.video_name)
         layout.addWidget(self.viewer3d.get_canvas().native)
+
+    def applyCalibration(self, folder_path):
+        """依錄影資料夾內的校正快照設定 K_F、K_S、F；沒有快照則用寫死的舊設備參數。"""
+        snapshot = calib_store.load_snapshot(folder_path) if folder_path else None
+        if snapshot is not None:
+            self.K_F, self.K_S, self.F = snapshot["K_F"], snapshot["K_S"], snapshot["F"]
+            print(f"[3D] 使用錄影時的校正快照：正面 SN{snapshot['front']}、側面 SN{snapshot['side']}")
+        else:
+            self.K_F, self.K_S, self.F = self.default_calibration
+            print("[3D] 此錄影沒有校正快照，使用程式內建的舊設備參數")
+        # PoseAnalyzer 內的 3D 計算在每次三角化時才讀取 K、F，直接更新即可
+        for analyzer in (self.pose_analyzer, self.pose_analyzer_2):
+            analyzer.viewer3D.K_L, analyzer.viewer3D.K_R, analyzer.viewer3D.F = self.K_S, self.K_F, self.F
 
     def loadProcessedData(self):
         json_loader = JsonLoader(self.video_loader.folder_path, self.video_loader.video_name)
@@ -515,6 +532,7 @@ class PoseVideoTabControl(QWidget):
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
+        self.applyCalibration(self.video_loader.folder_path)
         self.viewer3d = Triangulate3DViewer(self.K_S, self.K_F, self.F)
         self.viewer3d.setJsonPaths(self.video_loader.folder_path, self.video_loader.video_name)
         layout.addWidget(self.viewer3d.get_canvas().native)
