@@ -10,8 +10,8 @@
 > **接手的 AI 請先讀這一段。** 這裡記錄「上一位助手做到哪、下一步該做什麼」，每完成一個階段性步驟就會更新。
 > 若此區塊顯示「無進行中任務」，代表上一段工作已告一段落，可直接從下方待辦清單挑選。
 
-**更新時間**：2026-10-07 18:25
-**當前任務**：使用者實機整合測試。已驗證：02 存 F、03 讀校正檔、自動錄影 5 球皆印出「校正快照已存入」且資料夾內有 `calibration.json`。**未驗證**：3D 分頁讀快照——開新錄影時因既有 bug [P1-006] 崩潰。新登記 [P1-006]、[P2-003]、[P3-002]。等使用者同意 P1-006 修正方案
+**更新時間**：2026-10-07 18:50
+**當前任務**：(1) P1-006 已修正，請使用者用 3D 分頁開 `Db\Record\20261007_Pitcher01` 任一球，確認印出「[3D] 使用錄影時的校正快照」；(2) 筆電安裝包已建在 `C:\Users\user\Downloads\Pitcher_筆電安裝包\`（Spinnaker、模型權重、conda/pip 版本鎖定檔、安裝順序.txt），正在用測試環境 `Pitcher_locktest` 驗證安裝步驟，驗證後刪除該環境；(3) 之後依安裝包更新 README（筆電為 RTX 4090 Laptop，可用 cu118）
 **實驗室演練設定**：正面 SN24380119（primary）、側面 SN24380117（secondary）
 
 ### 本輪已完成（皆已 commit 並 push）
@@ -187,7 +187,7 @@
 ### [P1-006] 3D 分頁載入影片時崩潰：找不到 `CS_..._BRandRapsodo.json`
 
 - **登記日期**：2026-10-07（使用者實機錄影後開 3D 分頁時發現）
-- **狀態**：`OPEN`（修正方案待使用者同意）
+- **狀態**：`FIXED`（2026-10-07，commit 2b1d1bc；以實際錄影資料夾測過檔案搜尋，待使用者在 GUI 確認）
 - **優先序**：高（3D 分頁無法開啟新錄影，也擋住校正快照的實機驗證）
 - **症狀**：`FileNotFoundError: ...\CS_20261007_1811_Pitcher01_P01_BRandRapsodo.json`，接著 `reset()` 中 `self.viewer3d.reset()` 報 `'NoneType' object has no attribute 'reset'`。
 - **成因**：2D 分頁（`pitch_widget.py`）把球離手資料存成 **`CF_`**`..._BRandRapsodo.json`，3D 分頁（`video_widget_2.py:495`）卻用 `video_name_2`（**`CS_`**）組檔名，且 `display_roi_from_json` 沒有檔案存在檢查。第一次崩潰使 `viewer3d` 停在 `None`，之後的 `reset()` 再崩潰。`Db\Record` 內所有既有的 BRandRapsodo 檔皆為 `CF_` 開頭。非本輪校正修改造成（該行來自 234609e 前人程式碼）。`video_widget_compare.py:650,651,696` 有相同寫法。
