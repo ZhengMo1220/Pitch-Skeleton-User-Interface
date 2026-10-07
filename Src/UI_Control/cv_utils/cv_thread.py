@@ -6,7 +6,10 @@ import cv2
 import numpy as np
 from PyQt5.QtCore import QThread, pyqtSignal, QMutex
 
-# 相機序號設定檔：放在 UI_Control 目錄下，格式為
+from cv_utils import calib_store
+
+# 舊格式的相機序號設定檔（已由 Db/Calibration/camera_roles.json 取代，仍保留相容）：
+# 放在 UI_Control 目錄下，格式為
 #   {"front": "25462483", "side": "25462481"}
 # 存在時優先採用，避免為了換相機而修改程式碼。
 CAMERA_SN_CONFIG = os.path.join(
@@ -50,13 +53,24 @@ def detect_connected_serials():
 def resolve_camera_serials(sn1=None, sn2=None):
     """決定要使用的兩台相機序號。
 
-    優先順序：明確指定 > camera_serials.json > 自動偵測 > 寫死的備援值。
+    優先順序：明確指定 > Db/Calibration/camera_roles.json（calib.py 第 4 區設定）
+             > camera_serials.json（舊格式）> 自動偵測 > 寫死的備援值。
     回傳 (sn1, sn2)。
     """
     if sn1 and sn2:
         return sn1, sn2
 
-    # 設定檔
+    # 校正時指定的角色
+    try:
+        roles = calib_store.load_roles()
+    except Exception as e:
+        roles = None
+        logging.warning("讀取 %s 失敗: %s", calib_store.ROLES_JSON, e)
+    if roles:
+        logging.info("使用 camera_roles.json: front=%s side=%s", *roles)
+        return roles
+
+    # 舊格式設定檔
     if os.path.exists(CAMERA_SN_CONFIG):
         try:
             with open(CAMERA_SN_CONFIG, "r", encoding="utf-8") as f:
