@@ -2,7 +2,7 @@
 
 給要重建開發環境、除錯、或接手維護這個專案的人看。使用者安裝步驟請見 [README.md](../README.md)；AI 助手的協作規範與問題追蹤表請見 [TODO.md](TODO.md)。這份文件記錄「為什麼」——每個已知問題的成因與排查過程，方便日後遇到類似狀況時參考。
 
-最後更新：2026-09-21
+最後更新：2026-10-07
 
 ---
 
@@ -41,7 +41,7 @@
 **接下來的工作順序**
 1. 修好 2D 分頁的兩個問題（P1-001、P1-002）
 2. 比對新舊兩版骨架偵測程式（`detect_skeleton.py` vs `detect_skeleton_new.py`），決定要怎麼收拾這個未完成的重構
-3. 相機內參重新校正（因應 9/17 場勘後的新 8 台相機架構）
+3. 相機校正：流程已整理完成、輸出統一存到 `Db\Calibration`（2026-10-07），待正式現場校正
 4. GB10 主機的相機連接測試（等實體機器到手）
 
 ---
@@ -100,16 +100,27 @@ pip install --force-reinstall --no-deps opencv-python==4.8.1.78
 
 ## 相機硬體相關
 
-### 相機序號寫死在程式碼中
+### 相機校正流程（2026-10-07 更新）
 
-`Src\UI_Control\cv_utils\cv_thread.py` 第 66-71 行：
-```python
-SN1 = "25462483"
-SN2 = "25462481"
-self.camera1 = FlirCameraSystem(CONFIG, SN1)
-self.camera2 = FlirCameraSystem(CONFIG_2, SN2)
-```
-接上不同的實體 FLIR 相機時，需要直接修改此處的序號常數，目前沒有設定檔或環境變數的動態帶入機制。
+所有校正結果都存在 `Db\Calibration\`（不進 git），程式會自動讀取，不必再手動把數字貼進程式碼。
+
+| 步驟 | 執行 | 要接什麼 | 產出 |
+|---|---|---|---|
+| 1. 內參（每台各做一次） | `python calib.py`，選相機 → 連接 → 擷取 15~20 組 → 執行校正 | 只要 USB，同步線可接可不接 | `intrinsic\intrinsics_all.json`、`calib_SN<序號>.npz` |
+| 2. 指定正面/側面 | `calib.py` 第 4 區 → 儲存角色 | — | `camera_roles.json` |
+| 3. 拍外參照片 | `python main.py` →「2D 相機」分頁 →「拍照」 | 兩台 + GPIO 同步線 | `Db\Record\Calibrate_Picture\cf\`、`cs\` |
+| 4. 標註對應點 | `python 01_ball_detect_manual.py`（先正面再側面，每張 6 點，滾輪換張） | — | `extrinsic\selected_points_cf.json`、`_cs.json` |
+| 5. 算 F 矩陣 | `python 02_ransac_8points.py` | — | `extrinsic\fundamental.json` |
+| 6. 驗證 | `python 03_3d.py`（用第 1、4 點實距 340 mm 換算尺度，畫出 3D 點） | — | — |
+
+**注意事項**
+- 以上都要在 `Src\UI_Control` 底下執行
+- 相機序號不再寫死：`cv_thread.py` 依序採用「呼叫端指定 → `camera_roles.json` → 舊版 `camera_serials.json` → 自動偵測 → 預設值」
+- `01` 每次執行會從空白開始並覆蓋 JSON。若只是打開看看就關掉，會把結果清空（2026-10-07 演練時發生過）
+- `02` 每次跑出的 F 會略有不同（RANSAC 隨機抽樣，未固定種子）
+- 3D 分頁（`video_widget_2.py`）**目前仍使用寫死的舊設備參數**，尚未改為讀取校正檔（見 TODO P2-001）
+
+**2026-10-07 實驗室演練結果**（兩台 6mm 鏡頭，僅為熟悉流程）：外參 4 組照片 × 6 點 = 24 點，內點 12/24。原因是內點門檻 1 px 對手點球心太嚴（實際中位誤差 2.86 px），加上沒有做去畸變。
 
 ### `camera_widget.py` 的 `model` 參數已移除
 

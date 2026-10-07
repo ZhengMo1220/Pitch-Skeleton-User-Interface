@@ -1,7 +1,7 @@
 # 專案工作區（AI 協作規範 + 問題追蹤 + 待辦）
 
 > **這份文件給 AI 助手看**（Claude / GPT / 其他模型）。人類閱讀的白話說明請見 [DEVELOPMENT.md](DEVELOPMENT.md)。
-> 最後更新：2026-09-21
+> 最後更新：2026-10-07
 
 ---
 
@@ -10,25 +10,31 @@
 > **接手的 AI 請先讀這一段。** 這裡記錄「上一位助手做到哪、下一步該做什麼」，每完成一個階段性步驟就會更新。
 > 若此區塊顯示「無進行中任務」，代表上一段工作已告一段落，可直接從下方待辦清單挑選。
 
-**更新時間**：2026-10-07
-**當前任務**：相機內參校正（明天現場作業）
-**狀態**：`calib.py` 已重寫完成並實測通過（首次校正重投影誤差 0.38 px）
+**更新時間**：2026-10-07 17:40
+**當前任務**：校正流程改為自動讀寫 `Db\Calibration`（已完成 1～4 步並 commit），等使用者決定 3D 分頁做法與兩個新發現的問題
+**實驗室演練設定**：正面 SN24380119（primary）、側面 SN24380117（secondary）
 
-### 明天校正作業須知
+### 本輪已完成（皆已 commit，尚未 push）
+1. 新增 `cv_utils/calib_store.py`：校正檔路徑與讀寫集中於此（`Db\Calibration\{camera_roles.json, intrinsic\, extrinsic\}`）
+2. `calib.py`：輸出改到 `Db\Calibration\intrinsic\`；log 最新在上 + 時間戳；第 4 區改為「儲存角色」寫 `camera_roles.json`（原 `stereo_calib.json` 輸出移除，現行流程無人讀取）
+3. `01`：輸出改到 `extrinsic\`；`02`：讀 `extrinsic\`、F 存 `fundamental.json`（含角色、內點數、門檻）、移除用寫死舊 F/K 覆蓋的段落，改用真實內參算 R、t（缺內參則略過）
+4. `03_3d.py`：讀 `load_stereo_calibration()`，缺資料時印警告並退回寫死舊值
+5. `cv_thread.py`：序號優先讀 `camera_roles.json`，舊 `camera_serials.json` 仍相容；example 檔移除
+6. 資料搬移：`intrinsics_all.json`、`calib_SN24380119.npz` → `Db\Calibration\intrinsic\`；演練點位 → `extrinsic\`；舊設備點位備份 → `extrinsic\old_rig_backup_20261007\`；`Src\UI_Control\selected_points_*.json` 已從 git 移除（本機版已被 01 清空成 `{}`，原內容在 git 歷史）
 
-**執行方式**
-```
-conda activate Pitcher
-cd Src\UI_Control
-python calib.py
-```
+### 待使用者決定
+- **3D 分頁（`video_widget_2.py`）做法**：已評估，建議 (c)「錄影時把校正值快照存進該筆錄影資料夾 `calibration.json`，3D 分頁優先讀資料夾內的快照，沒有則退回目前寫死值」。改動點：`calib_store` 加 snapshot/load 函式、`pitch_widget.py` 第 771 與 2433 行建立資料夾後各加一行、`video_widget_2.py` 的 `loadVideo`/`loadProcessedData` 在建 `Triangulate3DViewer` 前取參數，並同步更新 `setupComponents` 建的兩個 `PoseAnalyzer`（`utils/analyze_3d.py` 內含自己的 `Triangulate3DViewer`）
+- **[新發現 A] `calib.py` 平均重投影誤差算錯**：沿用 OpenCV 教學寫法 `cv2.norm(L2)/N`，等於 RMS/√N，嚴重低估。實際：SN25462483 RMS **3.93 px（不合格，先前誤報 0.38 為佳）**；SN24380119 RMS 0.449 px（合格，介面顯示 0.029）。建議改為顯示 RMS 並以 RMS > 1.0 警告；待使用者同意
+- **[新發現 B] SN24380119 鏡頭焦距疑似不是 6mm**：fx 1411.8 × 像素 5.86 µm ≈ 8.3 mm（與論文 8mm 側面鏡頭 K_S fx 1405.8 吻合）。請使用者確認鏡頭標示
 
-**流程**：選相機 → 連接 → 確認棋盤格規格 → 擷取 10~15 組 → 執行校正 → 中斷連接 → 換下一台（共三台）→ 最後指定正面/側面並產生 `stereo_calib.json`
+### 其他已知事項
+- `02` 內點 12/24：門檻 1.0 px 對手點過嚴（中位誤差 2.86 px；門檻 3/5/8 px 時內點 12/15/19），且未去畸變。RANSAC 無固定種子，每次 F 不同
+- `findChessboardCornersSB`：使用者詢問過，結論現階段不改；正面長焦若常偵測失敗再換
+- `FlirCameraSystem` 開啟時載入 Default user set（觸發關閉），`calib.py` 單台開啟不會卡同步
 
-**輸出檔案**
-- `calib_SN<序號>.npz`：單台完整校正資料（自動）
-- `intrinsics_all.json`：所有相機內參，以序號為鍵累積（自動）
-- `stereo_calib.json`：下游程式實際讀取的檔案（**需手動按按鈕產生**）
+### 正式校正須知
+
+**流程**：見 [DEVELOPMENT.md「相機校正流程」](DEVELOPMENT.md)（內參 → 指定角色 → 拍照 → 01 → 02 → 03 驗證）
 
 **校正板規格差異（重要，來自論文 PPT slide 13）**
 
@@ -39,9 +45,20 @@ python calib.py
 
 正面需要大 10 倍的校正板，因為 50mm 長焦架在 13 公尺外，小板子在畫面上佔比太小、角點間距不足，校正精度會嚴重劣化。**手邊的 8×11 / 10mm 板子適用側面，正面可能不夠**——現場判斷標準：板子需佔畫面 1/3 以上且能移到四個角落。
 
-**相機序號**：`cv_thread.py` 不再寫死序號。優先序為「明確指定 > `camera_serials.json` > 自動偵測前兩台 > 內建預設」。明天若要指定特定兩台做外參校正，複製 `camera_serials.json.example` 為 `camera_serials.json` 並填入序號即可。
+**已知限制**：外參拍照（「2D 相機」分頁）透過 `VideoCaptureThread`，因此必須接兩台 + GPIO 同步線。
 
-**已知限制**：外參校正（`calib_extrin.py`）仍透過 `VideoCaptureThread`，因此必須接兩台 + GPIO 同步線。另外 `video_widget_2.py` 的內參是寫死的，不會讀取新校正結果（見 P2-001）。
+### 外參校正流程待優化（2026-10-07 演練時使用者提出）
+
+- [x] 輸出位置改到 `Db\Calibration\`（2026-10-07 完成）
+- [ ] 01 每次執行從空白開始並整個覆寫 JSON；只想重點側面也會清空正面 → 改為載入既有點位、可指定只處理單一視角或單張
+- [ ] 01 正面/側面分兩個視窗點，順序容易對錯 → 改為左右並排同時標註
+- [ ] 校正桿是白色球，可自動偵測球心，人只負責確認順序
+- [x] 02 結果存檔、移除寫死值（2026-10-07 完成）
+- [ ] `video_widget_2.py` 的 K_F/K_S/F 寫死 → 見上方「待使用者決定」（同 P2-001）
+- [ ] 02 內點門檻與去畸變
+- [ ] 拍照、標註、計算整合為單一校正工具
+
+驗證基準：2026-10-07 演練資料 `Db\Record\Calibrate_Picture\`（4 組：01、02、04、05）及 `Db\Calibration\extrinsic\selected_points_cf/cs.json`。
 
 ---
 
