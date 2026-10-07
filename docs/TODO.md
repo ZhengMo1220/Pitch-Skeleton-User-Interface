@@ -63,6 +63,10 @@
 - [ ] 02 內點門檻與去畸變
 - [ ] 拍照、標註、計算整合為單一校正工具
 
+### 程式輸出統一放到 Db（2026-10-07 使用者提出，暫不處理）
+
+- [ ] 盤點所有會寫檔的程式（3D 輸出、匯出、平板擷取、舊工具等），規劃放到 `Db\` 底下分類存放，避免散落在 `Src\UI_Control`
+
 驗證基準：2026-10-07 演練資料 `Db\Record\Calibrate_Picture\`（4 組：01、02、04、05）及 `Db\Calibration\extrinsic\selected_points_cf/cs.json`。
 
 ---
