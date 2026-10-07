@@ -10,8 +10,12 @@
 > **接手的 AI 請先讀這一段。** 這裡記錄「上一位助手做到哪、下一步該做什麼」，每完成一個階段性步驟就會更新。
 > 若此區塊顯示「無進行中任務」，代表上一段工作已告一段落，可直接從下方待辦清單挑選。
 
-**更新時間**：2026-10-07 18:50
-**當前任務**：(1) P1-006 已修正，請使用者用 3D 分頁開 `Db\Record\20261007_Pitcher01` 任一球，確認印出「[3D] 使用錄影時的校正快照」；(2) 筆電安裝包已建在 `C:\Users\user\Downloads\Pitcher_筆電安裝包\`（Spinnaker、模型權重、conda/pip 版本鎖定檔、安裝順序.txt），正在用測試環境 `Pitcher_locktest` 驗證安裝步驟，驗證後刪除該環境；(3) 之後依安裝包更新 README（筆電為 RTX 4090 Laptop，可用 cu118）
+**更新時間**：2026-10-07 19:30
+**當前任務**：
+- 筆電安裝包 `C:\Users\user\Downloads\Pitcher_筆電安裝包\` **已實測通過**（全新 conda 環境照「安裝順序.txt」安裝 → 版本與 Pitcher 環境逐一比對一致（僅刻意排除 mmcv-full）→ 實際載入 YOLO + ViTPose 模型與 PySpin 成功），測試環境已刪除。試裝過程修正 4 個問題：pip 用 cp950 讀 requirements（鎖定檔改純 ASCII）、原環境有刻意的依賴不一致（改 `--no-deps`）、mm 子專案 setup.py 需 torch（加 `--no-build-isolation`）、freeze 漏 setuptools（補 60.2.0）。另注意：未 `conda activate` 直接呼叫 python.exe 時，numpy 會載到 base 環境的 MKL 而當機，安裝與執行一律在已啟動的環境中進行
+- 待辦：依安裝包更新 README 安裝段落（先給使用者看）
+- 待使用者決定：UI_Control 資料檔整理（舊設備校正 → `Db\Calibration\old_rig_20260223\`；輸出/截圖 → `Db\Archive\UI_Control_20261007\`；刪除 660MB `trt_cache`（sm120，4090 不可用）；三支舊工具路徑是否跟著改）。注意 `side_camera_calib.npz` 內容其實是正面 50mm 內參（fx 7927.87）
+- 待使用者實測：P1-006 修正後用 3D 分頁開 20261007 錄影，確認印出「使用錄影時的校正快照」
 **實驗室演練設定**：正面 SN24380119（primary）、側面 SN24380117（secondary）
 
 ### 本輪已完成（皆已 commit 並 push）
