@@ -2,6 +2,11 @@ import json
 import numpy as np
 import cv2
 
+from cv_utils import calib_store
+
+# 點到對極線的距離小於此值（像素）才算內點
+INLIER_THRESHOLD_PX = 1.0
+
 def load_correspondences(json_path_left, json_path_right):
     # 讀取左右視角的 json 檔
     with open(json_path_left, 'r') as f_left:
@@ -31,7 +36,7 @@ def load_correspondences(json_path_left, json_path_right):
 
     return pts1_all, pts2_all
 
-pts1, pts2 = load_correspondences("selected_points_cs.json", "selected_points_cf.json")
+pts1, pts2 = load_correspondences(calib_store.POINTS_JSON["cs"], calib_store.POINTS_JSON["cf"])
 
 print("總共匹配點對數：", len(pts1))
 
@@ -97,9 +102,16 @@ def ransac_fundamental(x1, x2, threshold=1.0, iterations=2000):
 
     return best_F, max_inliers
 
-F, inliers = ransac_fundamental(pts1, pts2)
+F, inliers = ransac_fundamental(pts1, pts2, threshold=INLIER_THRESHOLD_PX)
 print("估計出的基本矩陣 F：\n", F)
 print("內點數量：", len(inliers), "/", len(pts1))
+
+roles = calib_store.load_roles()
+front_sn, side_sn = roles if roles else (None, None)
+if roles is None:
+    print("警告：尚未設定相機角色（calib.py 第 4 區），F 將無法被 3D 程式採用")
+calib_store.save_fundamental(F, front_sn, side_sn, len(inliers), len(pts1), INLIER_THRESHOLD_PX)
+print(f"F 已儲存至 {calib_store.FUNDAMENTAL_JSON}（front={front_sn} side={side_sn}）")
 
 def compute_essential_matrix(F, K_L, K_R):
     E = K_R.T @ F @ K_L
@@ -152,29 +164,19 @@ def triangulate_and_disambiguate(pts1, pts2, K_L, K_R, F):
 
     return best_points_3d, best_pose
 
-K_F = np.array([
-    [7.92787455e+03, 0.0, 8.69870446e+02],
-    [0.0, 8.03959073e+03, 7.16810004e+02],
-    [0.0, 0.0, 1.0]
-])
+# 以本次估得的 F 與兩台相機的內參計算 R、t（原本此處用寫死的舊 F/K 覆蓋，已移除）
+intr_f = calib_store.get_intrinsic(front_sn) if front_sn else None
+intr_s = calib_store.get_intrinsic(side_sn) if side_sn else None
+if intr_f is None or intr_s is None:
+    print("略過 R、t 計算：正面或側面相機尚未做內參校正（calib.py）")
+else:
+    K_F, K_S = intr_f[0], intr_s[0]
+    pts1_inliers = pts1[inliers]
+    pts2_inliers = pts2[inliers]
+    best_points_3d, best_pose = triangulate_and_disambiguate(pts1_inliers, pts2_inliers, K_S, K_F, F)
+    R, t = best_pose
 
-K_S = np.array([
-    [1.40583815e+03, 0.0, 9.64222231e+02],
-    [0.0, 1.40662233e+03, 5.75695704e+02],
-    [0.0, 0.0, 1.0]
-])
-
-F = np.array([
-            [-1.00177788e-07,  2.16557273e-06, -7.90363312e-04],
-            [ 1.58917237e-07,  2.44307598e-07, -3.48771760e-03],
-            [-9.75476979e-05,  7.35402506e-04,  1.00000000e+00]
-])
-pts1_inliers = pts1[inliers]
-pts2_inliers = pts2[inliers]
-best_points_3d, best_pose = triangulate_and_disambiguate(pts1_inliers, pts2_inliers, K_S, K_F, F)
-R, t = best_pose
-
-print("=====================================")
-print("相對旋轉矩陣 R (Rotation): \n", R)
-print("\n相對平移向量 t (Translation): \n", t)
-print("=====================================")
+    print("=====================================")
+    print("相對旋轉矩陣 R (Rotation): \n", R)
+    print("\n相對平移向量 t (Translation): \n", t)
+    print("=====================================")
