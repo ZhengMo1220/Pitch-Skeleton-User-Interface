@@ -72,9 +72,9 @@ cd ..\..
 
 a. 關閉所有相機程式、拔除相機，以系統管理員身分**依序**安裝：
 
-`TeledyneCommonComponentsSetup.exe` → `Spinnaker_GenICam_v140_x64.msi` → `Spinnaker_Binaries_v140_x64.msi` → `Spinnaker_GenTL_v140_x64.msi` → `Spinnaker_Drivers_x64.msi`
+`TeledyneCommonComponentsSetup.exe` → `VCRedist_v140_x64.msi` → `Spinnaker_GenICam_v140_x64.msi` → `Spinnaker_Binaries_v140_x64.msi` → `Spinnaker_GenTL_v140_x64.msi` → `Spinnaker_Drivers_x64.msi`
 
-（若顯示已安裝，選 `Repair`；詢問是否安裝驅動程式時選允許）
+（若顯示已安裝，選 `Repair` 或略過；詢問是否安裝驅動程式時選允許。安裝包內另有選用的說明文件、Python 範例，以及 GigE 網路相機才需要的 `GigeVisionInterface.exe`，本專案用 USB3 相機不必安裝）
 
 b. **重新啟動 Windows**
 
