@@ -323,6 +323,13 @@ class CalibWindow(QMainWindow):
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
         corners = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
 
+        # 板子沒移動就重複擷取，等於同一組資料算好幾次，會讓誤差假性偏低
+        if self.imgpoints:
+            shift = np.mean(np.linalg.norm(corners - self.imgpoints[-1], axis=2))
+            if shift < self.DUPLICATE_SHIFT_PX:
+                self.log(f"未擷取：與上一組幾乎相同（平均位移 {shift:.1f} px），請移動或傾斜板子後再擷取。")
+                return
+
         objp = np.zeros((pattern[0] * pattern[1], 3), np.float32)
         objp[:, :2] = np.mgrid[0:pattern[0], 0:pattern[1]].T.reshape(-1, 2)
         objp *= square
@@ -330,7 +337,78 @@ class CalibWindow(QMainWindow):
         self.objpoints.append(objp)
         self.imgpoints.append(corners)
         self.captured_count += 1
-        self.log(f"已擷取第 {self.captured_count} 組樣本")
+
+        covered, missing = self._coverage()
+        msg = f"已擷取第 {self.captured_count} 組樣本｜畫面覆蓋 {covered}/9 區"
+        if missing:
+            msg += f"，尚缺：{'、'.join(missing)}"
+        self.log(msg)
+
+    # 品質判斷門檻
+    RMS_GOOD = 0.5               # RMS 低於此值為良好
+    RMS_MAX = 1.0                # RMS 高於此值判定不合格
+    MIN_SAMPLES = 15             # 建議樣本數
+    MIN_TILT_DEG = 20.0          # 至少要有一組傾斜超過此角度
+    DUPLICATE_SHIFT_PX = 5.0     # 與上一組平均位移小於此值視為重複
+    REGION_NAMES = ["左上", "上", "右上", "左", "中", "右", "左下", "下", "右下"]
+
+    def _coverage(self):
+        """把畫面切成 3x3 九宮格，回傳 (已覆蓋區數, 未覆蓋的區名)"""
+        if self.image_size is None or not self.imgpoints:
+            return 0, list(self.REGION_NAMES)
+        w, h = self.image_size
+        pts = np.vstack([c.reshape(-1, 2) for c in self.imgpoints])
+        col = np.clip((pts[:, 0] / w * 3).astype(int), 0, 2)
+        row = np.clip((pts[:, 1] / h * 3).astype(int), 0, 2)
+        hit = set((row * 3 + col).tolist())
+        missing = [name for i, name in enumerate(self.REGION_NAMES) if i not in hit]
+        return len(hit), missing
+
+    def _calibrate(self):
+        """執行校正並計算每組樣本的誤差與傾斜角"""
+        rms, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
+            self.objpoints, self.imgpoints, self.image_size, None, None
+        )
+        per_image_rms = []
+        tilts = []
+        for i in range(len(self.objpoints)):
+            proj, _ = cv2.projectPoints(self.objpoints[i], rvecs[i], tvecs[i], mtx, dist)
+            d = np.linalg.norm(self.imgpoints[i].reshape(-1, 2) - proj.reshape(-1, 2), axis=1)
+            per_image_rms.append(float(np.sqrt(np.mean(d ** 2))))
+            # 板子法向量與相機光軸的夾角
+            R, _ = cv2.Rodrigues(rvecs[i])
+            tilts.append(float(np.degrees(np.arccos(min(1.0, abs(R[2, 2]))))))
+        return rms, mtx, dist, np.array(per_image_rms), np.array(tilts)
+
+    def _assess(self, rms, per_image_rms, tilts):
+        """依門檻判斷品質，回傳 (結論, 問題清單, 異常樣本索引)"""
+        problems = []
+        bad = [i for i, e in enumerate(per_image_rms)
+               if e > self.RMS_MAX and e > 2 * rms]
+
+        if rms > self.RMS_MAX:
+            verdict = "不合格，建議重拍"
+            problems.append(f"整體誤差 {rms:.3f} px 超過 {self.RMS_MAX} px")
+        elif rms > self.RMS_GOOD:
+            verdict = "可用，但建議補拍改善"
+            problems.append(f"整體誤差 {rms:.3f} px 介於 {self.RMS_GOOD}～{self.RMS_MAX} px")
+        else:
+            verdict = "良好"
+
+        if bad:
+            problems.append(f"{len(bad)} 組樣本誤差異常（第 {', '.join(str(i + 1) for i in bad)} 組），"
+                            "可能是模糊或晃動")
+        covered, missing = self._coverage()
+        if missing:
+            problems.append(f"畫面覆蓋 {covered}/9 區，缺：{'、'.join(missing)}（邊角沒拍到，畸變會校不準）")
+        if tilts.max() < self.MIN_TILT_DEG:
+            problems.append(f"最大傾斜僅 {tilts.max():.0f}°，請加入傾斜 {self.MIN_TILT_DEG:.0f}° 以上的樣本")
+        if self.captured_count < self.MIN_SAMPLES:
+            problems.append(f"樣本僅 {self.captured_count} 組，建議至少 {self.MIN_SAMPLES} 組")
+
+        if verdict == "良好" and problems:
+            verdict = "良好，但有改善空間"
+        return verdict, problems, bad
 
     def run_calibration(self):
         if self.captured_count < 10:
@@ -343,34 +421,68 @@ class CalibWindow(QMainWindow):
         self.log("開始計算校正參數...")
         QApplication.processEvents()
 
-        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
-            self.objpoints, self.imgpoints, self.image_size, None, None
-        )
+        rms, mtx, dist, per_image_rms, tilts = self._calibrate()
+        verdict, problems, bad = self._assess(rms, per_image_rms, tilts)
 
-        # 重投影誤差：逐張計算後取平均，比 calibrateCamera 回傳的 RMS 更直觀
-        total_err = 0.0
-        for i in range(len(self.objpoints)):
-            proj, _ = cv2.projectPoints(self.objpoints[i], rvecs[i], tvecs[i], mtx, dist)
-            total_err += cv2.norm(self.imgpoints[i], proj, cv2.NORM_L2) / len(proj)
-        mean_err = total_err / len(self.objpoints)
+        # 有異常樣本時，詢問是否剔除後重算
+        if bad and self.captured_count - len(bad) >= 10:
+            reply = QMessageBox.question(
+                self, "發現異常樣本",
+                f"第 {', '.join(str(i + 1) for i in bad)} 組樣本誤差明顯偏高"
+                f"（{', '.join(f'{per_image_rms[i]:.2f}' for i in bad)} px），"
+                "可能是拍攝時模糊或晃動。\n\n要剔除這些樣本並重新計算嗎？",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+            if reply == QMessageBox.Yes:
+                for i in sorted(bad, reverse=True):
+                    del self.objpoints[i]
+                    del self.imgpoints[i]
+                self.captured_count = len(self.imgpoints)
+                self.log(f"已剔除 {len(bad)} 組異常樣本，剩 {self.captured_count} 組，重新計算...")
+                QApplication.processEvents()
+                rms, mtx, dist, per_image_rms, tilts = self._calibrate()
+                verdict, problems, bad = self._assess(rms, per_image_rms, tilts)
 
         # 結果合成一則訊息，避免「最新在上」時多行順序顛倒
-        self.log(
-            f"校正完成 SN={self.connected_sn}\n"
-            f"  RMS: {ret:.4f}\n"
-            f"  平均重投影誤差: {mean_err:.4f} px  (< 0.5 為佳)\n"
+        report = (
+            f"校正完成 SN={self.connected_sn}｜判定：{verdict}\n"
+            f"  重投影誤差 RMS: {rms:.4f} px  (< {self.RMS_GOOD} 良好，> {self.RMS_MAX} 須重拍)\n"
+            f"  單組誤差範圍: {per_image_rms.min():.3f} ~ {per_image_rms.max():.3f} px\n"
+            f"  板子傾斜範圍: {tilts.min():.0f}° ~ {tilts.max():.0f}°\n"
             f"  fx={mtx[0,0]:.2f}  fy={mtx[1,1]:.2f}\n"
             f"  cx={mtx[0,2]:.2f}  cy={mtx[1,2]:.2f}\n"
             f"  畸變係數: {np.round(dist.ravel(), 6)}"
         )
+        if problems:
+            report += "\n  待改善：\n" + "\n".join(f"   - {p}" for p in problems)
+        self.log(report)
 
+        # 不合格時先確認，避免蓋掉之前較好的結果
+        if rms > self.RMS_MAX:
+            reply = QMessageBox.warning(
+                self, "校正不合格",
+                f"重投影誤差 {rms:.3f} px，超過 {self.RMS_MAX} px。\n\n"
+                + "\n".join(f"・{p}" for p in problems)
+                + "\n\n可能原因：棋盤格規格填錯、板子不平、樣本模糊。\n"
+                "建議「清空樣本」後重拍。\n\n仍要儲存這次結果嗎？（會覆蓋這台相機之前的校正）",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply != QMessageBox.Yes:
+                self.log("未儲存本次結果。")
+                return
+        elif problems:
+            QMessageBox.information(
+                self, f"校正結果：{verdict}",
+                f"重投影誤差 {rms:.3f} px。結果已儲存，但以下項目可以改善：\n\n"
+                + "\n".join(f"・{p}" for p in problems))
+
+        mean_err = float(np.mean(per_image_rms))
         os.makedirs(calib_store.INTRINSIC_DIR, exist_ok=True)
         out_name = os.path.join(calib_store.INTRINSIC_DIR, f"calib_SN{self.connected_sn}.npz")
         np.savez(
             out_name,
             mtx=mtx, dist=dist,
             image_size=np.array(self.image_size),
-            rms=ret, mean_reproj_err=mean_err,
+            rms=rms, mean_reproj_err=mean_err,
+            per_image_rms=per_image_rms, tilt_deg=tilts,
             pattern=np.array([self.spn_cols.value(), self.spn_rows.value()]),
             square_size=self.spn_square.value(),
             serial_number=self.connected_sn,
@@ -378,17 +490,9 @@ class CalibWindow(QMainWindow):
         )
         self.log(f"已儲存至 {out_name}")
 
-        self._append_to_json(mtx, dist, ret, mean_err)
+        self._append_to_json(mtx, dist, rms, mean_err, verdict)
 
-        if mean_err > 1.0:
-            QMessageBox.warning(
-                self, "重投影誤差偏高",
-                f"平均重投影誤差為 {mean_err:.3f} px，偏高。\n\n"
-                "可能原因：棋盤格規格填錯、樣本角度不夠多樣、或板子不夠平整。\n"
-                "建議清空樣本後重新擷取。"
-            )
-
-    def _append_to_json(self, mtx, dist, rms, mean_err):
+    def _append_to_json(self, mtx, dist, rms, mean_err, verdict):
         """把這台相機的內參累積寫入 intrinsics_all.json（以序號為鍵）。
         3D 計算時再依 camera_roles.json 取出正面/側面各自的內參。
         """
@@ -402,6 +506,7 @@ class CalibWindow(QMainWindow):
             "image_size": list(self.image_size),
             "rms": float(rms),
             "mean_reproj_err": float(mean_err),
+            "verdict": verdict,
             "pattern": [self.spn_cols.value(), self.spn_rows.value()],
             "square_size_mm": self.spn_square.value(),
             "sample_count": self.captured_count,
