@@ -80,7 +80,7 @@ c. 安裝 Python 版 SDK：
 
 ```
 conda activate Pitcher
-pip install "<安裝包路徑>_Spinnaker_4.0.0.116\spinnaker_python-4.0.0.116-cp38-cp38-win_amd64.whl"
+pip install "<安裝包路徑>\01_Spinnaker_4.0.0.116\spinnaker_python-4.0.0.116-cp38-cp38-win_amd64.whl"
 ```
 
 > **為什麼鎖定 4.0.0.116**：PySpin 與 Spinnaker SDK 版本必須完全一致，混搭會出現 `DLL load failed while importing PySpin`。PySpin 的 wheel 也綁定 Python 版本（`cp38` = Python 3.8），而本專案的 OpenMMLab 套件建構於 Python 3.8，較新的 Spinnaker 已不提供 cp38 版本，升級 SDK 等於要整套環境一起升級。
