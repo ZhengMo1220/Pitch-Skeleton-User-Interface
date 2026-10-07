@@ -1,6 +1,82 @@
+import os
+import json
+import logging
+
 import cv2
 import numpy as np
 from PyQt5.QtCore import QThread, pyqtSignal, QMutex
+
+# 相機序號設定檔：放在 UI_Control 目錄下，格式為
+#   {"front": "25462483", "side": "25462481"}
+# 存在時優先採用，避免為了換相機而修改程式碼。
+CAMERA_SN_CONFIG = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "camera_serials.json"
+)
+
+# 設定檔不存在且自動偵測失敗時的最後備援（原本寫死的值）
+FALLBACK_SN1 = "25462483"
+FALLBACK_SN2 = "25462481"
+
+
+def detect_connected_serials():
+    """列出目前實際連接的 FLIR 相機序號（依 PySpin 列舉順序）。"""
+    try:
+        import PySpin
+    except ImportError:
+        return []
+
+    serials = []
+    system = PySpin.System.GetInstance()
+    try:
+        cam_list = system.GetCameras()
+        for i in range(cam_list.GetSize()):
+            cam = cam_list.GetByIndex(i)
+            try:
+                sn = cam.TLDevice.DeviceSerialNumber.GetValue()
+                if sn and sn != "unknown":
+                    serials.append(sn)
+            except Exception:
+                pass
+            del cam
+        cam_list.Clear()
+    except Exception as e:
+        logging.warning("列舉相機失敗: %s", e)
+    finally:
+        system.ReleaseInstance()
+    return serials
+
+
+def resolve_camera_serials(sn1=None, sn2=None):
+    """決定要使用的兩台相機序號。
+
+    優先順序：明確指定 > camera_serials.json > 自動偵測 > 寫死的備援值。
+    回傳 (sn1, sn2)。
+    """
+    if sn1 and sn2:
+        return sn1, sn2
+
+    # 設定檔
+    if os.path.exists(CAMERA_SN_CONFIG):
+        try:
+            with open(CAMERA_SN_CONFIG, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            front = cfg.get("front")
+            side = cfg.get("side")
+            if front and side:
+                logging.info("使用 camera_serials.json: front=%s side=%s", front, side)
+                return front, side
+        except Exception as e:
+            logging.warning("讀取 %s 失敗: %s", CAMERA_SN_CONFIG, e)
+
+    # 自動偵測：取前兩台
+    detected = detect_connected_serials()
+    if len(detected) >= 2:
+        logging.info("自動偵測到相機: %s，採用前兩台", detected)
+        return detected[0], detected[1]
+
+    logging.warning("無法自動決定相機序號，使用預設值 %s / %s", FALLBACK_SN1, FALLBACK_SN2)
+    return FALLBACK_SN1, FALLBACK_SN2
 
 
 def normalize_fps(fps, default=30.0, min_fps=1.0, max_fps=240.0) -> float:
@@ -59,14 +135,17 @@ from camera_objects import FlirCameraSystem,DualFlirSystem
 class VideoCaptureThread(QThread):
     frame_ready = pyqtSignal(np.ndarray,np.ndarray)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, sn1=None, sn2=None):
         super().__init__(parent)
         CONFIG = ".\camera_config\GH3_camera_config.yaml"
         CONFIG_2 = ".\camera_config\GH3_camera_config_2.yaml"
-        # SN1 = "21091478"
-        # SN2 = "21091470"
-        SN1 = "25462483"
-        SN2 = "25462481"
+
+        # 序號不再寫死：可由呼叫端指定、camera_serials.json 設定、或自動偵測
+        SN1, SN2 = resolve_camera_serials(sn1, sn2)
+        self.serial_front = SN1
+        self.serial_side = SN2
+        print(f"[VideoCaptureThread] front={SN1}  side={SN2}")
+
         self.camera1 = FlirCameraSystem(CONFIG,SN1)
         self.camera2 = FlirCameraSystem(CONFIG_2,SN2)
         self.cameras = DualFlirSystem(self.camera1, self.camera2)
