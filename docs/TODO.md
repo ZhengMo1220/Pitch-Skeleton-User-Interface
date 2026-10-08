@@ -232,7 +232,12 @@
 - **優先序**：中（影響時間解析度：球離手、速度計算）
 - **症狀**：相機回報 179 FPS，但 `[AutoRecord] Actual recorded FPS` 為 66～69，存檔影片 FPS 同為 66～69。
 - **已確認非新問題**：2026-05-05、08-17、09-10 的既有錄影也都是 66～69 FPS（2025-08 為 60）。先前文件中「自動錄影保持 179 FPS」的說法有誤。
-- **待查**：瓶頸在擷取執行緒、即時骨架偵測、還是 Bayer 轉換/緩衝；需先量測各段耗時再決定。
+- **成因已查明（2026-10-08）**：
+  1. `cv_thread.py` 擷取迴圈 `count % 3 == 0` 才 emit `frame_ready`，而自動錄影 `cv_control.buffer_frame` 就是接這個訊號 → 錄影只拿到 1/3 幀，實際約 59.7 FPS。`cv_control.py` 註解「自動錄影不受採樣影響，每幀都存」與事實不符
+  2. `stop_auto_recording` 寫死預錄 30 幀，實際 `pre_frames` 為 45 幀 → FPS 高估成 66～69。**已修正**（commit「Fix auto-recording FPS: subtract the real pre-roll count」），模擬驗證 60.0
+- **影響**：既有錄影標示 66～69 FPS、實際約 60 → 時間被壓縮約 12%。2D 速度（`analyze.py` 用影片 FPS）與 3D 速度（`analyze_3d.py` 寫死 dt=0.014 即 69 FPS）都高估約 10～15%
+- **待辦**：(a) 接相機跑量測腳本（scratchpad `measure_fps.py`：只取像／取像+轉色／取像+轉色+複製，各 10 秒），確認同步下實際上限；(b) 錄影改為每幀都存、顯示仍 1/3，建議存原始 Bayer（2 MB/幀）寫檔時再轉色。本機 127 GB RAM 足夠（一球約 3.5 秒：彩色約 7.8 GB、Bayer 約 2.6 GB），筆電需另評估；(c) `analyze_3d.py` 的 dt 改讀影片 FPS
+- `cv_control_compare.py` 有同樣的寫死 30 幀，但沒有任何程式 import 它，未修改
 
 ### [P3-002] 平板擷取 OCR 初始化失敗
 
