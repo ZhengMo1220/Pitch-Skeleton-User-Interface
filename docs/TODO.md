@@ -109,7 +109,7 @@
 
 棒球投球動作分析系統。源自碩士論文《基於2D-to-3D Diffusion-Transformer網路之棒球投球骨架動作切分及動作分析》（施邑穎，成大人工智慧科技碩士學位學程）。程式碼由學長姐交接，**透過 USB 複製、非 git clone**，交接時有大量未提交的開發進度，存在多處未完成的重構痕跡。
 
-目前維護者：ZhengMo（ne6141050@gs.ncku.edu.tw），倉庫：`github.com/ZhengMo1220/Pitch-Skeleton-User-Interface`
+目前維護者：ZhengMo，倉庫：`github.com/ZhengMo1220/Pitch-Skeleton-User-Interface`
 
 ### 工作原則
 

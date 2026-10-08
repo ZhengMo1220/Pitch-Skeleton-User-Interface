@@ -167,3 +167,5 @@ Src/mmpose_main/data
 # Machine-specific runtime caches / test media (too large for GitHub's 100MB limit)
 Src/UI_Control/trt_cache/
 Src/UI_Control/rapsodo_data_extraction/K_zone/input.mp4
+# Rapsodo OCR debug crops (generated when debugging OCR)
+Src/UI_Control/rapsodo_data_extraction/RapsodoMetricsOCRV2/debug/
