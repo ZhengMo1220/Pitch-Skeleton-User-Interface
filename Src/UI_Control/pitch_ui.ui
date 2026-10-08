@@ -470,7 +470,7 @@
                 <item>
                  <widget class="QLabel" name="gain">
                   <property name="text">
-                   <string>曝光:</string>
+                   <string>增益:</string>
                   </property>
                  </widget>
                 </item>

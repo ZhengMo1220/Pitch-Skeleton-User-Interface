@@ -326,6 +326,18 @@ class PosePitchTabControl(QWidget):
         self.ui.blueRatioSlider.setMaximum(400)
         self.ui.gainSlider.setMinimum(0)
         self.ui.gainSlider.setMaximum(290)
+        # 曝光時間（µs），正面/側面各自存檔。179 FPS 每幀間隔約 5580 µs，上限取 5500 以免掉幀
+        self.exposureLabel = QLabel("曝光(µs):", self.ui.groupBox)
+        self.exposureSlider = QSlider(Qt.Horizontal, self.ui.groupBox)
+        self.exposureSlider.setRange(100, 5500)
+        self.exposureSlider.setSingleStep(50)
+        self.exposureSlider.setPageStep(500)
+        self.exposure_value = QLabel("0", self.ui.groupBox)
+        exposure_row = QHBoxLayout()
+        exposure_row.addWidget(self.exposureLabel)
+        exposure_row.addWidget(self.exposureSlider)
+        exposure_row.addWidget(self.exposure_value)
+        self.ui.horizontalLayout_14.insertLayout(0, exposure_row)
         self.pitchCount = 0
         self._resolution_base_text = "(0, 0) - "
         self._perf_ema_ms = {'detect': 0.0, 'analyze': 0.0, 'draw': 0.0, 'total': 0.0}
@@ -494,6 +506,7 @@ class PosePitchTabControl(QWidget):
         self.ui.redRatioSlider.valueChanged.connect(self.onRedRatioChanged)
         self.ui.blueRatioSlider.valueChanged.connect(self.onBlueRatioChanged)
         self.ui.gainSlider.valueChanged.connect(self.onGainChanged)
+        self.exposureSlider.valueChanged.connect(self.onExposureChanged)
         # 綁定側面攝影機 radio button
         self.ui.sideCamera.toggled.connect(self.updateCameraSliders) 
         # self.ui.frontCamera.toggled.connect(self.updateCameraSliders)    
@@ -549,6 +562,16 @@ class PosePitchTabControl(QWidget):
         cam = self.get_selected_camera()
         if cam is not None:
             cam.update_white_balance(gain=ratio)
+
+    def onExposureChanged(self, value):
+        self.exposure_value.setText(str(value))
+        cam = self.get_selected_camera()
+        if cam is not None:
+            try:
+                cam.update_exposure(float(value))
+            except Exception as e:
+                # 超出相機允許範圍時 PySpin 會丟例外，只提示不中斷畫面
+                print(f"[Exposure] 設定 {value} µs 失敗：{e}")
 
     def playBtnClicked(self):
         if self.video_loader.video_name == "" or self.video_loader.video_name_2 == "":
@@ -679,21 +702,29 @@ class PosePitchTabControl(QWidget):
     def updateCameraSliders(self):
         """根據目前選擇的攝影機更新 slider 和 label 的值"""
         cam = self.get_selected_camera()
+        sliders = (self.ui.gainSlider, self.ui.redRatioSlider, self.ui.blueRatioSlider, self.exposureSlider)
         try:
             gain_value = cam.full_config['gain_settings']['gain_value']
             redRatio_value = cam.full_config['white_balance_settings']['white_balance_red_ratio']
             blueRatio_value = cam.full_config['white_balance_settings']['white_balance_blue_ratio']
-            gain_slider_value = int(gain_value * 10)
-            red_slider_value = int(redRatio_value * 100)
-            blue_slider_value = int(blueRatio_value * 100)
-            self.ui.gainSlider.setValue(gain_slider_value)
+            exposure_value = cam.full_config['exposure_settings']['exposure_time']
+            # 只是把這台的設定顯示到滑桿上，暫停訊號以免觸發存檔；
+            # 用四捨五入，避免 1.93*100=192.999… 被捨去成 1.92 而越存越小
+            for slider in sliders:
+                slider.blockSignals(True)
+            self.ui.gainSlider.setValue(round(gain_value * 10))
             self.ui.gain_value.setText(f"{gain_value:.1f}")
-            self.ui.redRatioSlider.setValue(red_slider_value)
+            self.ui.redRatioSlider.setValue(round(redRatio_value * 100))
             self.ui.red_ratio_value.setText(f"{redRatio_value:.2f}")
-            self.ui.blueRatioSlider.setValue(blue_slider_value)
+            self.ui.blueRatioSlider.setValue(round(blueRatio_value * 100))
             self.ui.blue_ratio_value.setText(f"{blueRatio_value:.2f}")
+            self.exposureSlider.setValue(round(exposure_value))
+            self.exposure_value.setText(f"{round(exposure_value)}")
         except Exception as e:
             print(f"讀取 config 設定失敗: {e}")
+        finally:
+            for slider in sliders:
+                slider.blockSignals(False)
 
     def toggleCamera(self, state:int):
         """Toggle the camera on/off based on checkbox state."""
