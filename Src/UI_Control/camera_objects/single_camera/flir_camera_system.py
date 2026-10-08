@@ -702,6 +702,9 @@ class FlirCameraSystem(SingleCameraSystem):
         Args:
             exposure_time (float): New exposure time in microseconds.
         """
+        # 整數就存成整數，避免設定檔出現 2000 → 2000.0 這種無意義的差異
+        if float(exposure_time).is_integer():
+            exposure_time = int(exposure_time)
         self.full_config['exposure_settings']['exposure_time'] = exposure_time
         self._configure_exposure()
         self._save_config()
