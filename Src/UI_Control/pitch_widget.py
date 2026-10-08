@@ -337,7 +337,16 @@ class PosePitchTabControl(QWidget):
         exposure_row.addWidget(self.exposureLabel)
         exposure_row.addWidget(self.exposureSlider)
         exposure_row.addWidget(self.exposure_value)
-        self.ui.horizontalLayout_14.insertLayout(0, exposure_row)
+        # 原本一排擠四條滑桿太短：改成兩排，上排「曝光、增益」，下排沿用原本那排「紅色、藍色」
+        self.ui.horizontalLayout_14.removeItem(self.ui.horizontalLayout_9)
+        self.ui.horizontalLayout_9.setParent(None)
+        top_row = QHBoxLayout()
+        top_row.setSpacing(16)
+        self.ui.horizontalLayout_14.setSpacing(16)
+        top_row.addLayout(exposure_row)
+        top_row.addLayout(self.ui.horizontalLayout_9)
+        color_rows = self.ui.verticalLayout
+        color_rows.insertLayout(color_rows.indexOf(self.ui.horizontalLayout_14), top_row)
         self.pitchCount = 0
         self._resolution_base_text = "(0, 0) - "
         self._perf_ema_ms = {'detect': 0.0, 'analyze': 0.0, 'draw': 0.0, 'total': 0.0}
