@@ -698,7 +698,7 @@ class Ui_pitch_ui(object):
         self.groupBox.setTitle(_translate("pitch_ui", "調色"))
         self.frontCamera.setText(_translate("pitch_ui", "正面攝影機"))
         self.sideCamera.setText(_translate("pitch_ui", "側面攝影機"))
-        self.gain.setText(_translate("pitch_ui", "曝光:"))
+        self.gain.setText(_translate("pitch_ui", "增益:"))
         self.gain_value.setText(_translate("pitch_ui", "0"))
         self.red_ratio.setText(_translate("pitch_ui", "紅色:"))
         self.red_ratio_value.setText(_translate("pitch_ui", "0"))

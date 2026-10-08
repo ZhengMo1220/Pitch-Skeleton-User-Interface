@@ -693,8 +693,21 @@ class FlirCameraSystem(SingleCameraSystem):
             gs['gain_value'] = gain
         self._configure_white_balance()
         self._configure_gain()
+        self._save_config()
 
-        # 將最新設定寫回 YAML 檔案
+    def update_exposure(self, exposure_time: float):
+        """
+        Update exposure time (microseconds), apply to camera immediately and save to YAML.
+
+        Args:
+            exposure_time (float): New exposure time in microseconds.
+        """
+        self.full_config['exposure_settings']['exposure_time'] = exposure_time
+        self._configure_exposure()
+        self._save_config()
+
+    def _save_config(self) -> None:
+        """將最新設定寫回這台相機自己的 YAML 檔案"""
         if hasattr(self, 'config_yaml_path'):
             with open(self.config_yaml_path, 'w', encoding='utf-8') as f:
                 yaml.dump(self.full_config, f, allow_unicode=True, sort_keys=False)
