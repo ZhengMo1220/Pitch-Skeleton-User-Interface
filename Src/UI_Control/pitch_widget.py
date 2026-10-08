@@ -328,11 +328,17 @@ class PosePitchTabControl(QWidget):
         self.ui.gainSlider.setMaximum(290)
         # 曝光時間（µs），正面/側面各自存檔。179 FPS 每幀間隔約 5580 µs，上限取 5500 以免掉幀
         self.exposureLabel = QLabel("曝光(µs):", self.ui.groupBox)
+        # 滑桿一格 = EXPOSURE_STEP_US，拖動與方向鍵都會落在整齊的數值上；精確值用旁邊的輸入框直接打
+        self.EXPOSURE_STEP_US = 50
         self.exposureSlider = QSlider(Qt.Horizontal, self.ui.groupBox)
-        self.exposureSlider.setRange(100, 5500)
-        self.exposureSlider.setSingleStep(50)
-        self.exposureSlider.setPageStep(500)
-        self.exposure_value = QLabel("0", self.ui.groupBox)
+        self.exposureSlider.setRange(100 // self.EXPOSURE_STEP_US, 5500 // self.EXPOSURE_STEP_US)
+        self.exposureSlider.setSingleStep(1)
+        self.exposureSlider.setPageStep(10)
+        self.exposure_value = QSpinBox(self.ui.groupBox)
+        self.exposure_value.setRange(100, 5500)
+        self.exposure_value.setSingleStep(self.EXPOSURE_STEP_US)
+        # 打字時不立刻套用，按 Enter 或離開輸入框才套用，避免打到一半就寫進相機與設定檔
+        self.exposure_value.setKeyboardTracking(False)
         exposure_row = QHBoxLayout()
         exposure_row.addWidget(self.exposureLabel)
         exposure_row.addWidget(self.exposureSlider)
@@ -515,7 +521,10 @@ class PosePitchTabControl(QWidget):
         self.ui.redRatioSlider.valueChanged.connect(self.onRedRatioChanged)
         self.ui.blueRatioSlider.valueChanged.connect(self.onBlueRatioChanged)
         self.ui.gainSlider.valueChanged.connect(self.onGainChanged)
-        self.exposureSlider.valueChanged.connect(self.onExposureChanged)
+        # 滑桿只負責改輸入框；實際套用一律由輸入框觸發，兩者不會重複寫入
+        self.exposureSlider.valueChanged.connect(
+            lambda steps: self.exposure_value.setValue(steps * self.EXPOSURE_STEP_US))
+        self.exposure_value.valueChanged.connect(self.onExposureChanged)
         # 綁定側面攝影機 radio button
         self.ui.sideCamera.toggled.connect(self.updateCameraSliders) 
         # self.ui.frontCamera.toggled.connect(self.updateCameraSliders)    
@@ -573,7 +582,10 @@ class PosePitchTabControl(QWidget):
             cam.update_white_balance(gain=ratio)
 
     def onExposureChanged(self, value):
-        self.exposure_value.setText(str(value))
+        # 讓滑桿跟上輸入框（暫停訊號，避免滑桿再回頭改輸入框）
+        self.exposureSlider.blockSignals(True)
+        self.exposureSlider.setValue(round(value / self.EXPOSURE_STEP_US))
+        self.exposureSlider.blockSignals(False)
         cam = self.get_selected_camera()
         if cam is not None:
             try:
@@ -711,7 +723,8 @@ class PosePitchTabControl(QWidget):
     def updateCameraSliders(self):
         """根據目前選擇的攝影機更新 slider 和 label 的值"""
         cam = self.get_selected_camera()
-        sliders = (self.ui.gainSlider, self.ui.redRatioSlider, self.ui.blueRatioSlider, self.exposureSlider)
+        sliders = (self.ui.gainSlider, self.ui.redRatioSlider, self.ui.blueRatioSlider,
+                   self.exposureSlider, self.exposure_value)
         try:
             gain_value = cam.full_config['gain_settings']['gain_value']
             redRatio_value = cam.full_config['white_balance_settings']['white_balance_red_ratio']
@@ -727,8 +740,8 @@ class PosePitchTabControl(QWidget):
             self.ui.red_ratio_value.setText(f"{redRatio_value:.2f}")
             self.ui.blueRatioSlider.setValue(round(blueRatio_value * 100))
             self.ui.blue_ratio_value.setText(f"{blueRatio_value:.2f}")
-            self.exposureSlider.setValue(round(exposure_value))
-            self.exposure_value.setText(f"{round(exposure_value)}")
+            self.exposureSlider.setValue(round(exposure_value / self.EXPOSURE_STEP_US))
+            self.exposure_value.setValue(round(exposure_value))
         except Exception as e:
             print(f"讀取 config 設定失敗: {e}")
         finally:
