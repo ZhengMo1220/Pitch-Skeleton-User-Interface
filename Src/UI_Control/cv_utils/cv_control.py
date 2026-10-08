@@ -150,6 +150,8 @@ class Camera:
         """開始自動錄影，初始化 record_frames 並設置錄影標記"""
         # 從預存的60幀開始（pre_frames 已經由 buffer_frame 持續維護）
         self.record_frames = [(f.copy(), f2.copy()) for f, f2 in list(self.pre_frames)]
+        # 記下實際預錄幀數，計算 FPS 時要扣掉（預錄的幀不在計時區間內）
+        self.auto_record_pre_count = len(self.record_frames)
         self.auto_record_start_time = time.time()
         self.is_auto_recording = True
     
@@ -159,8 +161,8 @@ class Camera:
         duration = time.time() - self.auto_record_start_time if self.auto_record_start_time else 0
         # 總幀數
         total_frames = len(self.record_frames) if self.record_frames else 0
-        # 預存幀數 (假設預存是 60 幀)
-        pre_roll_count = 30 
+        # 預存幀數：用開始錄影時實際複製的數量（pre_frames 上限 45，原本寫死 30 會讓 FPS 高估）
+        pre_roll_count = getattr(self, 'auto_record_pre_count', 0)
         # 實際在 duration 期間產生的幀數
         new_frames_count = total_frames - pre_roll_count
         # 計算這段時間的真實產出率
