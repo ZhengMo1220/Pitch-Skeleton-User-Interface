@@ -10,7 +10,7 @@
 > **接手的 AI 請先讀這一段。** 這裡記錄「上一位助手做到哪、下一步該做什麼」，每完成一個階段性步驟就會更新。
 > 若此區塊顯示「無進行中任務」，代表上一段工作已告一段落，可直接從下方待辦清單挑選。
 
-**更新時間**：2026-10-07 19:30
+**更新時間**：2026-10-08 22:00
 **當前任務**：
 - 筆電安裝包 `C:\Users\user\Downloads\Pitcher_筆電安裝包\` **已實測通過**（全新 conda 環境照「安裝順序.txt」安裝 → 版本與 Pitcher 環境逐一比對一致（僅刻意排除 mmcv-full）→ 實際載入 YOLO + ViTPose 模型與 PySpin 成功），測試環境已刪除。試裝過程修正 4 個問題：pip 用 cp950 讀 requirements（鎖定檔改純 ASCII）、原環境有刻意的依賴不一致（改 `--no-deps`）、mm 子專案 setup.py 需 torch（加 `--no-build-isolation`）、freeze 漏 setuptools（補 60.2.0）。另注意：未 `conda activate` 直接呼叫 python.exe 時，numpy 會載到 base 環境的 MKL 而當機，安裝與執行一律在已啟動的環境中進行
 - 已完成：README 改寫（2026-10-07）。版本鎖定檔放進 repo 的 `environment\`（不用 `env\`：`.gitignore` 的 `ENV/` 在 Windows 不分大小寫會忽略它）。根目錄舊的 `requirements.txt`（numpy==1.23.5 等）已過時、README 不再引用，待決定是否刪除
@@ -21,12 +21,14 @@
 - 注意：`pitch_ui.py` 有手動修改，與 `pitch_ui.ui` 重新產生的結果不同（754 vs 744 行），**不要用 pyuic 重新產生覆蓋**；改介面文字需兩檔同步改。使用者的 VS Code 會在 `.ui` 存檔時自動產生 `*_ui_ui.py`，屬多餘檔案可刪
 - 待使用者決定（2026-10-08 提案，使用者暫緩先談協作）：(1) `GH3_camera_config.yaml`/`_2.yaml` 改名為 `GH3_front.yaml`/`GH3_side.yaml`（yaml 綁角色不綁序號；註解會被 yaml.dump 清掉，只能靠檔名）；(2) 開相機時印出「角色 SN ← yaml」；(3) `calib.py` 依所選相機的角色讀對應 yaml（目前固定讀正面）
 - 已查明（2026-10-08）：yaml 中 `device_link_throughput_limit`、`exposure_auto`、`exposure_mode` **程式沒有讀**，改了無效。頻寬上限未設定到相機，可能與 P2-003（錄影僅 68 FPS）有關，調查時先看
-- GitHub 協作（2026-10-07 討論中，使用者先了解再決定）：
-  - 已打標籤 `v2026.10.07`（指向 cbd06d6）
-  - 使用者筆電暫用 Download ZIP 取得程式（無法 push/pull，日後改用 git clone）
-  - 待使用者執行：repo 改私人（已確認 0 fork）
-  - 待使用者決定：A 建組織 + 成員 Read + fork/PR，或 B 學生方案 Pro + main 分支保護（建議 A）
-  - 待使用者決定：雲端硬碟 `118_mVMTLW6fZl6LcJljtjAKD-0s6X4_6` 目前為「知道連結者皆可檢視」，是否改「限制」；README 寫「需維護者授權」與現況不符，依決定修正
+- GitHub 協作（2026-10-08 定案，告一段落）：
+  - repo **維持公開**；實驗室同學已 fork（公開 fork）；**無協作者**，別人只能 fork → PR，由使用者合併
+  - 雲端硬碟已改為「限制」（只有擁有者），分享時逐一加 email
+  - **git 歷史已改寫兩次並強制推送**（使用者親自執行 filter-branch 與 push；auto mode 擋下 AI 執行）：(1) 刪除 51 個 commit 的 `Co-Authored-By: Claude` 標記；(2) 2026-08-19 起 54 個 commit 作者改為 `ZhengMo <221846216+ZhengMo1220@users.noreply.github.com>`（兩個 "Restore ... from prior contributor" 與 2024～2025 的 47 個保留學長 chenboch）。**因此本文件中 2026-08-19 之後的 commit 編號（如 c6e38f4、2b1d1bc）都已失效**，以 commit 標題搜尋。本機備份分支：`backup-before-rewrite`、`backup-before-author`
+  - 本機 git 身分已改為使用者（原為學長 chenbochen / a27879798@gmail.com）。**不得再加 Claude 共同作者標記**
+  - 標籤 `v2026.10.07` 已隨改寫更新
+  - 待同學在 fork 按 Sync fork → Discard commits；可選：main 分支保護禁止 force push（公開 repo 免費）
+  - 已移除：`Fix_Env.bat`（會刪 libiomp5md.dll 弄壞 torch）、根目錄 `requirements.txt`、`Src/mmengine_main`、`Src/cython_bbox-0.1.3`、OCR debug 圖片；`start.bat` 改為自動尋找 Anaconda 與專案路徑
 **實驗室演練設定**：正面 SN24380119（primary）、側面 SN24380117（secondary）
 
 ### 本輪已完成（皆已 commit 並 push）
