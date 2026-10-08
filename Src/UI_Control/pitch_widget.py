@@ -326,6 +326,16 @@ class PosePitchTabControl(QWidget):
         self.ui.blueRatioSlider.setMaximum(400)
         self.ui.gainSlider.setMinimum(0)
         self.ui.gainSlider.setMaximum(290)
+        # 錄影幀率：60 為原本行為（每 3 幀存 1 幀），179 為全幀率（存原始 Bayer，寫檔時轉色）
+        self.recordRateLabel = QLabel("錄影幀率：", self.ui.camerSettingGroupBox)
+        self.recordRateCombo = QComboBox(self.ui.camerSettingGroupBox)
+        self.recordRateCombo.addItems(["60 FPS", "179 FPS（全幀率）"])
+        record_rate_row = QHBoxLayout()
+        record_rate_row.addWidget(self.recordRateLabel)
+        record_rate_row.addWidget(self.recordRateCombo)
+        record_rate_row.setStretch(0, 2)
+        record_rate_row.setStretch(1, 2)
+        self.ui.verticalLayout_9.addLayout(record_rate_row)
         # 曝光時間（µs），正面/側面各自存檔。179 FPS 每幀間隔約 5580 µs，上限取 5500 以免掉幀
         self.exposureLabel = QLabel("曝光(µs):", self.ui.groupBox)
         # 滑桿一格 = EXPOSURE_STEP_US，拖動與方向鍵都會落在整齊的數值上；精確值用旁邊的輸入框直接打
@@ -525,6 +535,7 @@ class PosePitchTabControl(QWidget):
         self.exposureSlider.valueChanged.connect(
             lambda steps: self.exposure_value.setValue(steps * self.EXPOSURE_STEP_US))
         self.exposure_value.valueChanged.connect(self.onExposureChanged)
+        self.recordRateCombo.currentIndexChanged.connect(self.onRecordRateChanged)
         # 綁定側面攝影機 radio button
         self.ui.sideCamera.toggled.connect(self.updateCameraSliders) 
         # self.ui.frontCamera.toggled.connect(self.updateCameraSliders)    
@@ -580,6 +591,18 @@ class PosePitchTabControl(QWidget):
         cam = self.get_selected_camera()
         if cam is not None:
             cam.update_white_balance(gain=ratio)
+
+    def onRecordRateChanged(self, index):
+        full_rate = index == 1
+        if self.is_auto_recording:
+            # 錄影途中切換會讓前後幀來源不一致，先擋下
+            self.recordRateCombo.blockSignals(True)
+            self.recordRateCombo.setCurrentIndex(1 if self.camera.full_rate_recording else 0)
+            self.recordRateCombo.blockSignals(False)
+            print("[AutoRecord] 錄影中無法切換錄影幀率")
+            return
+        self.camera.set_full_rate_recording(full_rate)
+        print(f"[AutoRecord] 錄影幀率切換為 {'179（全幀率）' if full_rate else '60'} FPS")
 
     def onExposureChanged(self, value):
         # 讓滑桿跟上輸入框（暫停訊號，避免滑桿再回頭改輸入框）
@@ -1685,7 +1708,8 @@ class PosePitchTabControl(QWidget):
                 # self._update_perf_status(detect_ms, analyze_ms, draw_ms, total_ms, fps=fps)
 
                 if self.is_auto_recording and self.camera.record_frames is not None:
-                    new_frames_count = len(self.camera.record_frames) - 45
+                    # 以顯示幀數計時（約 60 FPS 下 135 幀 = 2.25 秒），全幀率模式錄影長度相同
+                    new_frames_count = self.camera.auto_record_display_frames()
                     if new_frames_count >= 135:
                         total_frames = len(self.camera.record_frames)
                         self.stopAutoRecording()

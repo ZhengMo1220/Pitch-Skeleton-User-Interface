@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+import threading
+from collections import deque
 
 import cv2
 import numpy as np
@@ -158,6 +160,13 @@ class VideoCaptureThread(QThread):
         SN1, SN2 = resolve_camera_serials(sn1, sn2)
         self.serial_front = SN1
         self.serial_side = SN2
+
+        # 全幀率錄影：開啟時每一幀都複製原始 Bayer（約 2 MB/幀）保留下來；顯示仍每 3 幀送一次。
+        # 預錄長度 135 幀，179 FPS 下約 0.75 秒，與 60 FPS 模式的 45 幀相同時間長度。
+        self.keep_raw = False
+        self.raw_pre_frames = deque(maxlen=135)
+        self.raw_record = None
+        self._raw_lock = threading.Lock()
         print(f"[VideoCaptureThread] front={SN1}  side={SN2}")
 
         self.camera1 = FlirCameraSystem(CONFIG,SN1)
@@ -186,13 +195,40 @@ class VideoCaptureThread(QThread):
             except:
                 pass
 
+    def set_keep_raw(self, enabled: bool):
+        """開關全幀率保留；關閉時清掉預錄與錄影中的原始幀以釋放記憶體"""
+        with self._raw_lock:
+            self.keep_raw = enabled
+            if not enabled:
+                self.raw_pre_frames.clear()
+                self.raw_record = None
+
+    def start_raw_record(self):
+        """以目前的預錄幀開始錄影，之後每一幀都會加進回傳的 list"""
+        with self._raw_lock:
+            self.raw_record = list(self.raw_pre_frames)
+            return self.raw_record
+
+    def stop_raw_record(self):
+        """停止加入新幀，回傳已錄下的 list"""
+        with self._raw_lock:
+            record, self.raw_record = self.raw_record, None
+            return record
+
     def run(self):
         # import gc
         count = 0  # 移到迴圈外，避免每次都重置為0
-        while self.running:    
+        while self.running:
             ret, frame1, frame2 = self.cameras.get_grayscale_images()
             if ret:
                 count += 1  # 先遞增計數
+                if self.keep_raw:
+                    # GetNDArray 指向 SDK 的記憶體，必須複製才能保留
+                    pair = (frame1.copy(), frame2.copy())
+                    with self._raw_lock:
+                        self.raw_pre_frames.append(pair)
+                        if self.raw_record is not None:
+                            self.raw_record.append(pair)
                 if count % 3 == 0:
                     # 只在發送時轉換為 BGR，不影響骨架偵測用的原始幀
                     rgb_frame1 = cv2.cvtColor(frame1, cv2.COLOR_BayerBG2BGR)
@@ -292,6 +328,11 @@ class FramesToVideoWriterThread(QThread):
             for idx, (f, f2) in enumerate(self.frames_list):
                 if not self._running:
                     break
+                # 全幀率錄影存的是原始 Bayer（單通道），寫檔時才轉彩色，轉法與即時顯示相同
+                if f.ndim == 2:
+                    f = cv2.cvtColor(f, cv2.COLOR_BayerBG2BGR)
+                if f2.ndim == 2:
+                    f2 = cv2.cvtColor(f2, cv2.COLOR_BayerBG2BGR)
                 writer1.write(f)
                 writer2.write(f2)
             

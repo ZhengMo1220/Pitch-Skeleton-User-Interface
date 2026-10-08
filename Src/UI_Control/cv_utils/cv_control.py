@@ -41,11 +41,15 @@ class Camera:
         self.record_frames = None
         self.is_auto_recording = False
         self.auto_record_start_time = None
+        # True：錄影保留相機每一幀（179 FPS）；False：沿用顯示用的每 3 幀一張（約 60 FPS）
+        self.full_rate_recording = False
+        self._record_start_frame_count = 0
 
     def open_camera(self):
         # 開啟相機，並設置回調來處理每一幀
         self.frame_count = 0
         self.video_thread = VideoCaptureThread()
+        self.video_thread.set_keep_raw(self.full_rate_recording)
         self.video_thread.frame_ready.connect(self.buffer_frame)
         self.video_thread.start_capture()
         self.is_opened = True
@@ -109,8 +113,9 @@ class Camera:
         # 接收每一幀並進行處理
         self.frame_count += 1
         
-        # 維護預存幀池（始終更新，用於自動錄影的前幀）
-        self.pre_frames.append((frame.copy(), frame_2.copy()))
+        # 維護預存幀池（60 FPS 模式用；全幀率模式改由擷取執行緒保留原始幀）
+        if not self.full_rate_recording:
+            self.pre_frames.append((frame.copy(), frame_2.copy()))
         
         # 采样帧放入 queue（用于正常显示）
         if self.is_opened and self.frame_count % self.fps_control == 0:
@@ -122,8 +127,8 @@ class Camera:
         if self.video_writer is not None and self.video_writer.is_writing:
             self.video_writer.write_frame(frame, frame_2)
         
-        # 自动录影（不受采样影响，每帧都存）
-        if self.is_auto_recording and self.record_frames is not None:
+        # 60 FPS 模式的自動錄影：這裡收到的已是每 3 幀抽 1 幀的畫面
+        if self.is_auto_recording and self.record_frames is not None and not self.full_rate_recording:
             self.record_frames.append((frame.copy(), frame_2.copy()))
 
     def startRecording(self, filename: str, filename_2: str):
@@ -149,7 +154,11 @@ class Camera:
     def start_auto_recording(self):
         """開始自動錄影，初始化 record_frames 並設置錄影標記"""
         # 從預存的60幀開始（pre_frames 已經由 buffer_frame 持續維護）
-        self.record_frames = [(f.copy(), f2.copy()) for f, f2 in list(self.pre_frames)]
+        if self.full_rate_recording and self.video_thread is not None:
+            self.record_frames = self.video_thread.start_raw_record()
+        else:
+            self.record_frames = [(f.copy(), f2.copy()) for f, f2 in list(self.pre_frames)]
+        self._record_start_frame_count = self.frame_count
         # 記下實際預錄幀數，計算 FPS 時要扣掉（預錄的幀不在計時區間內）
         self.auto_record_pre_count = len(self.record_frames)
         self.auto_record_start_time = time.time()
@@ -158,6 +167,8 @@ class Camera:
     def stop_auto_recording(self):
         """停止自動錄影，返回錄製的所有幀並清理"""
         self.is_auto_recording = False
+        if self.full_rate_recording and self.video_thread is not None:
+            self.video_thread.stop_raw_record()
         duration = time.time() - self.auto_record_start_time if self.auto_record_start_time else 0
         # 總幀數
         total_frames = len(self.record_frames) if self.record_frames else 0
@@ -169,13 +180,25 @@ class Camera:
         if duration > 0 and new_frames_count > 0:
             actual_fps = new_frames_count / duration
         else:
-            # 如果錄太短，就用回相機設定值 // 3
-            actual_fps = (self.video_thread.camera1.get_fps() / 3) if self.video_thread else 30
+            # 如果錄太短，就用回相機設定值（60 FPS 模式為 1/3）
+            divisor = 1 if self.full_rate_recording else 3
+            actual_fps = (self.video_thread.camera1.get_fps() / divisor) if self.video_thread else 30
             
         frames = self.record_frames[:] if self.record_frames else []
         self.record_frames = None
         
         return frames, normalize_fps(actual_fps) # 回傳計算出來的真實 FPS
+
+    def set_full_rate_recording(self, enabled: bool):
+        """切換錄影幀率；相機開啟中也可切換（錄影中請勿切換）"""
+        self.full_rate_recording = enabled
+        self.pre_frames.clear()
+        if self.video_thread is not None:
+            self.video_thread.set_keep_raw(enabled)
+
+    def auto_record_display_frames(self) -> int:
+        """錄影開始後經過的顯示幀數（約 60 FPS），兩種模式都用它判斷錄影長度"""
+        return self.frame_count - self._record_start_frame_count
 
     def setCameraId(self, new_idx: int):
         self.camera_idx = new_idx
