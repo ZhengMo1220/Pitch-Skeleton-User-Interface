@@ -418,8 +418,12 @@ class ImageDrawer():
                 stride_distance = self._calculate_stride_distance(frame_num)
                 if stride_distance is not None and keypoints is not None:
                     self.keyframe_stride_distance = float(stride_distance)
+<<<<<<< HEAD
                     metric = getattr(self.pose_analyzer.viewer3D, 'metric', False)
                     left_ankle = keypoints[self.pose_analyzer.viewer3D.heel if metric else 15]
+=======
+                    left_ankle = keypoints[15]
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
                     if base_x is not None and np.isfinite(left_ankle[0]) and np.isfinite(left_ankle[1]):
                         pts = np.array([
                             (int(base_x), int(left_ankle[1]) + 70),
@@ -431,7 +435,11 @@ class ImageDrawer():
                     img, elbow_angle = self.draw_extended_angle(img, keypoints[6], keypoints[8], keypoints[10], offset=80, return_angle=True)
                     img, knee_angle = self.draw_extended_angle(img, keypoints[15], keypoints[13], keypoints[11], offset=80, return_angle=True)
                                         
+<<<<<<< HEAD
                     img = self.draw_styled_metric(img, left_ankle, "後腳3D位移" if metric else "跨步距離", f"{stride_distance*100:.1f}", "cm", direction='right')
+=======
+                    img = self.draw_styled_metric(img, left_ankle, "跨步距離", f"{stride_distance*100:.1f}", "cm", direction='right')
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
                     if elbow_angle is not None and knee_angle is not None:
                         img = self.draw_styled_metric(img, keypoints[8], "肘彎曲", f"{elbow_angle}", "°", direction='left', offset_y=-150)
                         img = self.draw_styled_metric(img, keypoints[13], "膝彎曲", f"{knee_angle}", "°", direction='right', offset_y=-150)
@@ -522,7 +530,11 @@ class ImageDrawer():
                         cv2.polylines(img, [pts], False, (12, 170, 200), 5, cv2.LINE_AA)
                     img, knee_angle = self.draw_extended_angle(img, keypoints[15], keypoints[13], keypoints[11], offset=80, return_angle=True)
                     img = self.draw_styled_metric(
+<<<<<<< HEAD
                         img, keypoints[10], "初始腳跟至手腕3D距離" if getattr(self.pose_analyzer.viewer3D, 'metric', False) else "出手點距離", f"{extension_distance*100:.1f}", "cm",
+=======
+                        img, keypoints[10], "出手點距離", f"{extension_distance*100:.1f}", "cm",
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
                         direction='right', value_color=(255, 255, 0), label_color=(255, 255, 0)
                     )    
                     self.keyframe_extension_distance = float(extension_distance)        
@@ -606,8 +618,11 @@ class ImageDrawer():
             float: x位置（像素），若無法計算則返回 None
         """
         try:
+<<<<<<< HEAD
             if getattr(self.pose_analyzer.viewer3D, 'metric', False):
                 return None  # A pixel horizontal bar is not a metric ground line.
+=======
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
             keypoints = self.pose_estimater.getPersonDf(frame_num=1, is_select=True, is_kpt=True)
             if keypoints is None or len(keypoints) < 17:
                 return None
@@ -642,8 +657,11 @@ class ImageDrawer():
                 return None
             
             # 左腳踝索引 15，右腳踝索引 16
+<<<<<<< HEAD
             if getattr(viewer3d, 'metric', False):
                 return viewer3d.displacement(frame_num)
+=======
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
             left_ankle = pts[15]
             right_ankle = viewer3d.all_3d_frames[2][16]
             
@@ -677,8 +695,11 @@ class ImageDrawer():
                 return None
             
             # 左手腕索引 9，右手腕索引 10
+<<<<<<< HEAD
             if getattr(viewer3d, 'metric', False):
                 return viewer3d.displacement(frame_num, target_joint=10)
+=======
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
             right_wrist = pts[10]
             right_ankle = viewer3d.all_3d_frames[2][16]
             
@@ -904,4 +925,8 @@ class ImageDrawer():
         if hasattr(self, 'cached_frames'):
             if isinstance(self.cached_frames, list):
                 self.cached_frames.clear()
+<<<<<<< HEAD
             self.cached_frames = []
+=======
+            self.cached_frames = []
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff

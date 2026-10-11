@@ -112,6 +112,11 @@ cd Src\UI_Control
 python main.py
 ```
 
+<<<<<<< HEAD
+=======
+也可以直接雙擊專案根目錄的 `start.bat`，它會自動啟動 Pitcher 環境並切換到正確目錄。
+
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 | 分頁 | 用途 |
 |---|---|
 | 2D | 雙相機即時畫面、自動偵測投球並錄影、回放與投球階段分析（主要功能） |
@@ -125,6 +130,7 @@ python main.py
 
 新架設或移動相機後需要重新校正，結果自動存到 `Db\Calibration\`，錄影時會把當下的校正值一起存進該筆錄影資料夾。
 
+<<<<<<< HEAD
 建議使用新的整合入口（在專案根目錄執行）：
 
 ```powershell
@@ -142,6 +148,8 @@ python .\Src\UI_Control\calibrate.py
 
 新入口以程式位置解析路徑，可從任意工作目錄啟動。舊有分步工具仍可使用：
 
+=======
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 ```
 cd Src\UI_Control
 python calib.py                  # 1. 每台相機的內參，並指定正面／側面

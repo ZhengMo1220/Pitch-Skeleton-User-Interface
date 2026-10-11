@@ -104,6 +104,7 @@ pip install --force-reinstall --no-deps opencv-python==4.8.1.78
 
 所有校正結果都存在 `Db\Calibration\`（不進 git），程式會自動讀取，不必再手動把數字貼進程式碼。
 
+<<<<<<< HEAD
 **整合入口（2026-10-09）**：專案根目錄執行 `python Src/UI_Control/calibrate.py`。以校正精靈整合下面的 1–5 步，不載入骨架模型；內參重用 `calib.CalibWindow` 的取樣、角點與品質評估，計算放到背景執行，結果先暫存於本次 session。兩台內參及外參都成功後，才一起寫入現用校正檔。
 
 - 全新內參每台至少 15 組，RMS 須 ≤ 1 px；覆蓋區域、傾斜角度等建議列在紀錄。保留原始棋盤格照片與 NPZ 角點，方便重算。
@@ -123,6 +124,8 @@ python -m unittest discover -s Src/UI_Control/tests -v
 
 以下為原本仍保留的分步工具流程：
 
+=======
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 | 步驟 | 執行 | 要接什麼 | 產出 |
 |---|---|---|---|
 | 1. 內參（每台各做一次） | `python calib.py`，選相機 → 連接 → 擷取 15~20 組 → 執行校正 | 只要 USB，同步線可接可不接 | `intrinsic\intrinsics_all.json`、`calib_SN<序號>.npz` |

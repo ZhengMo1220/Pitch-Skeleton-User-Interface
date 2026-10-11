@@ -229,6 +229,7 @@ class PoseAnalyzer:
         if self.pose_estimater.person_df.empty:
             return False
 
+<<<<<<< HEAD
         person_df = self.pose_estimater.person_df
         selected_id = self.pose_estimater.person_id
         if selected_id is not None:
@@ -237,6 +238,11 @@ class PoseAnalyzer:
             # Single-person offline analysis need not require a manual person
             # selection. Multiple people still require an explicit selection.
             return False
+=======
+        person_df = self.pose_estimater.person_df[
+            self.pose_estimater.person_df['person_id'] == self.pose_estimater.person_id
+        ]
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 
         if frame_num is not None:
             person_df = person_df[person_df['frame_number'] <= frame_num]
@@ -372,4 +378,8 @@ class JointAreaChecker:
             self.last_joint_position = joint_position
             
         self.last_joint_position = joint_position
+<<<<<<< HEAD
         return False
+=======
+        return False
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff

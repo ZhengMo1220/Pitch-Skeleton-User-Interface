@@ -1,7 +1,11 @@
 # 專案工作區（AI 協作規範 + 問題追蹤 + 待辦）
 
 > **這份文件給 AI 助手看**（Claude / GPT / 其他模型）。人類閱讀的白話說明請見 [DEVELOPMENT.md](DEVELOPMENT.md)。
+<<<<<<< HEAD
 > 最後更新：2026-10-09
+=======
+> 最後更新：2026-10-07
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 
 ---
 
@@ -10,10 +14,15 @@
 > **接手的 AI 請先讀這一段。** 這裡記錄「上一位助手做到哪、下一步該做什麼」，每完成一個階段性步驟就會更新。
 > 若此區塊顯示「無進行中任務」，代表上一段工作已告一段落，可直接從下方待辦清單挑選。
 
+<<<<<<< HEAD
 **更新時間**：2026-10-09
 **當前任務**：
 - 已修正（2026-10-09，P1-008）：校正取樣的 `numpy.AxisError`。`calib.py` 統一角點為 `(N, 1, 2)` 保存，比較時兩邊展為 `(N, 2)`，避免越界與二／三維混用造成的錯誤廣播；角點數改變時拒收並提示清空樣本。`calibrate.py` 重新掃描現在顯示偵測數、序號、零台與錯誤原因；新取像優先選連線相機，保留仍連線的角色選擇，勾選重用內參時保留離線序號。
 - 驗證：`conda run -n Pitcher --no-capture-output python -m unittest discover -s Src/UI_Control/tests -v`，13 項通過；實際 SDK 與校正視窗的啟動／重掃均找到 SN25462481、SN25462483。未取實體棋盤格樣本，下一步由使用者重啟校正工具、確認正面／側面角色後實拍。進場前已有未提交的精靈、工作流程與文件變更，本輪保留，尚未合併提交。
+=======
+**更新時間**：2026-10-08 22:00
+**當前任務**：
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 - 筆電安裝包 `C:\Users\user\Downloads\Pitcher_筆電安裝包\` **已實測通過**（全新 conda 環境照「安裝順序.txt」安裝 → 版本與 Pitcher 環境逐一比對一致（僅刻意排除 mmcv-full）→ 實際載入 YOLO + ViTPose 模型與 PySpin 成功），測試環境已刪除。試裝過程修正 4 個問題：pip 用 cp950 讀 requirements（鎖定檔改純 ASCII）、原環境有刻意的依賴不一致（改 `--no-deps`）、mm 子專案 setup.py 需 torch（加 `--no-build-isolation`）、freeze 漏 setuptools（補 60.2.0）。另注意：未 `conda activate` 直接呼叫 python.exe 時，numpy 會載到 base 環境的 MKL 而當機，安裝與執行一律在已啟動的環境中進行
 - 已完成：README 改寫（2026-10-07）。版本鎖定檔放進 repo 的 `environment\`（不用 `env\`：`.gitignore` 的 `ENV/` 在 Windows 不分大小寫會忽略它）。根目錄舊的 `requirements.txt`（numpy==1.23.5 等）已過時、README 不再引用，待決定是否刪除
 - 已完成：UI_Control 資料檔整理（2026-10-07）。舊設備校正 → `Db\Calibration\old_rig_20260223\`（`side_camera_calib.npz` 改名 `front_camera_calib.npz`，內容其實是正面 50mm 內參 fx 7927.87）；輸出/截圖 → `Db\Archive\UI_Control_20261007\`；4 支舊工具改用 `calib_store.OLD_RIG_DIR` 並實測可讀。注意：舊的 `stereo_calib.json` 與 `stereo_calib.npz` 本來就是兩次不同校正（fx 1060.45 vs 1061.90），勿用 `extract_calib.py` 覆蓋 json
@@ -23,12 +32,23 @@
 - 注意：`pitch_ui.py` 有手動修改，與 `pitch_ui.ui` 重新產生的結果不同（754 vs 744 行），**不要用 pyuic 重新產生覆蓋**；改介面文字需兩檔同步改。使用者的 VS Code 會在 `.ui` 存檔時自動產生 `*_ui_ui.py`，屬多餘檔案可刪
 - 待使用者決定（2026-10-08 提案，使用者暫緩先談協作）：(1) `GH3_camera_config.yaml`/`_2.yaml` 改名為 `GH3_front.yaml`/`GH3_side.yaml`（yaml 綁角色不綁序號；註解會被 yaml.dump 清掉，只能靠檔名）；(2) 開相機時印出「角色 SN ← yaml」；(3) `calib.py` 依所選相機的角色讀對應 yaml（目前固定讀正面）
 - 已查明（2026-10-08）：yaml 中 `device_link_throughput_limit`、`exposure_auto`、`exposure_mode` **程式沒有讀**，改了無效。頻寬上限未設定到相機，可能與 P2-003（錄影僅 68 FPS）有關，調查時先看
+<<<<<<< HEAD
 - GitHub 協作（2026-10-07 討論中，使用者先了解再決定）：
   - 已打標籤 `v2026.10.07`（指向 cbd06d6）
   - 使用者筆電暫用 Download ZIP 取得程式（無法 push/pull，日後改用 git clone）
   - 待使用者執行：repo 改私人（已確認 0 fork）
   - 待使用者決定：A 建組織 + 成員 Read + fork/PR，或 B 學生方案 Pro + main 分支保護（建議 A）
   - 待使用者決定：雲端硬碟 `118_mVMTLW6fZl6LcJljtjAKD-0s6X4_6` 目前為「知道連結者皆可檢視」，是否改「限制」；README 寫「需維護者授權」與現況不符，依決定修正
+=======
+- GitHub 協作（2026-10-08 定案，告一段落）：
+  - repo **維持公開**；實驗室同學已 fork（公開 fork）；**無協作者**，別人只能 fork → PR，由使用者合併
+  - 雲端硬碟已改為「限制」（只有擁有者），分享時逐一加 email
+  - **git 歷史已改寫兩次並強制推送**（使用者親自執行 filter-branch 與 push；auto mode 擋下 AI 執行）：(1) 刪除 51 個 commit 的 `Co-Authored-By: Claude` 標記；(2) 2026-08-19 起 54 個 commit 作者改為 `ZhengMo <221846216+ZhengMo1220@users.noreply.github.com>`（兩個 "Restore ... from prior contributor" 與 2024～2025 的 47 個保留學長 chenboch）。**因此本文件中 2026-08-19 之後的 commit 編號（如 c6e38f4、2b1d1bc）都已失效**，以 commit 標題搜尋。本機備份分支：`backup-before-rewrite`、`backup-before-author`
+  - 本機 git 身分已改為使用者（原為學長 chenbochen / a27879798@gmail.com）。**不得再加 Claude 共同作者標記**
+  - 標籤 `v2026.10.07` 已隨改寫更新
+  - 待同學在 fork 按 Sync fork → Discard commits；可選：main 分支保護禁止 force push（公開 repo 免費）
+  - 已移除：`Fix_Env.bat`（會刪 libiomp5md.dll 弄壞 torch）、根目錄 `requirements.txt`、`Src/mmengine_main`、`Src/cython_bbox-0.1.3`、OCR debug 圖片；`start.bat` 改為自動尋找 Anaconda 與專案路徑
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 **實驗室演練設定**：正面 SN24380119（primary）、側面 SN24380117（secondary）
 
 ### 本輪已完成（皆已 commit 並 push）
@@ -76,6 +96,16 @@
 - [ ] 02 內點門檻與去畸變
 - [ ] 拍照、標註、計算整合為單一校正工具
 
+<<<<<<< HEAD
+=======
+### 外參校正改為自動找對應點（評估中）
+
+手動點校正桿對應點費工且誤差大（中位 2.86 px），正在評估自動化方法（例如大棋盤格同時入鏡）。有確定的做法再更新此處。
+- 學姊論文第 274-275 段的原方法：20 對同步照片、兩根校正桿、每對手點 8 點（共 160 點）、先去畸變、正規化 8 點法 + RANSAC 2000 次；內點門檻沒寫數值。**校正桿球距在論文、簡報、交接文件中都沒有記載**，需實際量測（`03_3d.py` 寫死的「第 1、4 點 340 mm」來源不明）
+- 學姊論文第 225 段：兩台側面 8mm、正面（本壘板後）50mm。但 2026-10-08 牛棚校正的 SN24380115 fx=12463，以 5.86 µm 像素換算約 73mm，與「50mm」不符、與設備交接清單的 75mm 紀錄吻合 → **待確認該台現在的鏡頭**
+> 給接手的 AI：使用者的個人研究細節放在本機 `docs/local/RESEARCH_NOTES.md`（不進 git），**研究內容不要寫進這份檔案或推上 GitHub**。
+
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 ### 程式輸出統一放到 Db（2026-10-07 使用者提出，暫不處理）
 
 - [ ] 盤點所有會寫檔的程式（3D 輸出、匯出、平板擷取、舊工具等），規劃放到 `Db\` 底下分類存放，避免散落在 `Src\UI_Control`
@@ -111,7 +141,11 @@
 
 棒球投球動作分析系統。源自碩士論文《基於2D-to-3D Diffusion-Transformer網路之棒球投球骨架動作切分及動作分析》（施邑穎，成大人工智慧科技碩士學位學程）。程式碼由學長姐交接，**透過 USB 複製、非 git clone**，交接時有大量未提交的開發進度，存在多處未完成的重構痕跡。
 
+<<<<<<< HEAD
 目前維護者：ZhengMo（ne6141050@gs.ncku.edu.tw），倉庫：`github.com/ZhengMo1220/Pitch-Skeleton-User-Interface`
+=======
+目前維護者：ZhengMo，倉庫：`github.com/ZhengMo1220/Pitch-Skeleton-User-Interface`
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 
 ### 工作原則
 
@@ -225,6 +259,7 @@
 - **附帶**：欄位為 `velocity_mph`，畫面標示卻是 `kph`，單位不一致，有資料後會差 1.6 倍
 - **連帶待驗證**：錄影校正快照的「3D 分頁讀取」端尚未實機驗證（崩潰發生在 `applyCalibration` 之前）。錄影端已驗證：5 球皆有 `calibration.json`
 
+<<<<<<< HEAD
 ### [P1-008] 校正取樣角點維度越界，重新掃描相機缺少結果提示
 
 - **登記日期**：2026-10-09
@@ -234,6 +269,8 @@
 - **影響範圍**：單台 `calib.py` 與整合 `calibrate.py` 的棋盤格取樣；整合工具設定頁的相機重掃與角色預選。
 - **修正**：統一角點形狀後逐點算位移，角點數不符時拒收；重掃顯示本次結果，連線序號優先，保留可用角色及離線匯入用途。測試見 `Src/UI_Control/tests/test_calibration_capture.py`。
 
+=======
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 ### [P2-003] 自動錄影實際只有約 66～69 FPS，不是 179 FPS
 
 - **登記日期**：2026-10-07
@@ -241,7 +278,34 @@
 - **優先序**：中（影響時間解析度：球離手、速度計算）
 - **症狀**：相機回報 179 FPS，但 `[AutoRecord] Actual recorded FPS` 為 66～69，存檔影片 FPS 同為 66～69。
 - **已確認非新問題**：2026-05-05、08-17、09-10 的既有錄影也都是 66～69 FPS（2025-08 為 60）。先前文件中「自動錄影保持 179 FPS」的說法有誤。
+<<<<<<< HEAD
 - **待查**：瓶頸在擷取執行緒、即時骨架偵測、還是 Bayer 轉換/緩衝；需先量測各段耗時再決定。
+=======
+- **成因已查明（2026-10-08）**：
+  1. `cv_thread.py` 擷取迴圈 `count % 3 == 0` 才 emit `frame_ready`，而自動錄影 `cv_control.buffer_frame` 就是接這個訊號 → 錄影只拿到 1/3 幀，實際約 59.7 FPS。`cv_control.py` 註解「自動錄影不受採樣影響，每幀都存」與事實不符
+  2. `stop_auto_recording` 寫死預錄 30 幀，實際 `pre_frames` 為 45 幀 → FPS 高估成 66～69。**已修正**（commit「Fix auto-recording FPS: subtract the real pre-roll count」），模擬驗證 60.0
+- **影響**：既有錄影標示 66～69 FPS、實際約 60 → 時間被壓縮約 12%。2D 速度（`analyze.py` 用影片 FPS）與 3D 速度（`analyze_3d.py` 寫死 dt=0.014 即 69 FPS）都高估約 10～15%
+- **待辦**：(a) 接相機跑量測腳本（scratchpad `measure_fps.py`：只取像／取像+轉色／取像+轉色+複製，各 10 秒），確認同步下實際上限；(b) 錄影改為每幀都存、顯示仍 1/3，建議存原始 Bayer（2 MB/幀）寫檔時再轉色。本機 127 GB RAM 足夠（一球約 3.5 秒：彩色約 7.8 GB、Bayer 約 2.6 GB），筆電需另評估；(c) `analyze_3d.py` 的 dt 改讀影片 FPS
+- `cv_control_compare.py` 有同樣的寫死 30 幀，但沒有任何程式 import 它，未修改
+- **進度（2026-10-08）**：
+  - 實測相機上限（scratchpad `measure_fps.py`）：只取像 179.5、取像+轉色 179.4、取像+轉色+複製彩色 172.0 FPS → 存原始 Bayer 可錄滿
+  - **已完成全幀率錄影**（commit「Add optional full-rate (179 FPS) auto recording」）：2D 分頁「相機設定」新增「錄影幀率」選單（預設 60）；179 模式由擷取執行緒保留每一幀原始 Bayer（預錄 135 幀），寫檔時轉彩色；停止條件改為顯示幀數（兩模式皆約 2.25 秒）。真相機測試：60 模式 180 幀；179 模式 541 幀 @ 179.3 FPS，顏色一致。使用者在主程式實錄 `Db\Record\20261008_Pitcher01\20261008_2249_P01`：530 幀 @ 179，寫檔約 15 秒
+  - 60 模式算出 62.2 FPS（理論 59.7），推測為 Qt 訊號佇列延遲造成計時誤差，影響小，未處理
+  - **未完成**：(1) `analyze_3d.py` dt 寫死 0.014 改讀影片 FPS —— **使用者決定暫緩**（目前不用 3D）。影響：速度顯示變正確，但 `video_widget_2._detect_foot_contact` 的「腳踝速度 ≤ 3.0 m/s」門檻是在偏高 19% 的速度下調的，改 dt 時要一併驗證門檻；179 FPS 影片在改之前速度只有實際約 4 成；(2) 播放時「正面/側面錯開 2 幀」（`pitch_widget.py` 雙影片模式 `frame_offset=2`、`video_widget_2.py` `setFrameOffset(-2)`）是否正確**尚未查明**：錄影是成對寫入、硬體同步，理論上應為 0。20261008_2249_P01 只有緩慢手部動作，互相關在 ±8 幀內無明顯峰值，無法判定；需重錄瞬間事件（拍手、球落地、敲桌）再分析。**不要直接把 2 乘以 3**
+    - 2026-10-08 再測：`20261008_2258_P02`（60 FPS）手碰滑鼠，兩台**同在第 26 幀**接觸 → 幀差約 0（±1），支持「錯開 2 幀是錯的」。`20261008_2303_P01`（179 FPS）無瞬間事件，無法判定
+    - 179 FPS 影片每約 3 幀有明暗起伏，推測為室內燈光 120 Hz 閃爍（179−120≈59 Hz），會干擾以影格差為基礎的自動分析
+    - 牛棚資料（`N:\20261008 pitcher videos\Db\Record\`，60 FPS，CF 為正面、CS 為投手後方）`20261008_Pitcher02\20261008_1050_P02`：兩台**同在第 121 幀手臂伸直**、122 幀正面可見球離手 → 幀差約 0。與實驗室結果一致
+    - **交接文件《交接程式操作文件_Ui_20260828》第 154 段只寫「雙影片預設 offset 為 2；單影片 offset 為 0」，沒有說明原因**；程式註解為「補償相機延遲」；git 歷史無紀錄（隨 2026-08-19 補存前人程式一起進來）
+    - **推論的根本原因（未驗證）**：`FlirCameraSystem.get_grayscale_image` 在第一次取像時才 `BeginAcquisition`，`DualFlirSystem.get_grayscale_images` 先取正面再取側面 → 正面（自由拍攝、送觸發）先開始，側面（等觸發）較晚就緒，錯過的觸發讓正面暫存區多出 K 張，之後永久錯位 K 張，且 **K 每次開相機可能不同**。另外取像失敗時只重啟該台相機的擷取（line ~105），也可能中途改變錯位
+    - **驗證方法**：scratchpad `startup_offset.py`（照主程式方式開相機 5 次，讀前 6 對 FrameID 比對）。2026-10-08 使用者已無接相機，待下次在實驗室執行
+    - 若推論成立，正解是**先讓側面開始擷取、再讓正面開始**，而不是調 offset 數值
+    - **影響範圍**：2D 生物力學數值只用側面影片，不受影響；靜態校正不受影響；**只影響 3D 配對**。使用者目前不用 3D → 暫不處理
+- 「錄影幀率」選單重開程式會回到 60，使用者表示暫不需要記住設定
+- **【更正 2026-10-09】60 FPS 是學姊刻意的設計**：論文（`Ms2026_Sports_ShihYiYing/Doc/Thesis/..._ThesisMs_20260824_V1B3_En_施邑穎.docx`）第 118 段「相機 180 fps，後續姿態估計以 30 fps 進行，先重新取樣以降低計算成本」；口試簡報（`TSG_Bullpen/..._20260707_V5B3_施邑穎_Oral_J.pptx`）第 5 頁：觸發後錄 180 frames (60fps)、FIFO 預錄 60 frames。原設計預錄 60 張（程式現為 45）。以下「本意是全幀率」的推論**是錯的**，保留供參考：
+- （已推翻）`cv_control.py` 原註解「自动录影（不受采样影响，每帧都存）」→ 曾推論前人本意是全幀率；交接文件第 85 段寫「前 60 幀緩衝」但程式為 45、FPS 計算寫 30，三處不一致；第 269 段「錄影時無法顯示骨架，以降低錄影處理負載」→ 前人有考慮處理負載。未找到「模型只能吃 60 FPS」之類說明
+- **179 FPS 改為預設前必須先驗證**（使用者要求：先尊重原設計，測試證明較好才換）：用真實投球的 179 FPS 影片測 (1) 一球分析時間；(2) 前腳著地／最大外旋／球離手是否都偵測得到、位置合理（分析程式有以「幀數」為單位、在 60 FPS 下調的門檻）；(3) 與同一球 60 FPS 比較能否抓到 60 漏掉的瞬間。任一項不行就維持預設 60
+- 2D 分頁「更新速率」選單（`pitch_ui.comboBox`）是前人留下的介面，**沒有任何程式讀取它**，目前無作用
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 
 ### [P3-002] 平板擷取 OCR 初始化失敗
 

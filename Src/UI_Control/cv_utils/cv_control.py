@@ -10,7 +10,10 @@ from cv_utils.cv_thread import VideoCaptureThread, VideoWriterThread, VideoToIma
 from PyQt5.QtWidgets import *
 from collections import deque
 import time
+<<<<<<< HEAD
 from cv_utils.analysis_io import save_pose_records
+=======
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 
 
 def normalize_fps(fps, default=30.0, min_fps=1.0, max_fps=2000.0) -> float:
@@ -42,11 +45,21 @@ class Camera:
         self.record_frames = None
         self.is_auto_recording = False
         self.auto_record_start_time = None
+<<<<<<< HEAD
+=======
+        # True：錄影保留相機每一幀（179 FPS）；False：沿用顯示用的每 3 幀一張（約 60 FPS）
+        self.full_rate_recording = False
+        self._record_start_frame_count = 0
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 
     def open_camera(self):
         # 開啟相機，並設置回調來處理每一幀
         self.frame_count = 0
         self.video_thread = VideoCaptureThread()
+<<<<<<< HEAD
+=======
+        self.video_thread.set_keep_raw(self.full_rate_recording)
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
         self.video_thread.frame_ready.connect(self.buffer_frame)
         self.video_thread.start_capture()
         self.is_opened = True
@@ -110,8 +123,14 @@ class Camera:
         # 接收每一幀並進行處理
         self.frame_count += 1
         
+<<<<<<< HEAD
         # 維護預存幀池（始終更新，用於自動錄影的前幀）
         self.pre_frames.append((frame.copy(), frame_2.copy()))
+=======
+        # 維護預存幀池（60 FPS 模式用；全幀率模式改由擷取執行緒保留原始幀）
+        if not self.full_rate_recording:
+            self.pre_frames.append((frame.copy(), frame_2.copy()))
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
         
         # 采样帧放入 queue（用于正常显示）
         if self.is_opened and self.frame_count % self.fps_control == 0:
@@ -123,8 +142,13 @@ class Camera:
         if self.video_writer is not None and self.video_writer.is_writing:
             self.video_writer.write_frame(frame, frame_2)
         
+<<<<<<< HEAD
         # 自动录影（不受采样影响，每帧都存）
         if self.is_auto_recording and self.record_frames is not None:
+=======
+        # 60 FPS 模式的自動錄影：這裡收到的已是每 3 幀抽 1 幀的畫面
+        if self.is_auto_recording and self.record_frames is not None and not self.full_rate_recording:
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
             self.record_frames.append((frame.copy(), frame_2.copy()))
 
     def startRecording(self, filename: str, filename_2: str):
@@ -150,32 +174,72 @@ class Camera:
     def start_auto_recording(self):
         """開始自動錄影，初始化 record_frames 並設置錄影標記"""
         # 從預存的60幀開始（pre_frames 已經由 buffer_frame 持續維護）
+<<<<<<< HEAD
         self.record_frames = [(f.copy(), f2.copy()) for f, f2 in list(self.pre_frames)]
+=======
+        if self.full_rate_recording and self.video_thread is not None:
+            self.record_frames = self.video_thread.start_raw_record()
+        else:
+            self.record_frames = [(f.copy(), f2.copy()) for f, f2 in list(self.pre_frames)]
+        self._record_start_frame_count = self.frame_count
+        # 記下實際預錄幀數，計算 FPS 時要扣掉（預錄的幀不在計時區間內）
+        self.auto_record_pre_count = len(self.record_frames)
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
         self.auto_record_start_time = time.time()
         self.is_auto_recording = True
     
     def stop_auto_recording(self):
         """停止自動錄影，返回錄製的所有幀並清理"""
         self.is_auto_recording = False
+<<<<<<< HEAD
         duration = time.time() - self.auto_record_start_time if self.auto_record_start_time else 0
         # 總幀數
         total_frames = len(self.record_frames) if self.record_frames else 0
         # 預存幀數 (假設預存是 60 幀)
         pre_roll_count = 30 
+=======
+        if self.full_rate_recording and self.video_thread is not None:
+            self.video_thread.stop_raw_record()
+        duration = time.time() - self.auto_record_start_time if self.auto_record_start_time else 0
+        # 總幀數
+        total_frames = len(self.record_frames) if self.record_frames else 0
+        # 預存幀數：用開始錄影時實際複製的數量（pre_frames 上限 45，原本寫死 30 會讓 FPS 高估）
+        pre_roll_count = getattr(self, 'auto_record_pre_count', 0)
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
         # 實際在 duration 期間產生的幀數
         new_frames_count = total_frames - pre_roll_count
         # 計算這段時間的真實產出率
         if duration > 0 and new_frames_count > 0:
             actual_fps = new_frames_count / duration
         else:
+<<<<<<< HEAD
             # 如果錄太短，就用回相機設定值 // 3
             actual_fps = (self.video_thread.camera1.get_fps() / 3) if self.video_thread else 30
+=======
+            # 如果錄太短，就用回相機設定值（60 FPS 模式為 1/3）
+            divisor = 1 if self.full_rate_recording else 3
+            actual_fps = (self.video_thread.camera1.get_fps() / divisor) if self.video_thread else 30
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
             
         frames = self.record_frames[:] if self.record_frames else []
         self.record_frames = None
         
         return frames, normalize_fps(actual_fps) # 回傳計算出來的真實 FPS
 
+<<<<<<< HEAD
+=======
+    def set_full_rate_recording(self, enabled: bool):
+        """切換錄影幀率；相機開啟中也可切換（錄影中請勿切換）"""
+        self.full_rate_recording = enabled
+        self.pre_frames.clear()
+        if self.video_thread is not None:
+            self.video_thread.set_keep_raw(enabled)
+
+    def auto_record_display_frames(self) -> int:
+        """錄影開始後經過的顯示幀數（約 60 FPS），兩種模式都用它判斷錄影長度"""
+        return self.frame_count - self._record_start_frame_count
+
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
     def setCameraId(self, new_idx: int):
         self.camera_idx = new_idx
         print(f'camera id: {self.camera_idx}')
@@ -284,9 +348,12 @@ class VideoLoader:
         return self.video_frames[safe_idx_1].copy(), self.video_frames_2[safe_idx_2].copy()
     
     def saveVideo(self, output_folder:str = None):
+<<<<<<< HEAD
         output_folder = output_folder or self.folder_path
         if not output_folder:
             raise ValueError("No video output folder is available")
+=======
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
         os.makedirs(output_folder, exist_ok=True)
 
         json_path = os.path.join(output_folder, f"{self.video_name}.json")
@@ -296,11 +363,16 @@ class VideoLoader:
         save_person_df_2 = self.image_drawer_2.pose_estimater.person_df.copy()
 
         # 🚩 直接儲存完整的 person_df，其中包含 keypoints (原始) 舆 smoothed_keypoints (平滑)
+<<<<<<< HEAD
         if os.path.normcase(os.path.abspath(json_path)) != os.path.normcase(os.path.abspath(json_path_2)):
             save_pose_records(json_path, save_person_df.to_dict(orient='records'))
         # Single-video analysis uses the same path twice; the side-view estimator
         # owns the complete analysis and must be the sole writer in that case.
         save_pose_records(json_path_2, save_person_df_2.to_dict(orient='records'))
+=======
+        save_person_df.to_json(json_path, orient='records')
+        save_person_df_2.to_json(json_path_2, orient='records')
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 
         # save_location = os.path.join(output_folder, f"{self.video_name}_Sk26.mp4")
         # save_location_2 = os.path.join(output_folder, f"{self.video_name_2}_Sk26.mp4")

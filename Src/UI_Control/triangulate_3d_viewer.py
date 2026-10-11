@@ -1,7 +1,10 @@
 import numpy as np
 import cv2
 import json
+<<<<<<< HEAD
 from cv_utils.analysis_io import atomic_json
+=======
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 from vispy import scene, app
 from vispy.scene.visuals import Arrow
 import os
@@ -209,7 +212,12 @@ class Triangulate3DViewer:
                 "frame_number": idx  # 使用真實的 frame index
             })
 
+<<<<<<< HEAD
         atomic_json(target_path, data_to_save)
+=======
+        with open(target_path, "w") as f:
+            json.dump(data_to_save, f, indent=4)
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
         print(f"[Info] 3D coordinates saved to {target_path} (Total frames: {len(data_to_save)})")
 
     def compute_essential_matrix(self):

@@ -8,7 +8,10 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, Optional, Any
+<<<<<<< HEAD
 from cv_utils.analysis_io import atomic_json
+=======
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
 
 
 class SimpleKeyframeLogger:
@@ -34,8 +37,12 @@ class SimpleKeyframeLogger:
                            kneeUp_frame: Optional[int] = None,
                            fc_data: Optional[Dict[str, Any]] = None,
                            mer_data: Optional[Dict[str, Any]] = None,
+<<<<<<< HEAD
                            br_data: Optional[Dict[str, Any]] = None,
                            analysis: Optional[Dict[str, Any]] = None) -> Optional[str]:
+=======
+                           br_data: Optional[Dict[str, Any]] = None) -> Optional[str]:
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
         """
         將三個關鍵幀的核心數據保存到一個簡單的JSON文件中。
 
@@ -72,7 +79,11 @@ class SimpleKeyframeLogger:
             export_data["foot_contact"] = {
                 "frame_number": fc_data.get("frame"),
                 "shoulder_hip_angle_deg": fc_data.get("shoulder_hip_angle"),
+<<<<<<< HEAD
                 "stride_distance_cm": fc_data.get("stride_distance") * 100 if fc_data.get("stride_distance") is not None else None
+=======
+                "stride_distance_cm": fc_data.get("stride_distance") * 100 * 0.818 if fc_data.get("stride_distance") is not None else None
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
             }
 
         # 填充 Max Shoulder ER 數據
@@ -87,18 +98,30 @@ class SimpleKeyframeLogger:
             export_data["release"] = {
                 "frame_number": br_data.get("frame"),
                 "wrist_speed_mps": br_data.get("wrist_speed"),
+<<<<<<< HEAD
                 "extension_distance_cm": br_data.get("extension_distance") * 100 if br_data.get("extension_distance") is not None else None
+=======
+                "extension_distance_cm": br_data.get("extension_distance") * 100 * 0.818 if br_data.get("extension_distance") is not None else None
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
             }
 
         # 生成文件名
         filename = f"{video_name}_keyframes.json"
         filepath = os.path.join(self.output_dir, filename)
+<<<<<<< HEAD
         if analysis is not None:
             export_data['Analysis'] = analysis
 
         # 保存到JSON文件
         try:
             atomic_json(filepath, export_data)
+=======
+
+        # 保存到JSON文件
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(export_data, f, indent=4, ensure_ascii=False)
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
             print(f"✓ 關鍵幀日誌已保存: {filepath}")
             return filepath
         except Exception as e:

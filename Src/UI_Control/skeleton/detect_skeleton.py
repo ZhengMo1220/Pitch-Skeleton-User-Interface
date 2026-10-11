@@ -123,10 +123,14 @@ class PoseEstimater:
                     '右手肘': [6, 8, 10],
                     # 'l_shoulder_angle': [18, 5, 7],
                     '右肩膀': [18, 6, 8],
+<<<<<<< HEAD
                     '右腋窩': [8, 6, 19],
                     # The 2D phase detector and MER overlay both consume this
                     # angle: right forearm relative to the elbow's horizontal.
                     '右肩外旋': [10, 8, 8],
+=======
+                    '右腋窩': [8, 6, 19]
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
                     # 'l_knee_angle': [11, 13, 15],
                     # 'r_knee_angle': [12, 14, 16]
                 }
@@ -522,4 +526,8 @@ class PoseEstimater:
         self.fps_timer = FPSTimer()
         self.smooth_filter = OneEuroFilter()
         self.is_detect = False
+<<<<<<< HEAD
         self.kpt_buffer = []
+=======
+        self.kpt_buffer = []
+>>>>>>> 776fe9a91c6aab9aa3b75aaa5aba367b3b445aff
