@@ -67,9 +67,9 @@ class ManualCoordinatesReviewTests(unittest.TestCase):
         canvas = self.canvas()
         canvas.update_preview_image(self.image())
         canvas.set_points({"O": [100, 100]})
-        old_item = canvas._pixmap_item
         canvas.update_preview_image(self.image(800, 600))
-        self.assertIsNot(canvas._pixmap_item, old_item)
+        pixmap = canvas._pixmap_item.pixmap()
+        self.assertEqual((pixmap.width(), pixmap.height()), (800, 600))
         self.assertEqual(canvas.image_size, (800, 600))
         self.assertEqual(canvas._points, {})
         self.assertEqual(canvas._markers, [])
