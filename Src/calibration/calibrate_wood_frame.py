@@ -344,8 +344,8 @@ class WoodFrameWindow(QMainWindow):
             cameras = {r: copy.deepcopy(self.entries[k]) for r, k in zip(ROLES, keys)}
             for camera in cameras.values():
                 validate_intrinsic(camera)
-            session = Path(calib_store.CALIB_DIR) / "sessions" / (
-                datetime.now().strftime("%Y%m%d_%H%M%S_%f") + self.session_suffix)
+            session = Path(calib_store.new_session_dir(
+                self.session_suffix.strip("_"), [self.serials[r].text().strip() for r in ROLES]))
             for role in ROLES:
                 (session / role).mkdir(parents=True, exist_ok=True)
             self.cameras, self.session = cameras, session

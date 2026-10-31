@@ -12,7 +12,7 @@ import numpy as np
 import sys
 import cv2
 import os
-from Src.paths import DB_DIR
+from Src.paths import CALIB_PHOTO_DIR, MANUAL_RECORD_DIR
 from Src.UI_Control.forms.camera_ui import Ui_camera_ui
 from datetime import datetime
 from Src.cameras.video_control import Camera
@@ -106,6 +106,7 @@ class PoseCameraTabControl(QWidget):
         self.camera_scene_2 = QGraphicsScene()
         self.last_frame_cf = None
         self.last_frame_cs = None
+        self.photo_dir = None  # 每次開相機的照片放同一個資料夾（同一個機位）
 
     def bindUI(self):
         """Bind UI elements to their corresponding functions."""
@@ -118,6 +119,7 @@ class PoseCameraTabControl(QWidget):
         """Toggle the camera on/off based on checkbox state."""
         if state == 2:
             # frame_width, frame_height, fps = 
+            self.photo_dir = None
             self.camera.toggleCamera(True)
             # self.ui.ResolutionLabel.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
             self.timer.start(1)
@@ -136,7 +138,8 @@ class PoseCameraTabControl(QWidget):
     def startRecording(self):
         """Start recording the video."""
         current_time = datetime.now().strftime("%Y%m%d_%H%M")
-        output_dir = f'{DB_DIR.as_posix()}/Record/C{self.ui.CameraIdInput.value()}_Fps120_{current_time}'
+        # 手動錄影不是投球資料，放在 Record 之外；實際幀率以影片本身為準
+        output_dir = f'{MANUAL_RECORD_DIR.as_posix()}/{current_time}'
         os.makedirs(output_dir, exist_ok=True)
         video_filename = os.path.join(output_dir, f'CF_{current_time}.mp4')
         video_filename_2 = os.path.join(output_dir, f'CS_{current_time}.mp4')
@@ -164,7 +167,9 @@ class PoseCameraTabControl(QWidget):
             QMessageBox.warning(self, "無法儲存照片", "目前沒有可儲存的影像，請先開啟相機。")
             return
 
-        output_dir = f'{DB_DIR.as_posix()}/Record/Calibrate_Picture'
+        if self.photo_dir is None:
+            self.photo_dir = f'{CALIB_PHOTO_DIR.as_posix()}/{datetime.now().strftime("%Y%m%d_%H%M")}'
+        output_dir = self.photo_dir
         cf_dir = os.path.join(output_dir, 'cf')
         cs_dir = os.path.join(output_dir, 'cs')
         os.makedirs(cf_dir, exist_ok=True)
