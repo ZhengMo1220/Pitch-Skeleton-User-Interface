@@ -131,6 +131,23 @@ class Video3DTests(unittest.TestCase):
         tab._play_timer.stop()
         tab.is_play = False
 
+    def test_recording_context_restores_left_hand_and_saved_metric_calibration(self):
+        tab = self.setup_tab()
+        saved = self.folder / 'calibration_pnp.json'
+        saved.write_text(json.dumps(self.rig), encoding='utf-8')
+        (self.folder / 'recording_context.json').write_text(json.dumps({
+            'schema': 'pitch_recording_v1', 'pitch_hand': 'left',
+            'front': 'front', 'side': 'side-L', 'calibrations': {'pnp': saved.name}}), encoding='utf-8')
+        tab.calibration_combo.setCurrentIndex(tab.calibration_combo.findData('legacy'))
+        tab.updateVideoInfo()
+        tab._analysis_timer.stop()
+        self.assertEqual(tab.pitch_hand, 'left')
+        self.assertEqual(tab.heel_combo.currentData(), 24)
+        self.assertEqual(tab.pose_estimater.pitch_hand_id, 9)
+        self.assertEqual(tab.calibration_combo.currentData(), 'pnp')
+        self.assertEqual(Path(tab.calibration_path.text()), saved)
+        self.assertTrue(tab._calibration_ready, tab.calibration_status.text())
+
     def test_distortion_and_camera_order_recover_true_scale(self):
         xyz, pairs = self.points()
         for order in ('cf', 'cs'):
@@ -141,6 +158,25 @@ class Video3DTests(unittest.TestCase):
             viewer.add_2d_keypoints(*(moved if order == 'cf' else moved[::-1]), 1)
             self.assertAlmostEqual(viewer.displacement(1), .65, places=6)
             self.assertAlmostEqual(viewer.compute_joint_velocity_causal(25, .014, 1), 39., places=5)
+
+    def test_release_checkbox_updates_both_images_and_3d_marker_for_each_hand(self):
+        tab = self.setup_tab()
+        self.run_tab_frames(tab)
+        from Src.UI_Control.rendering.release_points import release_point
+        for wrist in (10, 9):
+            for estimator in (tab.pose_estimater, tab.pose_estimater_2):
+                estimator.setPitchHandId(wrist)
+            with patch.object(tab, 'showImage') as show:
+                tab.ui.showBR_checkBox.setChecked(True)
+                self.assertTrue(tab.viewer3d.release_marker.visible)
+                points = [release_point(estimator, tab.wrist_speed_frame)
+                          for estimator in (tab.pose_estimater, tab.pose_estimater_2)]
+                self.assertNotEqual(points[0], points[1])
+                enabled = [call.args[0].copy() for call in show.call_args_list[-2:]]
+                tab.ui.showBR_checkBox.setChecked(False)
+                self.assertFalse(tab.viewer3d.release_marker.visible)
+                for image, call in zip(enabled, show.call_args_list[-2:]):
+                    self.assertFalse(self.np.array_equal(image, call.args[0]))
 
     def test_rejected_joint_and_degenerate_ray_do_not_crash_other_joints(self):
         viewer = self.viewer()
@@ -333,6 +369,19 @@ class Video3DTests(unittest.TestCase):
         self.assertFalse(hasattr(tab, 'save_analysis_button'))
         self.assertTrue(tab.ui.frameSlider.isEnabled())
 
+    def test_analysis_throttles_preview_but_reconstructs_every_frame(self):
+        tab = self.setup_tab()
+        tab._analysis_preview_at = float('inf')
+        with patch.object(tab, '_updateFrame') as preview, \
+                patch.object(tab, 'phaseDetection') as events:
+            for frame in range(12):
+                tab._analyze_video_frame(frame)
+        self.assertEqual(tab._analysis_frames, set(range(12)))
+        self.assertEqual(set(tab.viewer3d.all_3d_frames), set(range(12)))
+        self.assertEqual(preview.call_count, 1)
+        self.assertEqual(preview.call_args[0][-1], 11)
+        events.assert_called_once_with(11)
+
     def test_reanalysis_discards_manual_events_and_saves_new_detection(self):
         tab = self.setup_tab()
         self.run_tab_frames(tab)
@@ -357,6 +406,11 @@ class Video3DTests(unittest.TestCase):
         tab.show()
         self.app.processEvents()
         views = (tab.ui.FrameView, tab.ui.FrameView_2)
+        self.assertEqual(tab.ui.FC_label_unit.text(), '°\ncm')
+        self.assertEqual(tab.ui.MER_label_unit.text(), '°\n')
+        self.assertEqual(tab.ui.BR_label_unit.text(), 'm/s\ncm')
+        self.assertEqual(tab.ui.MER_label_2.text().count('\n'), 1)
+        self.assertEqual(tab.ui.MER_label_3.text().count('\n'), 1)
         before = [view.geometry() for view in views]
         for frame, thumbnail, button in ((4, tab.ui.fcView, tab.ui.footContact_ptn),
                                          (7, tab.ui.merView, tab.ui.maxER_ptn),
@@ -368,9 +422,11 @@ class Video3DTests(unittest.TestCase):
             self.assertEqual(tab.ui.frameSlider.value(), frame)
             self.assertEqual([view.geometry() for view in views], before)
             tab.ui.frameSlider.setValue(0)
+            tab.is_play = True
             QTest.mouseClick(thumbnail.viewport(), Qt.LeftButton)
             self.app.processEvents()
-            self.assertEqual(tab.ui.frameSlider.value(), frame)
+            self.assertEqual(tab.ui.frameSlider.value(), 0)
+            self.assertTrue(tab.is_play)
             self.assertEqual([view.geometry() for view in views], before)
 
     def test_sidebar_tabs_do_not_resize_video_or_keyframe_rows(self):

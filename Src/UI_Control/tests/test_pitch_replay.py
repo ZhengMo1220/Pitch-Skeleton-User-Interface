@@ -66,6 +66,18 @@ class PitchReplayTests(unittest.TestCase):
         self.tab.deleteLater()
         self.app.processEvents()
 
+    def test_recording_context_restores_left_hand_for_2d(self):
+        (self.folder / 'recording_context.json').write_text(json.dumps({
+            'schema': 'pitch_recording_v1', 'pitch_hand': 'left',
+            'front': 'front', 'side': 'side-L', 'calibrations': {}}), encoding='utf-8')
+        with patch.object(self.tab, '_load_saved_analysis', return_value=False), \
+                patch.object(self.tab, 'updateFrame'), patch.object(self.tab, 'playBtnClicked'):
+            self.tab.updateVideoInfo()
+        self.assertTrue(self.tab.ui.pitchInput_L.isChecked())
+        self.assertEqual(self.tab.camera.pitch_hand, 'left')
+        self.assertEqual(self.tab.pose_estimater.pitch_hand_id, 9)
+        self.assertEqual(self.tab.pose_estimater_2.pitch_hand_id, 9)
+
     def set_events(self):
         self.tab.preparation_frame = 2
         self.tab.foot_contact_frame = 4
@@ -207,6 +219,61 @@ class PitchReplayTests(unittest.TestCase):
         self.assertEqual(len(json.loads((self.folder / 'single.json').read_text())), 12)
         self.assertFalse(self.tab.single_video_scan_running)
 
+    def test_single_video_scan_reuses_poses_and_detects_events_once(self):
+        self.tab.single_video_mode = True
+        self.set_poses()
+        with patch.object(self.tab.pose_estimater_2, 'processImage',
+                          side_effect=AssertionError('cached frame was inferred again')), \
+                patch.object(self.tab, 'phaseDetection') as detect:
+            self.tab.scan_single_video_keyframes()
+        detect.assert_called_once_with(11)
+        self.assertEqual(self.tab.pose_analyzer_2.processed_frames, set(range(12)))
+        self.assertEqual(len(self.tab.pose_estimater_2.person_df), 12)
+
+    def test_single_video_scan_cancel_does_not_export_completion(self):
+        self.tab.single_video_mode = True
+        self.set_poses()
+        def cancel():
+            self.tab.single_video_scan_running = False
+        with patch.object(self.module.QApplication, 'processEvents', side_effect=cancel), \
+                patch.object(self.tab, '_complete_video_analysis') as complete:
+            self.tab.scan_single_video_keyframes()
+        complete.assert_not_called()
+        self.assertTrue(self.tab.ui.playBtn.isEnabled())
+
+    def test_reanalysis_ignores_slow_motion_but_restores_playback_rate(self):
+        self.set_poses()
+        self.tab.ui.slowMotionInput.setCurrentText('0.5')
+        normal_interval = self.tab._get_play_interval_ms()
+        with patch.object(self.tab, 'playBtnClicked'):
+            self.tab.restart_video_analysis()
+        self.assertEqual(self.tab._get_play_interval_ms(), 0)
+        self.tab._complete_video_analysis()
+        self.assertEqual(self.tab._get_play_interval_ms(), normal_interval)
+
+    def test_replaying_analyzed_frame_skips_measurements(self):
+        self.set_poses()
+        with patch.object(self.tab.pose_estimater_2, 'getPersonDf',
+                          side_effect=AssertionError('recomputed an analyzed frame')):
+            self.tab.pose_analyzer_2.addAnalyzeInfo(4)
+
+    def test_fast_analysis_finalizes_events_when_last_pose_is_missing(self):
+        self.set_poses()
+        self.tab.ui.skeletonVideoCheckBox.blockSignals(True)
+        self.tab.ui.skeletonVideoCheckBox.setChecked(True)
+        self.tab.ui.skeletonVideoCheckBox.blockSignals(False)
+        self.tab.ui.frameSlider.blockSignals(True)
+        self.tab.ui.frameSlider.setValue(11)
+        self.tab.ui.frameSlider.blockSignals(False)
+        self.tab._fast_analysis = True
+        self.tab._analysis_preview_at = float('inf')
+        with patch.object(self.tab.pose_estimater_2, 'getPersonDf', return_value=self.pd.DataFrame()), \
+                patch.object(self.tab, 'phaseDetection') as phase, \
+                patch.object(self.tab, 'updateFrame'), \
+                patch.object(self.tab, '_complete_video_analysis'):
+            self.tab.analyzeFrame()
+        phase.assert_called_once_with(11)
+
     def test_replay_restores_mer_br_without_roi_or_skeleton(self):
         payload = {'Keyframes': {'preparation_frame': 2, 'FC': {'frame': 4},
                     'MER': {'frame': 7, 'shoulder_angle': 160.}, 'BR': {'frame': 10, 'wrist_speed': 15.}}}
@@ -262,28 +329,78 @@ class PitchReplayTests(unittest.TestCase):
         self.set_poses()
         self.tab.image_drawer.setShowSkeleton(True)
         self.tab.image_drawer_2.setShowSkeleton(True)
-        self.tab.show_br_points, self.tab.br_points = True, [(100, 100)]
-        with patch.object(self.tab, 'showImage') as show, \
-             patch.object(self.tab, '_draw_br_points', side_effect=lambda image: image * 0):
+        self.tab.show_br_points = False
+        with patch.object(self.tab, 'showImage') as show:
             self.tab.updateFrame(frame_num=4)
         raw = self.tab.video_loader.video_frames[4]
         self.np.testing.assert_array_equal(show.call_args_list[0].args[0], raw)
         self.assertFalse(self.np.array_equal(show.call_args_list[1].args[0], raw))
 
-    def test_keyframe_thumbnail_and_heading_pause_and_seek(self):
+    def test_release_checkbox_draws_and_clears_without_changing_source_frames(self):
+        self.set_poses()
+        self.set_events()
+        self.tab.br_points = [(100, 100)]
+        raw = self.tab.video_loader.video_frames[4].copy()
+        self.tab.ui.frameSlider.setValue(4)
+        with patch.object(self.tab, 'showImage') as show:
+            self.tab.ui.showBR_checkBox.setChecked(True)
+            self.assertFalse(self.np.array_equal(show.call_args_list[-2].args[0], raw))
+            self.tab.ui.showBR_checkBox.setChecked(False)
+            self.np.testing.assert_array_equal(show.call_args_list[-2].args[0], raw)
+        self.np.testing.assert_array_equal(self.tab.video_loader.video_frames[4], raw)
+        self.assertEqual(self.tab.br_points, [(100, 100)])
+        self.tab.ui.frameSlider.setValue(11)
+        self.assertFalse(self.tab.ui.showBR_checkBox.isChecked())
+
+    def test_left_hand_events_measurements_and_overlays_use_right_leg_left_arm(self):
+        from Src.UI_Control.tests.test_pitch_events import pitch_rows
+        rows = pitch_rows()
+        for row in rows:
+            p = self.np.array(row['keypoints'])
+            p[:, 0] = 640 - p[:, 0]
+            for a, b in ((5, 6), (7, 8), (9, 10), (11, 12), (13, 14),
+                         (15, 16), (20, 21), (22, 23), (24, 25)):
+                p[[a, b]] = p[[b, a]]
+            row['keypoints'] = p.tolist()
+        self.tab.ui.pitchInput_L.setChecked(True)
+        self.tab.pose_estimater_2.setProcessedData(self.pd.DataFrame(rows))
+        loader = self.tab.video_loader
+        loader.total_frames = len(rows)
+        loader.video_frames = loader.video_frames_2 = [loader.video_frames[0]] * len(rows)
+        for frame in range(len(rows)):
+            self.tab.pose_analyzer_2.addAnalyzeInfo(frame)
+            self.tab.phaseDetection(frame)
+        self.assertEqual((self.tab.preparation_frame, self.tab.foot_contact_frame,
+                          self.tab.max_shoulder_angle_frame, self.tab.wrist_speed_frame), (2, 10, 15, 17))
+        data = self.tab._get_frame_analysis_data(17)
+        self.assertGreater(data['wrist_speed_2d'], 0)
+        self.assertEqual(self.tab.image_drawer_2.pitch_joints.wrist, 9)
+        self.assertEqual(self.tab.image_drawer_2.pitch_joints.knee, 14)
+        self.assertGreater(self.tab.image_drawer_2._calculate_stride_distance(10), 0)
+        self.assertGreater(self.tab.image_drawer_2._calculate_extension_distance(17), 0)
+        self.assertTrue(self.np.isfinite(self.tab.max_shoulder_angle_value))
+
+    def test_only_keyframe_headings_pause_and_seek(self):
         from PyQt5.QtCore import Qt
         from PyQt5.QtTest import QTest
         self.set_events()
         self.set_poses()
         self.tab._render_keyframe_results()
         self.tab._play_timer = Mock()
-        self.tab.is_play = True
-        QTest.mouseClick(self.tab.ui.merView.viewport(), Qt.LeftButton)
-        self.assertEqual(self.tab.ui.frameSlider.value(), 7)
-        self.assertFalse(self.tab.is_play)
-        self.tab._play_timer.stop.assert_called()
-        self.tab.ui.release_ptn.click()
-        self.assertEqual(self.tab.ui.frameSlider.value(), 10)
+        for frame, view, button in ((4, self.tab.ui.fcView, self.tab.ui.footContact_ptn),
+                                    (7, self.tab.ui.merView, self.tab.ui.maxER_ptn),
+                                    (10, self.tab.ui.brView, self.tab.ui.release_ptn)):
+            self.tab.ui.frameSlider.setValue(0)
+            self.tab.is_play = True
+            self.tab._play_timer.stop.reset_mock()
+            QTest.mouseClick(view.viewport(), Qt.LeftButton)
+            self.assertEqual(self.tab.ui.frameSlider.value(), 0)
+            self.assertTrue(self.tab.is_play)
+            self.tab._play_timer.stop.assert_not_called()
+            button.click()
+            self.assertEqual(self.tab.ui.frameSlider.value(), frame)
+            self.assertFalse(self.tab.is_play)
+            self.tab._play_timer.stop.assert_called()
 
     def test_single_side_replay_remaps_paired_timeline_to_source_frames(self):
         self.tab.single_video_mode = True

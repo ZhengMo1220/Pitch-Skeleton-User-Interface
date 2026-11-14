@@ -1,5 +1,7 @@
 # Pitch-Skeleton-User-Interface
 
+只需監看 1–5 台 FLIR 即時畫面（不做同步或骨架分析）：雙擊 `start_flir_preview.bat`，操作說明見 [DEVELOPMENT.md〈FLIR 多相機即時預覽〉](docs/DEVELOPMENT.md)。
+
 棒球投手骨架分析系統：雙台 FLIR 高速相機同步錄影，以 YOLO + ViTPose 偵測 2D 骨架，並以雙相機三角測量重建 3D 骨架。
 
 > 開發者／維護者請另外參考 [DEVELOPMENT.md](docs/DEVELOPMENT.md)（環境問題排查、硬體細節、系統設計背景），相機校正細節見 [CALIBRATION.md](docs/CALIBRATION.md)。
@@ -35,6 +37,17 @@ Db\pretrain\
 ├─ yolov8_s_syncbn_fast_8xb16-500e_coco_20230117_180101-5aa5f0f1.pth ← 人物偵測（程式預設使用）
 └─ 其他 .pth（備用模型）
 ```
+
+人物偵測器預設為 YOLOv8s。另可試用 YOLO26（`yolo26m`／`yolo26l`／`yolo26x`），尚未與 YOLOv8s 實機比較，**不在安裝包與鎖定檔中**，需要時另外安裝：
+
+```
+conda activate Pitcher
+pip install --no-deps ultralytics==8.4.202 ultralytics-thop==2.2.5
+cd Db\pretrain
+python -c "from ultralytics import YOLO; YOLO('yolo26m.pt')"
+```
+
+再於啟動前設定環境變數，例如 `set PITCH_DETECTOR=yolo26m`；對照表在 `Src/pose/person_detector.py`。
 
 ### 2. 建立 conda 環境
 
@@ -113,7 +126,7 @@ conda activate Pitcher
 python Src/UI_Control/main.py
 ```
 
-也可以直接雙擊專案根目錄的 `start.bat`，它會自動啟動 Pitcher 環境並切換到正確目錄。
+也可以直接雙擊專案根目錄的 `start.bat`，它會自動啟動 Pitcher 環境並切換到正確目錄。`start.bat`、`start_calibrate.bat`、`start_flir_preview.bat` 雙擊後黑色命令視窗只閃一下就隱藏；程式輸出寫到 `Db\Logs\<bat 名稱>.log`（每次啟動覆蓋），程式無法啟動或異常結束時會跳出訊息視窗，告知 log 位置。
 
 | 分頁 | 用途 |
 |---|---|
@@ -125,6 +138,8 @@ python Src/UI_Control/main.py
 雙相機錄影需接 **GPIO 同步線**（正面相機為 primary），且兩台相機需接在**不同的 USB 控制器**上（單台 179 FPS 約佔 3 Gbps）。
 
 ## 相機校正
+
+第一次到場請依 [CALIBRATION.md 第 9 節〈實際校正操作單〉](docs/CALIBRATION.md) 執行：列出內參、各種外參方法、道具、照片數、左右投相機設定，以及最後場地原點／坐標軸與實尺驗證。棋盤格新預設為 **8 × 7 內角點、每格 100 × 100 mm**；木框可先用多張照片校正兩面實際角度，再做外參。
 
 新架設或移動相機後需要重新校正，結果自動存到 `Db\Calibration\`，錄影時會把當下的校正值一起存進該筆錄影資料夾。
 

@@ -16,6 +16,7 @@ from Src.paths import CALIB_PHOTO_DIR, MANUAL_RECORD_DIR
 from Src.UI_Control.forms.camera_ui import Ui_camera_ui
 from datetime import datetime
 from Src.cameras.video_control import Camera
+from Src.cameras.pitch_profiles import save_recording_context
 from Src.UI_Control.widgets.camera_settings import CameraSettingsPanel
 
 class PoseCameraTabControl(QWidget):
@@ -119,9 +120,14 @@ class PoseCameraTabControl(QWidget):
         """Toggle the camera on/off based on checkbox state."""
         if state == 2:
             # frame_width, frame_height, fps = 
-            self.photo_dir = None
-            self.camera.toggleCamera(True)
+            try:
+                self.camera.toggleCamera(True)
+            except Exception as exc:
+                self.ui.cameraCheckBox.setChecked(False)
+                QMessageBox.warning(self, "無法開啟相機", str(exc))
+                return
             # self.ui.ResolutionLabel.setText(f"(0, 0) - ({frame_width} x {frame_height}), FPS: {fps}")
+            self.photo_dir = None  # 重新開相機視為新的機位，照片放新資料夾
             self.timer.start(1)
         else:
             self.camera.toggleCamera(False)
@@ -141,6 +147,9 @@ class PoseCameraTabControl(QWidget):
         # 手動錄影不是投球資料，放在 Record 之外；實際幀率以影片本身為準
         output_dir = f'{MANUAL_RECORD_DIR.as_posix()}/{current_time}'
         os.makedirs(output_dir, exist_ok=True)
+        thread = self.camera.video_thread
+        if thread is not None:
+            save_recording_context(output_dir, self.camera.pitch_hand, thread.serial_front, thread.serial_side)
         video_filename = os.path.join(output_dir, f'CF_{current_time}.mp4')
         video_filename_2 = os.path.join(output_dir, f'CS_{current_time}.mp4')
         self.ui.showSkeletonCheckBox.setChecked(False)
@@ -168,8 +177,8 @@ class PoseCameraTabControl(QWidget):
             return
 
         if self.photo_dir is None:
-            self.photo_dir = f'{CALIB_PHOTO_DIR.as_posix()}/{datetime.now().strftime("%Y%m%d_%H%M")}'
-        output_dir = self.photo_dir
+            self.photo_dir = CALIB_PHOTO_DIR / datetime.now().strftime("%Y%m%d_%H%M")
+        output_dir = str(self.photo_dir)
         cf_dir = os.path.join(output_dir, 'cf')
         cs_dir = os.path.join(output_dir, 'cs')
         os.makedirs(cf_dir, exist_ok=True)

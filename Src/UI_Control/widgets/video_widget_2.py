@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QColor, QImage, QPixmap, QPainter, QFont
 from PyQt5.QtCore import Qt, QTimer, QRect
 import numpy as np
-from Src.analysis.pitch_events import detect_pitch_events, EVENT_METHOD
+from Src.analysis.pitch_events import detect_pitch_events, PitchEventDetector, EVENT_METHOD
 from Src.UI_Control.widgets.keyframe_navigation import bind_keyframe_navigation
 import sys
 import cv2
@@ -36,6 +36,8 @@ from Src.UI_Control.viewers.triangulate_3d_viewer import Triangulate3DViewer
 import time
 from Src.analysis.keyframe_export import SimpleKeyframeLogger
 from Src.calibration import calib_store
+from Src.cameras.pitch_profiles import (calibration_path, load_profile_legacy,
+    read_recording_context, recording_calibration, get_profile)
 from Src.analysis.analysis_io import atomic_json, read_optional_json
 from Src.analysis.pose_replay import pose_timeline, pose_input_signature, remap_pose_rows
 from Src.calibration.chessboard_cross.chessboard_metric import DEFAULT_CALIBRATION
@@ -43,6 +45,7 @@ from Src.analysis.metric_session import load_rig
 from Src.UI_Control.viewers.metric_3d_viewer import MetricTriangulate3DViewer
 from Src.analysis.analyze import PoseAnalyzer as PoseAnalyzer2D
 from Src.UI_Control.widgets.video_layout import align_video_layout
+from Src.UI_Control.rendering.release_points import release_point, draw_release_points
 from Src.paths import DB_DIR
 
 class SliderColorOverlay(QWidget):
@@ -165,6 +168,7 @@ class PoseVideoTabControl(QWidget):
         self.setupCalibrationControls()
 
     def setupCalibrationControls(self):
+        self.pitch_hand = 'right'
         self.calibration_combo = QComboBox()
         for label, method in [('PnP 雙機校正', 'pnp'), ('8Points 雙機尺度', '8point'), ('舊版比例（無公制校正）', 'legacy')]:
             self.calibration_combo.addItem(label, method)
@@ -203,7 +207,7 @@ class PoseVideoTabControl(QWidget):
         apply.clicked.connect(lambda: self._apply_selected_calibration(resume=True))
         self.offset_spin.valueChanged.connect(self._invalidate_calibration)
         self.reference_spin.valueChanged.connect(self._invalidate_calibration)
-        self.heel_combo.currentIndexChanged.connect(self._invalidate_calibration)
+        self.heel_combo.currentIndexChanged.connect(self._pitch_hand_changed)
         self.calibration_path.textEdited.connect(self._invalidate_calibration)
         events = QGroupBox('手動修正關鍵幀')
         event_layout = QVBoxLayout(events)
@@ -233,9 +237,28 @@ class PoseVideoTabControl(QWidget):
     def _calibration_method_changed(self):
         method = self.calibration_combo.currentData()
         if method != 'legacy':
-            self.calibration_path.setText(str(DEFAULT_CALIBRATION / method / 'stereo.json'))
+            folder = self.video_loader.folder_path
+            saved = recording_calibration(folder, method) if folder else None
+            self.calibration_path.setText(str(saved or calibration_path(self.pitch_hand, method)))
         self.calibration_path.setEnabled(method != 'legacy')
         self._invalidate_calibration()
+
+    def _pitch_hand_changed(self):
+        hand = 'right' if self.heel_combo.currentData() == 25 else 'left'
+        handler = getattr(self, 'pitch_hand_handler', None)
+        if handler is None or handler(hand):
+            self.set_pitch_hand(hand)
+
+    def set_pitch_hand(self, hand, force=False):
+        self.heel_combo.blockSignals(True)
+        self.heel_combo.setCurrentIndex(self.heel_combo.findData(25 if hand == 'right' else 24))
+        self.heel_combo.blockSignals(False)
+        if hand == self.pitch_hand and not force:
+            return
+        self.pitch_hand = hand
+        for estimator in (self.pose_estimater, self.pose_estimater_2):
+            estimator.setPitchHandId(10 if hand == 'right' else 9)
+        self._calibration_method_changed()
 
     def _browse_calibration(self):
         path, _ = QFileDialog.getOpenFileName(self, '選擇棋盤 stereo.json', self.calibration_path.text(), 'JSON (*.json)')
@@ -308,6 +331,12 @@ class PoseVideoTabControl(QWidget):
             description = '舊版估算：固定倍率，距離與速度不具校正精度。'
         else:
             rig = load_rig(self.calibration_path.text())
+            context = read_recording_context(loader.folder_path)
+            if context:
+                for role, key in (('cf', 'front'), ('cs', 'side')):
+                    serial = rig['intrinsics'][role].get('serial_number')
+                    if serial and str(serial) != str(context.get(key)):
+                        raise ValueError('所選校正檔與錄影當時的相機序號不符。')
             if rig['method'] != method:
                 raise ValueError('所選方法與 stereo.json 的 method 不一致。')
             names = [Path(str(n)).name[:2].lower() for n in (loader.video_name, loader.video_name_2)]
@@ -360,7 +389,7 @@ class PoseVideoTabControl(QWidget):
         metric = method != 'legacy'
         self.ui.FC_label_2.setText('肩髖分離角度:\n' + ('同一後腳3D位移:' if metric else '跨步距離:'))
         self.ui.BR_label_2.setText('右手腕速度:\n' + ('初始腳跟至手腕3D距離:' if metric else '出手點距離:'))
-        self.ui.MER_label_2.setText('手臂平面／軀幹角:' if metric else '肩外旋角度:')
+        self.ui.MER_label_2.setText(('手臂平面／軀幹角:' if metric else '肩外旋角度:') + '\n')
         if method != 'legacy' and not self._valid_stereo_frame(self.reference_spin.value()):
             self._calibration_description += ' 初始幀超出雙目同步範圍，後腳位移將無法計算；請調整初始幀。'
         self._calibration_ready = True
@@ -396,9 +425,12 @@ class PoseVideoTabControl(QWidget):
 
     def _calibrated_phase_detection(self, frame):
         side = self.pose_estimater if self.video_loader.video_name.upper().startswith('CS') else self.pose_estimater_2
+        if not hasattr(self, '_pitch_event_cache'):
+            self._pitch_event_cache = PitchEventDetector()
         result = detect_pitch_events(side.person_df, self.video_loader.video_fps,
             'right' if self.heel_combo.currentData() == 25 else 'left',
-            through_frame=frame, person_id=side.person_id)
+            through_frame=frame, person_id=side.person_id,
+            cache=self._pitch_event_cache, revision=side.pose_revision)
         previous = (self.foot_contact_frame, self.max_shoulder_angle_frame, self.wrist_speed_frame)
         self.preparation_frame, self.foot_contact_frame = result.preparation, result.fc
         self.max_shoulder_angle_frame, self.wrist_speed_frame = result.mer, result.br
@@ -684,6 +716,8 @@ class PoseVideoTabControl(QWidget):
         self.graph_plotter.updateGraph(0)
 
     def resetPhaseDetection(self):
+        self._pitch_event_cache = PitchEventDetector()
+        self._analysis_preview_at = 0.0
         self._phase_last_frame = -1
         self._manual_events = set()
         self._analysis_dirty = False
@@ -761,8 +795,6 @@ class PoseVideoTabControl(QWidget):
         self.ui.showBboxCheckBox.stateChanged.connect(self.toggleShowBbox)
         
         # 釋放點相關按鈕和複選框
-        if hasattr(self.ui, 'resetBRBtn'):
-            self.ui.resetBRBtn.clicked.connect(self.resetBRPoints)
         if hasattr(self.ui, 'showBR_checkBox'):
             self.ui.showBR_checkBox.stateChanged.connect(self.toggleShowBRPoints)
         # self.ui.showAngleCheckBox.stateChanged.connect(self.toggleShowAngleInfo)
@@ -927,8 +959,19 @@ class PoseVideoTabControl(QWidget):
             self.K_F, self.K_S, self.F = snapshot["K_F"], snapshot["K_S"], snapshot["F"]
             print(f"[3D] 使用錄影時的校正快照：正面 SN{snapshot['front']}、側面 SN{snapshot['side']}")
         else:
-            self.K_F, self.K_S, self.F = self.default_calibration
-            print("[3D] 此錄影沒有校正快照，使用程式內建的舊設備參數")
+            context = read_recording_context(folder_path) if folder_path else None
+            if context:
+                raise ValueError('此錄影沒有 F 矩陣快照；請選用錄影時保存的 PnP／8Points 校正，或明確選擇相符的外參檔。')
+            profile = get_profile(self.pitch_hand)
+            calibrated = load_profile_legacy(self.pitch_hand) if profile else None
+            if calibrated is not None:
+                self.K_F, self.K_S, self.F = calibrated['K_F'], calibrated['K_S'], calibrated['F']
+                print(f"[3D] 使用 {self.pitch_hand} 設定的 F 矩陣與相機內參")
+            elif self.pitch_hand == 'left' or profile is not None:
+                raise ValueError('此手別尚無 F 矩陣校正；請設定左右投外參或改用 PnP／8Points。')
+            else:
+                self.K_F, self.K_S, self.F = self.default_calibration
+                print("[3D] 此錄影沒有校正快照，使用程式內建的舊設備參數")
         # PoseAnalyzer 內的 3D 計算在每次三角化時才讀取 K、F，直接更新即可
         for analyzer in (self.pose_analyzer, self.pose_analyzer_2):
             analyzer.viewer3D.K_L, analyzer.viewer3D.K_R, analyzer.viewer3D.F = self.K_S, self.K_F, self.F
@@ -980,6 +1023,20 @@ class PoseVideoTabControl(QWidget):
 
     def updateVideoInfo(self):
         """更新與影片相關的資訊顯示在 UI 上。"""
+        context = read_recording_context(self.video_loader.folder_path)
+        if context:
+            handler = getattr(self, 'pitch_hand_handler', None)
+            if handler is not None and not handler(context['pitch_hand']):
+                self.calibration_status.setText('請先停止錄影再載入不同手別的影片。')
+                return
+            self.set_pitch_hand(context['pitch_hand'])
+            method = self.calibration_combo.currentData()
+            if method == 'legacy' and method not in context.get('calibrations', {}):
+                method = next((m for m in ('pnp', '8point') if m in context.get('calibrations', {})), method)
+                self.calibration_combo.setCurrentIndex(self.calibration_combo.findData(method))
+            saved = recording_calibration(self.video_loader.folder_path, method)
+            if saved and method != 'legacy':
+                self.calibration_path.setText(str(saved))
         self.reset()
         self._calibration_ready = False
         self.frame_offset = self.offset_spin.value()
@@ -1103,12 +1160,12 @@ class PoseVideoTabControl(QWidget):
             self.image_drawer.keyframe_shoulder_hip_angle = angle
             self.image_drawer.keyframe_stride_distance = distance
             self.ui.FC_label.setText(formatted(angle) + '\n' + formatted(distance, 100))
-            self.ui.FC_label_unit.setText('deg\ncm')
+            self.ui.FC_label_unit.setText('°\ncm')
         elif keyframe_type == 'max_shoulder_er':
             angle = value('shoulder_angle')
             self.image_drawer.keyframe_shoulder_angle = angle
-            self.ui.MER_label_3.setText(formatted(angle))
-            self.ui.MER_label_unit.setText('deg')
+            self.ui.MER_label_3.setText(formatted(angle) + '\n')
+            self.ui.MER_label_unit.setText('°\n')
         elif keyframe_type == 'release':
             speed = value('wrist_speed')
             distance = self.image_drawer._calculate_extension_distance(frame_num)
@@ -1236,6 +1293,8 @@ class PoseVideoTabControl(QWidget):
     def _updateFrame(self, frame, frame_2, frame_num: int):
         """內部更新幀顯示，直接使用已獲取的圖像數據"""
         if self.viewer3d is not None:
+            self.viewer3d.set_release_point(self.wrist_speed_frame, self.pose_estimater.pitch_hand_id,
+                                            self.show_br_points)
             self.viewer3d.set_frame(frame_num)  # Clear the skeleton when this frame has no valid reconstruction.
             if not getattr(self.viewer3d, 'metric', False) and frame_num not in self.viewer3d.all_3d_frames:
                 for visual in (self.viewer3d.head_lines, self.viewer3d.left_lines,
@@ -1244,9 +1303,9 @@ class PoseVideoTabControl(QWidget):
         drawed_img = self.image_drawer.drawInfo(frame, frame_num, self.pose_estimater.kpt_buffer)
         drawed_img_2 = self.image_drawer_2.drawInfo(frame_2, frame_num, self.pose_estimater_2.kpt_buffer)
         
-        # 如果啟用顯示釋放點，則在 frame_2 上繪製
-        if self.show_br_points and self.br_points:
-            drawed_img_2 = self._draw_br_points(drawed_img_2)
+        if self.show_br_points:
+            drawed_img = draw_release_points(drawed_img, [release_point(self.pose_estimater, self.wrist_speed_frame)])
+            drawed_img_2 = draw_release_points(drawed_img_2, [release_point(self.pose_estimater_2, self.wrist_speed_frame)])
         
         self.showImage(drawed_img, self.view_scene, self.ui.FrameView)
         self.showImage(drawed_img_2, self.curve_scene, self.ui.FrameView_2)
@@ -1299,7 +1358,7 @@ class PoseVideoTabControl(QWidget):
         self._analysis_dirty = True
         self._set_analysis_running(True)
         self.calibration_status.setText('正在分析 0 / ' + str(self.video_loader.total_frames) + '，完成後自動儲存 JSON。')
-        self._analysis_timer.start(1)
+        self._analysis_timer.start(0)
 
     def _set_analysis_running(self, running):
         self._analysis_running = running
@@ -1335,14 +1394,20 @@ class PoseVideoTabControl(QWidget):
                 a, b = {'keypoints': left.iloc[0]['keypoints']}, {'keypoints': right.iloc[0]['keypoints']}
                 self.viewer3d.add_2d_keypoints(a, b, frame_num=frame_num)
                 self.pose_analyzer.addAnalyzeInfo(frame_num, a, b)
-        self.phaseDetection(frame_num)
         self._analysis_frames.add(frame_num)
         self._analysis_dirty = True
+        # Infer/reconstruct every frame, but only redraw expensive views at
+        # 10 Hz. The last frame always updates events and the final preview.
+        if (time.perf_counter() < self._analysis_preview_at
+                and frame_num != loader.total_frames - 1):
+            return
+        self.phaseDetection(frame_num)
         self.ui.frameSlider.blockSignals(True)
         self.ui.frameSlider.setValue(frame_num)
         self.ui.frameSlider.blockSignals(False)
         self.ui.frameNumLabel.setText(f'{frame_num}/{loader.total_frames - 1}')
         self._updateFrame(frame, frame_2, frame_num)
+        self._analysis_preview_at = time.perf_counter() + 0.1
 
     def _analyze_next_frame(self):
         if not self._analysis_running:
@@ -1468,98 +1533,13 @@ class PoseVideoTabControl(QWidget):
             # 原景模式：顯示全部幀
             self.graph_plotter.zoomIn(0, total_frames)
 
-    def _draw_br_points(self, image: np.ndarray) -> np.ndarray:
-        """在圖像上繪製釋放點 (BR Points)
-        
-        Args:
-            image: 輸入圖像 (H x W x 3, BGR)
-            
-        Returns:
-            繪製後的圖像
-        """
-        if not self.br_points or len(self.br_points) == 0:
-            return image
-        
-        result = image.copy()
-        
-        # 顏色配置
-        COLOR_POINT = (0, 0, 255)        # 紅色 - 個別點
-        COLOR_CENTER = (0, 0, 255)       # 藍色 - 中心位置
-        COLOR_CIRCLE = (255, 255, 255)       # 藍色 - 外圍圓
-        POINT_RADIUS = 10
-        
-        # 繪製每個釋放點
-        for i, point_data in enumerate(self.br_points):
-            if point_data is None or len(point_data) < 2:
-                continue
-            
-            try:
-                x, y = int(point_data[0]), int(point_data[1])
-                
-                # 檢查座標是否在圖像範圍內
-                if 0 <= x < result.shape[1] and 0 <= y < result.shape[0]:
-                    # 繪製點
-                    cv2.circle(result, (x, y), POINT_RADIUS, COLOR_POINT, -1)
-                    # 繪製邊框
-                    cv2.circle(result, (x, y), POINT_RADIUS, COLOR_CIRCLE, 2)
-                    # 繪製序號
-                    cv2.putText(result, str(i+1), (x - 5, y - POINT_RADIUS - 5),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-            except (ValueError, TypeError):
-                continue
-        
-        # # 如果有多個點，繪製中心位置
-        # if len(self.br_points) > 1:
-        #     try:
-        #         points_arr = np.array([p[:2] for p in self.br_points if p is not None and len(p) >= 2], dtype=np.float32)
-        #         if len(points_arr) > 0:
-        #             center = np.mean(points_arr, axis=0).astype(int)
-        #             cv2.circle(result, tuple(center), POINT_RADIUS + 3, COLOR_CENTER, -1)
-        #             cv2.circle(result, tuple(center), POINT_RADIUS + 3, (255, 255, 255), 2)
-        #             # 添加統計信息
-        #             cv2.putText(result, f"BR Points: {len(self.br_points)}", (10, 30),
-        #                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-        #             cv2.putText(result, f"Center: ({center[0]}, {center[1]})", (10, 60),
-        #                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        #     except (ValueError, TypeError):
-        #         pass
-        # else:
-        #     # 單個點的情況下，显示點數和座標
-        #     if len(self.br_points) == 1 and self.br_points[0] is not None and len(self.br_points[0]) >= 2:
-        #         x, y = int(self.br_points[0][0]), int(self.br_points[0][1])
-        #         cv2.putText(result, f"BR Points: 1", (10, 30),
-        #                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-        #         cv2.putText(result, f"Position: ({x}, {y})", (10, 60),
-        #                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        
-        return result
-
-    def resetBRPoints(self):
-        """清除所有釋放點記錄"""
-        reply = QMessageBox.question(
-            self, "確認", "確定要清除所有釋放點 (BR) 記錄嗎?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reply == QMessageBox.Yes:
-            self.br_points = []
-            print("✓ 已清除所有釋放點記錄")
-            # 如果當前正在顯示，則刷新畫面
-            if self.show_br_points:
-                self.updateFrame(self.ui.frameSlider.value())
-            QMessageBox.information(self, "成功", "所有釋放點記錄已清除")
-
     def toggleShowBRPoints(self, state: int):
-        """切換顯示釋放點
-        
-        Args:
-            state: 複選框狀態 (2=勾選, 0=未勾選)
-        """
         self.show_br_points = (state == 2)
-        if self.show_br_points:
-            print(f"✓ 顯示釋放點 (共 {len(self.br_points)} 個)")
-        else:
-            print("✓ 隱藏釋放點")
-        self.updateFrame(self.ui.frameSlider.value())
+        if self.viewer3d is not None:
+            self.viewer3d.set_release_point(self.wrist_speed_frame, self.pose_estimater.pitch_hand_id,
+                                            self.show_br_points)
+        if self.video_loader.total_frames:
+            self.updateFrame(self.ui.frameSlider.value())
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
