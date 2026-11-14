@@ -66,6 +66,19 @@ class PitchReplayTests(unittest.TestCase):
         self.tab.deleteLater()
         self.app.processEvents()
 
+    def test_video_list_tolerates_missing_record_folder(self):
+        # P1-013: a fresh install has no Db/Record yet; the 2D tab must open with an empty list.
+        missing = self.folder / 'no_record_yet'
+        self.module.PosePitchTabControl.load_video_list(self.tab, str(missing))
+        self.assertEqual(self.tab.tree.topLevelItemCount(), 0)
+        self.assertFalse(missing.exists())
+
+        pitch = self.folder / 'rec' / '20261115_Pitcher01' / '1200_P01'
+        pitch.mkdir(parents=True)
+        (pitch / 'CS_1200_P01.mp4').touch()
+        self.module.PosePitchTabControl.load_video_list(self.tab, str(self.folder / 'rec'))
+        self.assertEqual(self.tab.tree.topLevelItemCount(), 1)
+
     def test_recording_context_restores_left_hand_for_2d(self):
         (self.folder / 'recording_context.json').write_text(json.dumps({
             'schema': 'pitch_recording_v1', 'pitch_hand': 'left',

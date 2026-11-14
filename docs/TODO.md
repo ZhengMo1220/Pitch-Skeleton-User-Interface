@@ -15,8 +15,8 @@
 **【PR #7 合併（2026-11-15，使用者同意）】**
 - 同學 ChocoLa-1484 的 PR #7（12 個 commit，基於當時 main，無舊歷史、無衝突）：FLIR 1–5 台獨立預覽、左右投相機設定、木框 ArUco 與形狀校正、棋盤預設 8×7／100 mm、骨架效能與 UI 主題、YOLO26 偵測器選項、bat 隱藏視窗並寫 `Db\Logs`、GH3 YAML 高度 1084→1080。
 - 合併時調整：(1) 不收 45 MB 簡報 `docs/Proj_Sports_Bullpen_..._楊乃諺.pptx`（公開 repo，原檔仍在 PR 分支）；(2) 新文件併入既有文件：`FIRST_SITE_CALIBRATION.md` → CALIBRATION.md 第 9 節，`FLIR_PREVIEW.md`、`PERFORMANCE_UI_20261030.md` → DEVELOPMENT.md 最後兩節；(3) 本區塊順序還原，PR 刪掉的 PR #6 紀錄補回；(4) **人物偵測器預設維持 YOLOv8s**（使用者選擇），YOLO26 為選用，`ultralytics` 不放進鎖定檔（維持與實驗室環境一致），README 寫明另外安裝方式。
-- 驗證（2026-11-15，使用者筆電）：此機沒有 Pitcher 環境與 Db，改用版本相近的 `Skeleton` 環境（Python 3.8.20、torch 2.0.1+cu118、mmpose 1.3.1；無 mmyolo），PySpin 用只供測試的假模組（此機 SDK 為 4.2，沒有 cp38 wheel）。逐檔獨立程序：main 基準 23 檔 218 項全過；合併後 30 檔 297 項全過（`test_video_3d_replay` 跳過 1 項，main 相同）。`test_pitch_hand_ui` 需要 `Db\Record` 存在，暫建空資料夾測完已刪除，見 P1-013。
-- **待辦**：實驗室主機（Pitcher 環境、真 PySpin）再跑一次全部測試並開主程式；YAML 1080 之後的新錄影與 1080 內參尺寸一致，舊 1084 錄影仍需對應舊內參；YOLO26 與 YOLOv8s 實機比較後再決定是否換預設；修 P1-013。
+- 驗證（2026-11-15，使用者筆電）：此機沒有 Pitcher 環境與 Db，改用版本相近的 `Skeleton` 環境（Python 3.8.20、torch 2.0.1+cu118、mmpose 1.3.1；無 mmyolo），PySpin 用只供測試的假模組（此機 SDK 為 4.2，沒有 cp38 wheel）。逐檔獨立程序：main 基準 24 檔 218 項全過；合併後 30 檔 293 項全過（`test_video_3d_replay` 跳過 1 項，main 相同）。`test_pitch_hand_ui` 當時需要 `Db\Record` 存在（暫建空資料夾測完已刪除），已由 P1-013 修正；修正後不建 Db，30 檔 294 項全過。
+- **待辦**：實驗室主機（Pitcher 環境、真 PySpin）再跑一次全部測試並開主程式；YAML 1080 之後的新錄影與 1080 內參尺寸一致，舊 1084 錄影仍需對應舊內參；YOLO26 與 YOLOv8s 實機比較後再決定是否換預設。
 
 > 以下到 PR #6 紀錄之前，是同學在 PR #7 中寫的交接原文（2026-10-28～11-05），文件連結已改為合併後的位置。
 
@@ -446,7 +446,7 @@
 ### [P1-013] 沒有 `Db\Record` 時主程式開啟即崩潰
 
 - **登記日期**：2026-11-15（合併 PR #7 時由 `test_pitch_hand_ui` 發現）
-- **狀態**：未修正，待使用者同意
+- **狀態**：`FIXED`（2026-11-15，使用者同意）：`load_video_list` 開頭資料夾不存在就留空列表並 return，不主動建立資料夾（錄影時才建立）。回歸測試 `test_pitch_replay.test_video_list_tolerates_missing_record_folder`；`test_pitch_hand_ui` 在沒有 Db 的電腦也通過。
 - **症狀**：`Main()` 建立 2D 分頁時 `FileNotFoundError: ...\Db\Record`。
 - **成因**：`pitch_widget.load_video_list()` 直接 `os.listdir(root_folder)`，沒有先確認資料夾存在；main 在 PR #7 之前就是如此（建構子、錄影後與重新整理共三處呼叫）。
 - **影響**：照 README 全新安裝、還沒錄過影的電腦，第一次開主程式就當掉；實驗室主機已有 `Db\Record`，所以沒出現過。

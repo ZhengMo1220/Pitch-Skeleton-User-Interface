@@ -1891,6 +1891,9 @@ class PosePitchTabControl(QWidget):
         """掃描所有子資料夾並分類加入 Tree"""
         video_exts = (".mp4", ".avi", ".mov", ".mkv", ".wmv")
         self.tree.clear()  # 清空 TreeWidget
+        if not os.path.isdir(root_folder):
+            # 全新安裝尚未錄影時 Db/Record 不存在；列表留空，錄影時才會建立（P1-013）
+            return
         for pitcher_folder in os.listdir(root_folder):
             pitcher_path = os.path.join(root_folder, pitcher_folder)
             if not os.path.isdir(pitcher_path):
